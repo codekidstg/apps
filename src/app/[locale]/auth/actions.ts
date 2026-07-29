@@ -55,7 +55,7 @@ const ROLE_REDIRECTS: Record<string, string> = {
 
 // ── Action login ─────────────────────────────────────────────────
 export async function login(formData: FormData) {
-  const ip = getClientIp();
+  const ip = await getClientIp();
 
   // 1. Rate limit
   const { allowed, remaining, resetIn } = checkRateLimit(ip);

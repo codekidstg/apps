@@ -20,9 +20,9 @@ export default async function QuestePage({ params }: { params: Promise<{ lessonI
 
   const { data: lesson } = await supabase
     .from("lessons")
-    .select("id, title, xp_reward, chapter_id")
+    .select("id, title, xp_reward, chapter_id, theme_id")
     .eq("id", lessonId)
-    .single<{ id: string; title: string; xp_reward: number; chapter_id: string }>();
+    .single<{ id: string; title: string; xp_reward: number; chapter_id: string; theme_id: string | null }>();
   if (!lesson) notFound();
 
   const { data: chapter } = await supabase
@@ -42,7 +42,7 @@ export default async function QuestePage({ params }: { params: Promise<{ lessonI
     .order("order_index");
   const blocks = (blocksRaw ?? []) as Block[];
 
-  type LessonRow = { id: string; title: string; order_index: number; chapter_id: string };
+  type LessonRow = { id: string; title: string; order_index: number; chapter_id: string; theme_id?: string };
   const { data: allLessons } = await supabase
     .from("lessons")
     .select("id, title, order_index, chapter_id")

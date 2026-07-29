@@ -12,9 +12,11 @@ function NeuronCanvas() {
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
+    const safeCanvas = canvas;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const ctxRaw = safeCanvas.getContext("2d");
+    if (!ctxRaw) return;
+    const ctx = ctxRaw;
 
     let raf: number;
     let W = 0, H = 0;
@@ -27,10 +29,10 @@ function NeuronCanvas() {
     let nodes: Node[] = [];
 
     function resize() {
-      W = canvas.offsetWidth;
-      H = canvas.offsetHeight;
-      canvas.width  = W * devicePixelRatio;
-      canvas.height = H * devicePixelRatio;
+      W = safeCanvas.offsetWidth;
+      H = safeCanvas.offsetHeight;
+      safeCanvas.width  = W * devicePixelRatio;
+      safeCanvas.height = H * devicePixelRatio;
       ctx.scale(devicePixelRatio, devicePixelRatio);
     }
 
@@ -89,7 +91,7 @@ function NeuronCanvas() {
     }
 
     const ro = new ResizeObserver(() => { resize(); });
-    ro.observe(canvas);
+    ro.observe(safeCanvas);
     resize();
     init();
     draw();

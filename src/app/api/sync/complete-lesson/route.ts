@@ -22,11 +22,12 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
 
   // Merge optimiste : on récupère le score existant et on garde le MAX
-  const { data: existing } = await (admin.from("lesson_progress") as any)
+  const { data: existingRaw } = await (admin.from("lesson_progress") as any)
     .select("score, status")
     .eq("student_id", student.id)
     .eq("lesson_id", lessonId)
-    .maybeSingle<{ score: number; status: string }>();
+    .maybeSingle();
+  const existing = existingRaw as { score: number; status: string } | null;
 
   const mergedScore = existing ? Math.max(existing.score ?? 0, score) : score;
   const alreadyCompleted = existing?.status === "completed";

@@ -27,10 +27,11 @@ export default async function ThemePage({
 
   const admin = createAdminClient();
 
-  const { data: theme } = await (admin.from("themes") as any)
+  const { data: themeRaw } = await (admin.from("themes") as any)
     .select("id, title, level")
     .eq("id", themeId)
-    .single<{ id: string; title: string; level: string }>();
+    .single();
+  const theme = themeRaw as { id: string; title: string; level: string } | null;
   if (!theme) redirect("/fr/eleve");
 
   const { data: chaptersRaw } = await admin
