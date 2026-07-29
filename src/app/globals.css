@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Palette CodeKids — Navy & Ambre ───────────────────────────── */
+  --color-brand-navy:         #1B2D5E;
+  --color-brand-navy-light:   #EEF1F8;
+  --color-brand-navy-dark:    #111E40;
+
+  --color-brand-amber:        #FDB813;
+  --color-brand-amber-light:  #FEF8E1;
+  --color-brand-amber-dark:   #D99F0F;
+
+  /* alias legacy (pour les composants qui utilisent encore brand-orange/brand-blue) */
+  --color-brand-orange:       #FDB813;
+  --color-brand-orange-light: #FEF8E1;
+  --color-brand-orange-dark:  #D99F0F;
+  --color-brand-blue:         #1B2D5E;
+  --color-brand-blue-light:   #EEF1F8;
+  --color-brand-blue-mid:     #2D4A8A;
+  --color-brand-blue-soft:    #8DA0C4;
+
+  /* Surfaces */
+  --color-page:               #F5F7FA;
+  --color-card:               #FFFFFF;
+  --color-cream:              #F5F7FA;
+  --color-cream-border:       #E2E8F0;
+
+  /* Texte */
+  --color-ink:                #1B2D5E;
+  --color-ink-muted:          #64748B;
+  --color-ink-light:          #94A3B8;
+
+  /* Niveaux */
+  --color-explorer:           #10B981;
+  --color-explorer-light:     #F0FDF4;
+  --color-explorer-border:    #D1FAE5;
+
+  --color-builder:            #7C3AED;
+  --color-builder-light:      #F5F3FF;
+  --color-builder-border:     #EDE9FE;
+
+  --color-architect:          #FDB813;
+  --color-architect-light:    #FEF8E1;
+  --color-architect-border:   #FDE68A;
+
+  --color-gold:               #FDB813;
+
+  /* Typographie */
+  --font-display: "Nunito", system-ui, sans-serif;
+  --font-body:    "Nunito", system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-body);
+    color: #1B2D5E;
+    background-color: #F5F7FA;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 900;
+    letter-spacing: -0.025em;
+    color: #1B2D5E;
+  }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(120px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in { animation: slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* ── Lesson prose (cours élève) — dark gaming ───────────────────────────── */
+.lesson-prose { color: #e2e8f0; line-height: 1.75; font-size: 1rem; }
+
+.lesson-prose h1 { color: white; font-size: 1.5rem; font-weight: 900; margin: 0 0 1rem; letter-spacing: -0.02em; }
+.lesson-prose h2 { color: white; font-size: 1.2rem; font-weight: 900; margin: 1.75rem 0 0.75rem; padding-bottom: 0.4rem; border-bottom: 2px solid #334155; }
+.lesson-prose h3 { color: #FDB813; font-size: 1rem; font-weight: 800; margin: 1.25rem 0 0.5rem; }
+
+.lesson-prose p  { margin: 0 0 0.875rem; color: #94a3b8; }
+.lesson-prose strong { color: white; font-weight: 700; }
+.lesson-prose em { color: #64748b; font-style: italic; }
+
+.lesson-prose ul { margin: 0.5rem 0 1rem 0; padding-left: 1.25rem; list-style: none; }
+.lesson-prose ul li { position: relative; padding-left: 1rem; margin-bottom: 0.35rem; color: #94a3b8; }
+.lesson-prose ul li::before { content: "▸"; position: absolute; left: -0.25rem; color: #FDB813; font-size: 0.75rem; top: 0.15rem; }
+
+.lesson-prose ol { margin: 0.5rem 0 1rem 0; padding-left: 1.5rem; }
+.lesson-prose ol li { margin-bottom: 0.35rem; color: #94a3b8; }
+
+.lesson-prose code { color: #FDB813; background: #0f172a; padding: 0.15em 0.45em; border-radius: 0.35rem; font-size: 0.875em; font-family: monospace; border: 1px solid #1e293b; }
+.lesson-prose pre { background: #0f172a; border: 1px solid #1e293b; border-radius: 0.875rem; padding: 1.25rem 1.5rem; overflow-x: auto; margin: 1rem 0; }
+.lesson-prose pre code { background: transparent; color: #FDB813; padding: 0; font-size: 0.875rem; line-height: 1.7; border: none; }
+
+.lesson-prose blockquote { border-left: 3px solid #FDB813; margin: 1rem 0; padding: 0.75rem 1rem; background: #FDB81310; border-radius: 0 0.75rem 0.75rem 0; color: #94a3b8; font-style: italic; }
+
+.lesson-prose hr { border: none; border-top: 1px solid #334155; margin: 1.5rem 0; }
+
+/* Tables */
+.lesson-prose table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.25rem; border-radius: 0.75rem; overflow: hidden; border: 1px solid #334155; }
+.lesson-prose thead th { background: #0f172a; color: #FDB813; font-weight: 800; padding: 0.65rem 1rem; text-align: left; font-size: 0.875rem; }
+.lesson-prose tbody tr:nth-child(even) { background: #0f172a; }
+.lesson-prose tbody tr:nth-child(odd)  { background: #1e293b; }
+.lesson-prose tbody td { padding: 0.6rem 1rem; color: #94a3b8; font-size: 0.875rem; border-bottom: 1px solid #334155; }
+.lesson-prose tbody tr:last-child td { border-bottom: none; }

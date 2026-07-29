@@ -1,0 +1,38 @@
+{
+  "navigation": {
+    "home": "Accueil",
+    "levels": "Les niveaux",
+    "pricing": "Tarifs",
+    "about": "À propos",
+    "login": "Connexion",
+    "cta": "Commencer l'aventure"
+  },
+  "hero": {
+    "tagline": "Bâtis ta cité numérique",
+    "subtitle": "Apprends à coder, comprendre les algorithmes et protéger le monde numérique — à travers des quêtes et des jeux pensés pour toi.",
+    "cta_primary": "Commencer l'aventure",
+    "cta_secondary": "Voir les niveaux"
+  },
+  "levels": {
+    "title": "Trois chemins, une cité à bâtir",
+    "explorers": {
+      "name": "Les Explorateurs",
+      "ages": "10 – 12 ans",
+      "description": "Pense comme un algorithme. Résous des puzzles, programme des blocs, découvre la logique du code sans écrire une seule ligne."
+    },
+    "builders": {
+      "name": "Les Bâtisseurs",
+      "ages": "12 – 15 ans",
+      "description": "Passe des blocs au texte. Écris tes premiers programmes en Python, crée des pages web et apprends à naviguer sur internet en sécurité."
+    },
+    "architects": {
+      "name": "Les Architectes",
+      "ages": "15 – 18 ans",
+      "description": "Conçois, crée, protège. Maîtrise Python et JavaScript, explore les structures de données, la cybersécurité éthique et les bases de l'IA."
+    }
+  },
+  "footer": {
+    "tagline": "Une aventure numérique pour chaque enfant.",
+    "rights": "© 2025 CodeKids. Tous droits réservés."
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "codekids-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "codekids-vitrine-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/roland/codekids-vitrine",
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3011"
+      ],
+      "port": 3011
+    },
+    {
+      "name": "lesson-generator",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4242",
+        "--directory",
+        "/private/tmp/claude-501/-Users-roland-codekids/055e92b4-f881-4898-b01b-7470f382f9c2/scratchpad"
+      ],
+      "port": 4242
+    }
+  ]
+}
