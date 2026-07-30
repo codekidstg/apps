@@ -30,6 +30,7 @@ export async function submitSessionReport(formData: FormData) {
 
   const session_id       = formData.get("session_id") as string | null;
   const student_id       = formData.get("student_id") as string | null;
+  const occurrence_date  = formData.get("occurrence_date") as string | null;
   const advancement      = formData.get("advancement") as string;
   const engagement       = formData.get("engagement") as string;
   const difficulty_notes = formData.get("difficulty_notes") as string | null;
@@ -41,6 +42,7 @@ export async function submitSessionReport(formData: FormData) {
     session_id:       session_id || null,
     teacher_id:       user.id,
     student_id:       student_id || null,
+    occurrence_date:  occurrence_date || null,
     advancement,
     engagement,
     difficulty_notes: difficulty_notes || null,

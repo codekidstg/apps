@@ -51,32 +51,35 @@ export default async function RapportsPage() {
 
   // Charger les rapports existants pour ce prof
   const { data: reportsRaw } = await (admin.from("session_reports") as any)
-    .select("id, session_id, reported_at, advancement, engagement, difficulty_notes, help_methods, next_session_note")
+    .select("id, session_id, occurrence_date, reported_at, advancement, engagement, difficulty_notes, help_methods, next_session_note")
     .eq("teacher_id", user.id)
     .order("reported_at", { ascending: false });
 
-  // Index des rapports par session_id (plusieurs occurrences peuvent partager le même session_id)
-  // On garde le dernier rapport par session_id + date de séance (approximatif : par session_id)
-  const reportsBySessionId = new Map<string, any>();
+  // Index par (session_id, occurrence_date) pour que chaque occurrence soit unique
+  const reportsByKey = new Map<string, any>();
   for (const r of (reportsRaw ?? [])) {
-    if (!reportsBySessionId.has(r.session_id ?? "standalone")) {
-      reportsBySessionId.set(r.session_id ?? "standalone", r);
-    }
+    const key = `${r.session_id ?? ""}|${r.occurrence_date ?? ""}`;
+    if (!reportsByKey.has(key)) reportsByKey.set(key, r);
   }
 
-  const items = past.map(occ => ({
-    sessionId:   occ.sessionId,
-    title:       occ.title,
-    dateStr:     occ.at.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
-    dayShort:    WEEKDAY_SHORT[occ.at.getDay()],
-    day:         occ.at.getDate(),
-    monthShort:  occ.at.toLocaleDateString("fr-FR", { month: "short" }),
-    time:        occ.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
-    duration:    occ.duration_min,
-    studentName: occ.studentName,
-    recurring:   occ.recurring,
-    report:      reportsBySessionId.get(occ.sessionId) ?? null,
-  }));
+  const items = past.map(occ => {
+    const occDate = occ.at.toISOString().slice(0, 10);
+    const key = `${occ.sessionId}|${occDate}`;
+    return {
+      sessionId:      occ.sessionId,
+      occurrenceDate: occDate,
+      title:          occ.title,
+      dateStr:        occ.at.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+      dayShort:       WEEKDAY_SHORT[occ.at.getDay()],
+      day:            occ.at.getDate(),
+      monthShort:     occ.at.toLocaleDateString("fr-FR", { month: "short" }),
+      time:           occ.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+      duration:       occ.duration_min,
+      studentName:    occ.studentName,
+      recurring:      occ.recurring,
+      report:         reportsByKey.get(key) ?? null,
+    };
+  });
 
   return <RapportsClient items={items} />;
 }

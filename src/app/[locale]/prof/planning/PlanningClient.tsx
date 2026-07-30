@@ -8,6 +8,7 @@ const SessionReportForm = dynamic(() => import("@/components/prof/SessionReportF
 type PastSession = {
   sessionId?: string;
   studentId?: string;
+  occurrenceDate: string;
   title: string;
   dateStr: string;
   time: string;
@@ -53,6 +54,7 @@ export default function PastSessionsList({ sessions }: { sessions: PastSession[]
         <SessionReportForm
           sessionId={openReport.sessionId}
           studentId={openReport.studentId ?? undefined}
+          occurrenceDate={openReport.occurrenceDate}
           sessionTitle={openReport.title}
           sessionDate={`${openReport.dateStr} à ${openReport.time}`}
           onClose={() => setOpenReport(null)}

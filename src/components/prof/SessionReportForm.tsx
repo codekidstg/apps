@@ -8,6 +8,7 @@ type Props = {
   studentId?: string;
   sessionTitle: string;
   sessionDate: string;
+  occurrenceDate: string; // ISO date YYYY-MM-DD — identifie l'occurrence exacte
   onClose: () => void;
 };
 
@@ -34,7 +35,7 @@ const HELP_METHODS = [
   { value: "other",       label: "Autre" },
 ];
 
-export default function SessionReportForm({ sessionId, studentId, sessionTitle, sessionDate, onClose }: Props) {
+export default function SessionReportForm({ sessionId, studentId, sessionTitle, sessionDate, occurrenceDate, onClose }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(1);
   const [advancement, setAdvancement] = useState("");
@@ -107,6 +108,7 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
         <form ref={formRef} onSubmit={handleSubmit}>
           {sessionId && <input type="hidden" name="session_id" value={sessionId} />}
           {studentId && <input type="hidden" name="student_id" value={studentId} />}
+          <input type="hidden" name="occurrence_date" value={occurrenceDate} />
 
           <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
 

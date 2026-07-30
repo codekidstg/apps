@@ -310,14 +310,15 @@ export default async function ProfPlanningPage() {
 
       {/* Sessions passées — archive + bouton rapport */}
       <PastSessionsList sessions={past.map(occ => ({
-        sessionId:   occ.sessionId,
-        title:       occ.title,
-        dateStr:     occ.at.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
-        time:        occ.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
-        duration:    occ.duration_min,
-        studentId:   undefined,
-        studentName: occ.studentName,
-        recurring:   occ.recurring,
+        sessionId:      occ.sessionId,
+        occurrenceDate: occ.at.toISOString().slice(0, 10),
+        title:          occ.title,
+        dateStr:        occ.at.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
+        time:           occ.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+        duration:       occ.duration_min,
+        studentId:      undefined,
+        studentName:    occ.studentName,
+        recurring:      occ.recurring,
       }))} />
     </div>
   );

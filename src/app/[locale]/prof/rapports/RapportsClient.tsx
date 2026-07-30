@@ -38,6 +38,7 @@ type Report = {
 
 type Item = {
   sessionId: string;
+  occurrenceDate: string;
   title: string;
   dateStr: string;
   dayShort: string;
@@ -237,6 +238,7 @@ export default function RapportsClient({ items }: { items: Item[] }) {
         <SessionReportForm
           sessionId={openForm.sessionId}
           studentId={undefined}
+          occurrenceDate={openForm.occurrenceDate}
           sessionTitle={openForm.title}
           sessionDate={`${openForm.dateStr} à ${openForm.time}`}
           onClose={() => setOpenForm(null)}
