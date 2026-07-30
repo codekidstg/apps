@@ -65,19 +65,31 @@ export default function Sidebar({ role, displayName }: Props) {
 
   return (
     <aside className="w-60 shrink-0 flex flex-col h-full" style={{ background: "#1B2D5E" }}>
-      {/* Logo + identité */}
-      <div className="px-4 pt-4 pb-3 flex flex-col gap-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+      {/* Logo + logout */}
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
         <Link href="/">
           <Logo size={90} variant="white" />
         </Link>
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0" style={{ background: "#FDB813", color: "#1B2D5E" }}>
-            {displayName.charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <div className="text-white text-sm font-black truncate leading-tight">{displayName}</div>
-            <div className="text-xs font-bold leading-tight" style={{ color: "rgba(255,255,255,0.35)" }}>{roleLabel[role] ?? role}</div>
-          </div>
+        <form action={logout}>
+          <button
+            type="submit"
+            title="Déconnexion"
+            className="text-xs font-bold px-2 py-1.5 rounded-lg transition-colors hover:text-white"
+            style={{ color: "rgba(255,255,255,0.35)", background: "rgba(255,255,255,0.06)" }}
+          >
+            ⎋ Exit
+          </button>
+        </form>
+      </div>
+
+      {/* Identité */}
+      <div className="px-4 py-3 flex items-center gap-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0" style={{ background: "#FDB813", color: "#1B2D5E" }}>
+          {displayName.charAt(0).toUpperCase()}
+        </div>
+        <div className="min-w-0">
+          <div className="text-white text-sm font-black truncate leading-tight">{displayName}</div>
+          <div className="text-xs font-bold leading-tight" style={{ color: "rgba(255,255,255,0.35)" }}>{roleLabel[role] ?? role}</div>
         </div>
       </div>
 
@@ -134,26 +146,6 @@ export default function Sidebar({ role, displayName }: Props) {
         })}
       </nav>
 
-      {/* User + logout */}
-      <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black" style={{ background: "#FDB813", color: "#1B2D5E" }}>
-            {displayName.charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-white text-xs font-bold truncate">{displayName}</div>
-          </div>
-        </div>
-        <form action={logout}>
-          <button
-            type="submit"
-            className="w-full text-left text-xs font-bold py-1 transition-colors hover:text-white"
-            style={{ color: "rgba(255,255,255,0.35)" }}
-          >
-            ← Déconnexion
-          </button>
-        </form>
-      </div>
     </aside>
   );
 }

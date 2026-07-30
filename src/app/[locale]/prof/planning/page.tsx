@@ -1,5 +1,4 @@
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import PageHeader from "@/components/backoffice/PageHeader";
 
 const WEEKDAY_FULL  = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const WEEKDAY_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
@@ -99,11 +98,16 @@ export default async function ProfPlanningPage() {
   const nextSessionDateStr = nextSession?.at.toDateString();
 
   return (
-    <div className="max-w-4xl space-y-8">
-      <PageHeader
-        title="Mon planning"
-        subtitle={`${sessions?.length ?? 0} session${(sessions?.length ?? 0) !== 1 ? "s" : ""} configurée${(sessions?.length ?? 0) !== 1 ? "s" : ""}`}
-      />
+    <div className="max-w-3xl space-y-6">
+      {/* Header inline compact */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-black" style={{ color: "#1B2D5E" }}>Mon planning</h1>
+          <p className="text-xs font-bold mt-0.5" style={{ color: "#94A3B8" }}>
+            {sessions?.length ?? 0} session{(sessions?.length ?? 0) !== 1 ? "s" : ""} configurée{(sessions?.length ?? 0) !== 1 ? "s" : ""}
+          </p>
+        </div>
+      </div>
 
       {/* Prochaine session — spotlight */}
       {nextSession && (
