@@ -68,7 +68,7 @@ export default function CertificatsClient({
         totalXp:     0,
         nLessons:    cert.nLessons,
         profName,
-        issuedAt:    new Date(cert.issued_at).toLocaleDateString("fr-FR"),
+        issuedAt:    new Date(cert.issued_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
         certId:      cert.id,
         verifyHash:  cert.id.slice(0, 12),
       },

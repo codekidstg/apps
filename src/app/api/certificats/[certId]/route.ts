@@ -95,7 +95,7 @@ export async function GET(
       totalXp:       cert.total_xp ?? (student as any)?.xp ?? 0,
       nLessons,
       profName:      (prof as any)?.display_name ?? "Prof CodeKids",
-      issuedAt:      new Date(cert.issued_at).toLocaleDateString("fr-FR"),
+      issuedAt:      new Date(cert.issued_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
       certId:        cert.id,
       verifyHash:    cert.verify_hash ?? "",
   }) as unknown as ReactElement<DocumentProps, JSXElementConstructor<DocumentProps>>;

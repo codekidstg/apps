@@ -79,7 +79,7 @@ const s = StyleSheet.create({
   sigBlock: { alignItems: "center", flex: 1 },
   sigName: { fontFamily: "Times-Italic", fontSize: 10, color: GOLD, marginBottom: 3 },
   sigLine: { width: 90, height: 1, backgroundColor: GOLD, marginBottom: 3 },
-  sigRole: { fontFamily: "Helvetica", fontSize: 6, color: BLUE_D },
+  sigRole: { fontFamily: "Helvetica", fontSize: 6, color: BLUE_D, textTransform: "uppercase" as const },
   // Numéro de certificat — bloc centré
   certIdRow: { alignItems: "center", marginTop: 10, marginBottom: 0 },
   certIdBox: { borderWidth: 1, borderColor: BLUE_3, borderRadius: 3, paddingHorizontal: 10, paddingVertical: 3 },
@@ -123,22 +123,22 @@ function DiamondIcon({ size = 7 }: { size?: number }) {
   );
 }
 
-function Seal() {
+function LogoSeal() {
   return (
     <View style={s.sealArea}>
-      <Svg width="40" height="40" viewBox="0 0 44 44">
-        <Circle cx="22" cy="22" r="20" fill="none" stroke={GOLD} strokeWidth="1" strokeDasharray="3 3" />
-        <Circle cx="22" cy="22" r="15" fill={NAVY} stroke={GOLD2} strokeWidth="1.5" />
-        <Polygon points="22,10 24.5,17 32,17 26,21.5 28.5,29 22,25 15.5,29 18,21.5 12,17 19.5,17" fill={GOLD} />
-      </Svg>
+      <Image src={LOGO_PATH} style={{ width: 44, height: 44, objectFit: "contain" }} />
       <Text style={s.sealLabel}>CERTIFIÉ</Text>
     </View>
   );
 }
 
-function formatCertNumber(certId: string, issuedAt: string): string {
-  const year = issuedAt.split("/").pop() ?? new Date().getFullYear().toString();
-  return `CK-${year}-${certId.slice(0, 8).toUpperCase()}`;
+function formatCertNumber(certId: string, issuedAt: string, themeName?: string): string {
+  const year = issuedAt.split(" ").pop() ?? new Date().getFullYear().toString();
+  const slug = themeName
+    ? themeName.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 5)
+    : null;
+  const hash = certId.slice(0, 8).toUpperCase();
+  return slug ? `CK-${year}-${slug}-${hash}` : `CK-${year}-${hash}`;
 }
 
 export default function CertificatePDF(p: CertProps) {
@@ -150,7 +150,8 @@ export default function CertificatePDF(p: CertProps) {
   const modules   = (p.modules ?? []).slice(0, 6);
   const lvlColor  = LEVEL_COLORS[String(p.levelNum ?? "2")] ?? "#7C3AED";
   const ROMAN     = ["I", "II", "III", "IV", "V", "VI"];
-  const certNum   = formatCertNumber(p.certId, p.issuedAt);
+  const certNum   = formatCertNumber(p.certId, p.issuedAt, p.themeName ?? p.levelName);
+  const showXp    = (p.totalXp ?? 0) > 0;
 
   // Compétences : max 5, mention "et bien plus" si au-delà
   const allComps  = p.competencies ?? [];
@@ -161,7 +162,7 @@ export default function CertificatePDF(p: CertProps) {
   const phraseSubject = isLevel ? (p.levelName ?? `Niveau ${p.levelNum}`) : (p.themeName ?? "ce module");
   const certPhrase = isLevel
     ? `Certifie que ${p.studentName} a complété avec succès le parcours ${phraseSubject}, démontrant une maîtrise des compétences numériques fondamentales et avancées définies par le référentiel codeKids.`
-    : `Certifie que ${p.studentName} a acquis avec succès toutes les compétences du module « ${phraseSubject} », validées à l'issue d'un parcours pédagogique supervisé par un enseignant certifié codeKids.`;
+    : `Certifie que ${p.studentName} a acquis avec succès toutes les compétences du module « ${phraseSubject} », validées à l'issue d'un parcours pédagogique supervisé par un mentor certifié codeKids.`;
 
   return (
     <Document>
@@ -242,7 +243,7 @@ export default function CertificatePDF(p: CertProps) {
 
           {/* Score */}
           <Text style={s.scoreTxt}>
-            Score {p.score}/100 · {p.totalXp} XP · {p.nLessons ? `${p.nLessons} leçon${p.nLessons > 1 ? "s" : ""}` : ""} · {p.issuedAt}
+            Score {p.score}/100{showXp ? ` · ${p.totalXp} XP` : ""}{p.nLessons ? ` · ${p.nLessons} leçon${p.nLessons > 1 ? "s" : ""}` : ""} · {p.issuedAt}
           </Text>
 
           {/* Séparateur bas */}
@@ -253,12 +254,12 @@ export default function CertificatePDF(p: CertProps) {
 
           {/* Footer */}
           <View style={s.footerRow}>
-            <Seal />
+            <LogoSeal />
 
             <View style={s.sigBlock}>
               <Text style={s.sigName}>{p.profName}</Text>
               <View style={s.sigLine} />
-              <Text style={s.sigRole}>Enseignant responsable</Text>
+              <Text style={s.sigRole}>Mentor</Text>
             </View>
 
             <View style={s.sigBlock}>
@@ -268,7 +269,7 @@ export default function CertificatePDF(p: CertProps) {
             </View>
 
             <View style={s.metaBlock}>
-              <Text style={s.metaTxt}>Lomé, {p.issuedAt}</Text>
+              <Text style={s.metaTxt}>Lomé, Togo · {p.issuedAt}</Text>
               <Text style={s.metaTxt}>codekids.tg/verif</Text>
               <Text style={s.metaTxt}>Hash : {p.verifyHash.slice(0, 12)}…</Text>
             </View>
