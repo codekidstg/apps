@@ -1,6 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
+export const dynamic = "force-dynamic";
+
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import PageHeader from "@/components/backoffice/PageHeader";
 import Link from "next/link";
 
 type ThemeRef = { id: string; title: string };
@@ -13,8 +14,10 @@ export default async function ProfDashboard() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
 
-  const { data: assignmentsRaw } = await supabase
-    .from("theme_assignments")
+  const admin = createAdminClient();
+
+  const { data: assignmentsRaw } = await (admin
+    .from("theme_assignments") as any)
     .select("id, scheduled_at, themes(id, title), classes(id, name)")
     .eq("teacher_id", user.id)
     .order("scheduled_at", { ascending: false });
@@ -26,17 +29,20 @@ export default async function ProfDashboard() {
     class:        (Array.isArray(a.classes) ? a.classes[0] : a.classes) as ClassRef | null,
   }));
 
-  const { data: classesRaw } = await supabase
-    .from("classes")
+  const { data: classesRaw } = await (admin
+    .from("classes") as any)
     .select("id, name, level")
     .eq("teacher_id", user.id);
 
   const classes = (classesRaw ?? []) as ClassRow[];
 
   return (
-    <div>
-      <PageHeader title="Tableau de bord" subtitle="Vos cours affectés et vos classes" />
-      <div className="p-8 space-y-8">
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-black" style={{ color: "#1B2D5E" }}>Tableau de bord</h1>
+        <p className="text-xs font-bold mt-0.5" style={{ color: "#94A3B8" }}>Vos cours affectés et vos classes</p>
+      </div>
+      <div className="space-y-6">
 
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white rounded-2xl border border-cream-border p-6 text-center">

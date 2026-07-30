@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { getLocale } from "next-intl/server";
 
 // ── Rate limiting en mémoire ─────────────────────────────────────
 // Max 5 tentatives par IP toutes les 15 minutes
@@ -45,7 +46,7 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number; rese
 }
 
 // ── Destinations par rôle ────────────────────────────────────────
-const ROLE_REDIRECTS: Record<string, string> = {
+const ROLE_DESTINATIONS: Record<string, string> = {
   admin:   "/admin",
   manager: "/manager",
   teacher: "/cours",
@@ -106,6 +107,7 @@ export async function login(formData: FormData) {
   buckets.delete(ip);
 
   // 5. Redirection selon le rôle
+  const locale = await getLocale();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile }  = await supabase
     .from("profiles")
@@ -114,7 +116,8 @@ export async function login(formData: FormData) {
     .single<{ role: string }>();
 
   const role        = profile?.role ?? "student";
-  const destination = redirectTo ?? ROLE_REDIRECTS[role] ?? "/";
+  const dest        = redirectTo ?? ROLE_DESTINATIONS[role] ?? "/";
+  const destination = dest.startsWith(`/${locale}`) ? dest : `/${locale}${dest}`;
 
   redirect(destination);
 }

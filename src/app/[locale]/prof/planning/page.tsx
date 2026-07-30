@@ -1,4 +1,5 @@
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import PastSessionsList from "./PlanningClient";
 
 const WEEKDAY_FULL  = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const WEEKDAY_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
@@ -304,36 +305,16 @@ export default async function ProfPlanningPage() {
         )}
       </section>
 
-      {/* Sessions passées — archive */}
-      {past.length > 0 && (
-        <section>
-          <details>
-            <summary className="cursor-pointer text-xs font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2 list-none">
-              <span className="text-gray-300">▶</span>
-              Archivées — 7 derniers jours ({past.length})
-            </summary>
-            <div className="mt-3 space-y-1.5">
-              {past.map((occ, i) => (
-                <div key={i} className="flex items-center gap-4 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-2.5 opacity-60">
-                  <div className="w-10 text-center shrink-0">
-                    <div className="text-[10px] font-bold text-gray-400 uppercase">{WEEKDAY_SHORT[occ.at.getDay()]}</div>
-                    <div className="text-lg font-black text-gray-500 leading-none">{occ.at.getDate()}</div>
-                    <div className="text-[10px] text-gray-400">{occ.at.toLocaleDateString("fr-FR", { month: "short" })}</div>
-                  </div>
-                  <div className="w-px h-6 bg-gray-200 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-black text-gray-500 text-sm line-through">{occ.title}</div>
-                    <div className="text-xs text-gray-400">
-                      {occ.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {occ.duration_min} min
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-black bg-gray-200 text-gray-500 px-2 py-1 rounded-full">Terminée</span>
-                </div>
-              ))}
-            </div>
-          </details>
-        </section>
-      )}
+      {/* Sessions passées — archive + bouton rapport */}
+      <PastSessionsList sessions={past.map(occ => ({
+        title:       occ.title,
+        dateStr:     occ.at.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
+        time:        occ.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+        duration:    occ.duration_min,
+        studentId:   undefined,
+        studentName: occ.studentName,
+        recurring:   occ.recurring,
+      }))} />
     </div>
   );
 }

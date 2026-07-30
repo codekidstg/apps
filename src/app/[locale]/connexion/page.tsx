@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useActionState } from "react";
-import { login } from "@/app/[locale]/auth/actions";
+import { useEffect, useRef, useState } from "react";
 import Logo from "@/components/Logo";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useParams } from "next/navigation";
 
 // ── Neurone canvas ───────────────────────────────────────────────
 function NeuronCanvas() {
@@ -113,11 +112,10 @@ export default function ConnexionPage() {
   const searchParams = useSearchParams();
   const error         = searchParams.get("error");
   const redirectParam = searchParams.get("redirect");
+  const params        = useParams();
+  const locale        = (params?.locale as string) ?? "fr";
 
-  const [, formAction, pending] = useActionState(async (_: unknown, formData: FormData) => {
-    await login(formData);
-    return null;
-  }, null);
+  const [pending, setPending] = useState(false);
 
   return (
     <div className="relative min-h-screen bg-cream flex items-center justify-center px-4 overflow-hidden">
@@ -151,7 +149,12 @@ export default function ConnexionPage() {
             </div>
           )}
 
-          <form action={formAction} className="flex flex-col gap-5">
+          <form
+            method="POST"
+            action={`/api/auth/login`}
+            onSubmit={() => setPending(true)}
+            className="flex flex-col gap-5"
+          >
             {/* Honeypot — invisible pour les humains, piège pour les bots */}
             <input
               type="text"
