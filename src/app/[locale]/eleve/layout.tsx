@@ -7,6 +7,7 @@ import Logo from "@/components/Logo";
 import BadgeToast from "@/components/eleve/BadgeToast";
 import SwRegistrar from "@/components/eleve/SwRegistrar";
 import OfflineBanner from "@/components/eleve/OfflineBanner";
+import { logout } from "@/app/[locale]/auth/actions";
 
 type StudentData = {
   display_name: string;
@@ -66,11 +67,23 @@ export default async function EleveLayout({ children }: { children: React.ReactN
       {/* Sidebar */}
       <aside className="w-64 shrink-0 flex flex-col" style={{ background: "#0f172a", borderRight: "1px solid #1e293b" }}>
         {/* Logo */}
-        <div className="px-3 pt-4 pb-3 flex flex-col items-start gap-0.5" style={{ borderBottom: "1px solid #1e293b" }}>
-          <Link href="/eleve">
-            <Logo size={90} variant="white" />
-          </Link>
-          <div className="text-xs font-mono tracking-widest uppercase ml-1" style={{ color: "#334155" }}>◈ Espace Élève</div>
+        <div className="px-3 pt-4 pb-3 flex items-center justify-between" style={{ borderBottom: "1px solid #1e293b" }}>
+          <div className="flex flex-col items-start gap-0.5">
+            <Link href="/eleve">
+              <Logo size={90} variant="white" />
+            </Link>
+            <div className="text-xs font-mono tracking-widest uppercase ml-1" style={{ color: "#334155" }}>◈ Espace Élève</div>
+          </div>
+          <form action={logout}>
+            <button
+              type="submit"
+              title="Déconnexion"
+              className="text-xs font-bold px-2 py-1.5 rounded-lg transition-colors hover:bg-slate-800 hover:text-white"
+              style={{ color: "#475569" }}
+            >
+              ⎋ Exit
+            </button>
+          </form>
         </div>
 
         {/* Avatar + nom */}
@@ -109,14 +122,6 @@ export default async function EleveLayout({ children }: { children: React.ReactN
           ))}
         </nav>
 
-        {/* Footer */}
-        <div className="p-4" style={{ borderTop: "1px solid #1e293b" }}>
-          <form action="/fr/auth/logout" method="POST">
-            <button className="text-xs font-bold transition-colors w-full text-left hover:text-white" style={{ color: "#475569" }}>
-              ← Déconnexion
-            </button>
-          </form>
-        </div>
       </aside>
 
       {/* Main */}
