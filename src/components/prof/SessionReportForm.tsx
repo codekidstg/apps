@@ -53,7 +53,9 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(formRef.current!);
-    // Inject multi-select values manually
+    // Les étapes 1 et 2 sont démontées du DOM — on injecte les valeurs depuis le state
+    data.set("advancement", advancement);
+    data.set("engagement", engagement);
     data.delete("help_methods");
     helpMethods.forEach(v => data.append("help_methods", v));
 
