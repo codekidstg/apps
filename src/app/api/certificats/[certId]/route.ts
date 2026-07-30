@@ -25,7 +25,13 @@ export async function GET(
     .single();
 
   if (!cert) return NextResponse.json({ error: "Certificat introuvable" }, { status: 404 });
-  if (!cert.validated_at) return NextResponse.json({ error: "Certificat non encore validé" }, { status: 403 });
+
+  // Autoriser le prof/admin à prévisualiser avant validation
+  const role = user.app_metadata?.role;
+  const isStaff = ["admin", "teacher", "manager"].includes(role);
+  if (!cert.validated_at && !isStaff) {
+    return NextResponse.json({ error: "Certificat non encore validé" }, { status: 403 });
+  }
 
   // Données élève
   const { data: student } = await (admin.from("students") as any)
