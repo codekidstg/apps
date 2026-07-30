@@ -5,6 +5,7 @@ const WEEKDAY_FULL  = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendr
 const WEEKDAY_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
 type Occurrence = {
+  sessionId: string;
   title: string;
   at: Date;
   duration_min: number;
@@ -27,6 +28,7 @@ function buildOccurrences(sessions: any[], from: Date, to: Date): Occurrence[] {
     while (cursor <= to) {
       if (cursor >= from && (!s.active_until || cursor <= new Date(s.active_until))) {
         out.push({
+          sessionId: s.id,
           title: s.title,
           at: new Date(cursor),
           duration_min: s.duration_min,
@@ -43,6 +45,7 @@ function buildOccurrences(sessions: any[], from: Date, to: Date): Occurrence[] {
     const at = new Date(s.scheduled_at);
     if (at >= from && at <= to) {
       out.push({
+        sessionId: s.id,
         title: s.title,
         at,
         duration_min: s.duration_min,
@@ -307,6 +310,7 @@ export default async function ProfPlanningPage() {
 
       {/* Sessions passées — archive + bouton rapport */}
       <PastSessionsList sessions={past.map(occ => ({
+        sessionId:   occ.sessionId,
         title:       occ.title,
         dateStr:     occ.at.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
         time:        occ.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),

@@ -35,6 +35,7 @@ const managerNav: NavItem[] = [
 const teacherNav: NavItem[] = [
   { label: "Tableau de bord", href: "/prof",              icon: "◈" },
   { label: "Mon planning",    href: "/prof/planning",     icon: "📅" },
+  { label: "Mes rapports",    href: "/prof/rapports",     icon: "📝" },
   { label: "Mes cours",       href: "/prof/cours",        icon: "📚" },
   { label: "Mes classes",     href: "/prof/classes",      icon: "👨‍🏫" },
   { label: "Certificats",     href: "/prof/certificats",  icon: "🎓" },
