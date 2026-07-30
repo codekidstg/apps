@@ -736,7 +736,7 @@ function SortGame({ title, description, items, done, onSolved, savedOrder, onSta
       {description && <p className="text-sm mb-4 leading-relaxed whitespace-pre-line" style={{ color: "#94a3b8", fontFamily: description.includes("■") ? "monospace" : "inherit" }}>{description}</p>}
       <div className="space-y-2">
         {order.map((item, idx) => (
-          <div key={item} className="flex items-center gap-2">
+          <div key={idx} className="flex items-center gap-2">
             <span className="text-xs w-5 text-right font-mono" style={{ color: "#334155" }}>{idx + 1}.</span>
             <div className="flex-1 rounded-xl px-3 py-2 text-sm font-mono"
               style={{ background: "#0f172a", color: "#FDB813", border: "1px solid #1e293b" }}>{item}</div>
