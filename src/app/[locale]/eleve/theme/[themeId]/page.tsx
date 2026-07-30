@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
@@ -47,7 +49,6 @@ export default async function ThemePage({
         .from("lessons")
         .select("id, title, xp_reward, chapter_id, order_index")
         .in("chapter_id", chapterIds)
-        .eq("status", "published")
         .order("order_index") as any
     : { data: [] };
   const lessons: Lesson[] = lessonsRaw ?? [];

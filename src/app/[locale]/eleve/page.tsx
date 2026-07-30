@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
@@ -33,9 +35,9 @@ export default async function EleveDashboard() {
 
   const [{ data: themesRaw }, { data: chaptersRaw }, { data: lessonsRaw }, { data: progressRaw }, { data: achievementsRaw }] =
     await Promise.all([
-      (admin.from("themes") as any).select("id, title, level").eq("status", "published").order("level").order("title"),
-      admin.from("chapters").select("id, title, theme_id") as any,
-      (admin.from("lessons") as any).select("id, title, xp_reward, chapter_id").eq("status", "published").order("order_index"),
+      (admin.from("themes") as any).select("id, title, level").eq("status", "published").order("level").order("order_index"),
+      (admin.from("chapters") as any).select("id, title, theme_id, order_index").order("order_index"),
+      (admin.from("lessons") as any).select("id, title, xp_reward, chapter_id").order("order_index"),
       (supabase.from("lesson_progress") as any).select("lesson_id, status").eq("student_id", student.id),
       (supabase.from("student_achievements") as any).select("badge_id, earned_at").eq("student_id", student.id).order("earned_at", { ascending: false }),
     ]);
