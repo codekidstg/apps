@@ -460,6 +460,11 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
               return <FillBlankGame key={block.id} blockId={block.id} title={cfg.title as string} template={template} blanks={blanks} done={done} onSolved={markDone} savedAnswers={(gameStates[block.id] as string[]) ?? []} onStateChange={(s) => saveGameState(block.id, s)} />;
             }
 
+            if (gameType === "bug_hunt") {
+              const bh = cfg as any;
+              return <BugHuntGame key={block.id} blockId={block.id} title={bh.title} description={bh.description} context={bh.context} instructions={bh.instructions ?? []} bugIndex={bh.bug_index ?? 0} fix={bh.fix ?? ""} explanation={bh.explanation} done={done} onSolved={markDone} savedState={(gameStates[block.id] as string) ?? null} onStateChange={(s) => saveGameState(block.id, s)} />;
+            }
+
             return null;
           }
 
@@ -728,7 +733,7 @@ function SortGame({ title, description, items, done, onSolved, savedOrder, onSta
         {done && <span className="ml-auto text-xs font-mono font-black px-2 py-0.5 rounded-full"
           style={{ background: "#10b98120", color: "#10b981", border: "1px solid #10b98140" }}>✅ Réussi</span>}
       </div>
-      {description && <p className="text-sm mb-4 leading-relaxed" style={{ color: "#94a3b8" }}>{description}</p>}
+      {description && <p className="text-sm mb-4 leading-relaxed whitespace-pre-line" style={{ color: "#94a3b8", fontFamily: description.includes("■") ? "monospace" : "inherit" }}>{description}</p>}
       <div className="space-y-2">
         {order.map((item, idx) => (
           <div key={item} className="flex items-center gap-2">
@@ -767,6 +772,90 @@ function SortGame({ title, description, items, done, onSolved, savedOrder, onSta
           <div className="text-xs font-mono font-black mb-2" style={{ color: "#334155" }}>Sortie attendue :</div>
           <pre className="font-mono text-xs leading-relaxed" style={{ color: "#FDB813" }}>{expectedOutput}</pre>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── BugHuntGame ──────────────────────────────────────────────────────────────
+function BugHuntGame({ title, description, context, instructions, bugIndex, fix, explanation, done, onSolved, savedState, onStateChange }: {
+  blockId: string; title?: string; description?: string; context?: string;
+  instructions: string[]; bugIndex: number; fix: string; explanation?: string;
+  done: boolean; onSolved: () => void;
+  savedState: string | null; onStateChange: (s: string) => void;
+}) {
+  const [selected, setSelected] = useState<number | null>(
+    savedState != null && savedState !== "" ? parseInt(savedState) : null
+  );
+  const [wrong, setWrong] = useState<number | null>(null);
+  const solved = selected === bugIndex || done;
+
+  function select(idx: number) {
+    if (solved) return;
+    if (idx === bugIndex) {
+      setSelected(idx);
+      onStateChange(String(idx));
+      onSolved();
+    } else {
+      setWrong(idx);
+      setTimeout(() => setWrong(null), 800);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl p-6" style={{ background: "#1e293b", border: "1px solid #334155" }}>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🕵️</span>
+        <span className="font-black text-white">{title ?? "Trouve le bug !"}</span>
+        {solved && (
+          <span className="ml-auto text-xs font-mono font-black px-2 py-0.5 rounded-full"
+            style={{ background: "#10b98120", color: "#10b981", border: "1px solid #10b98140" }}>✅ Trouvé !</span>
+        )}
+      </div>
+      {description && <p className="text-sm mb-3 leading-relaxed" style={{ color: "#94a3b8" }}>{description}</p>}
+      {context && (
+        <div className="rounded-xl px-4 py-3 mb-4 text-sm font-mono whitespace-pre-line" style={{ background: "#0f172a", color: "#60a5fa", border: "1px solid #1e293b" }}>
+          {context}
+        </div>
+      )}
+
+      <div className="space-y-2 mb-4">
+        {instructions.map((inst, idx) => {
+          const isBug    = solved && idx === bugIndex;
+          const isWrong  = wrong === idx;
+          return (
+            <button key={idx} onClick={() => select(idx)} disabled={solved}
+              className="w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl font-mono text-sm transition-all duration-150"
+              style={{
+                background: isBug ? "#10b98115" : isWrong ? "#ef444415" : "#0f172a",
+                border:     isBug ? "2px solid #10b98140" : isWrong ? "2px solid #ef444440" : "2px solid #1e293b",
+                color:      isBug ? "#10b981" : isWrong ? "#ef4444" : "#FDB813",
+                cursor:     solved ? "default" : "pointer",
+              }}>
+              <span className="text-xs font-bold w-5 text-right flex-shrink-0" style={{ color: "#334155" }}>{idx + 1}.</span>
+              <span className="flex-1">{inst}</span>
+              {isBug    && <span className="text-xs font-bold" style={{ color: "#10b981" }}>← BUG !</span>}
+              {isWrong  && <span className="text-xs font-bold" style={{ color: "#ef4444" }}>✗</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {solved ? (
+        <div className="rounded-xl px-5 py-4 space-y-2" style={{ background: "#052e16", border: "1px solid #166534" }}>
+          <div className="font-black text-sm" style={{ color: "#10b981" }}>🎉 Bravo — bug trouvé !</div>
+          <div className="text-sm font-mono" style={{ color: "#4ade80" }}>
+            Ligne {bugIndex + 1} :{" "}
+            <span style={{ color: "#ef4444", textDecoration: "line-through" }}>{instructions[bugIndex]}</span>
+            {" → "}
+            <span style={{ color: "#10b981" }}>{fix}</span>
+          </div>
+          {explanation && <div className="text-xs leading-relaxed mt-1" style={{ color: "#86efac" }}>💡 {explanation}</div>}
+        </div>
+      ) : (
+        <p className="text-xs font-mono text-center" style={{ color: "#334155" }}>
+          Clique sur l'instruction incorrecte 👆
+        </p>
       )}
     </div>
   );
