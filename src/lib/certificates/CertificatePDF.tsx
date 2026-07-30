@@ -123,10 +123,14 @@ function DiamondIcon({ size = 7 }: { size?: number }) {
   );
 }
 
-function LogoSeal() {
+function Seal() {
   return (
     <View style={s.sealArea}>
-      <Image src={LOGO_PATH} style={{ width: 44, height: 44, objectFit: "contain" }} />
+      <Svg width="40" height="40" viewBox="0 0 44 44">
+        <Circle cx="22" cy="22" r="20" fill="none" stroke={GOLD} strokeWidth="1" strokeDasharray="3 3" />
+        <Circle cx="22" cy="22" r="15" fill={NAVY} stroke={GOLD2} strokeWidth="1.5" />
+        <Polygon points="22,10 24.5,17 32,17 26,21.5 28.5,29 22,25 15.5,29 18,21.5 12,17 19.5,17" fill={GOLD} />
+      </Svg>
       <Text style={s.sealLabel}>CERTIFIÉ</Text>
     </View>
   );
@@ -254,7 +258,7 @@ export default function CertificatePDF(p: CertProps) {
 
           {/* Footer */}
           <View style={s.footerRow}>
-            <LogoSeal />
+            <Seal />
 
             <View style={s.sigBlock}>
               <Text style={s.sigName}>{p.profName}</Text>

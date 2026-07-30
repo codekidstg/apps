@@ -135,10 +135,11 @@ export default function CertHtmlPreview(p: CertPreviewData) {
 
         {/* Footer */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
-          {/* Logo à la place du sceau */}
+          {/* Sceau étoile gold */}
           <div style={{ textAlign: "center", width: 56 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-white.png" alt="codeKids" style={{ width: 48, height: 48, objectFit: "contain" }} />
+            <div style={{ width: 44, height: 44, borderRadius: "50%", border: "1px dashed #d4a017", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto" }}>
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#1e2a45", border: "1.5px solid #c9980a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#d4a017" }}>★</div>
+            </div>
             <p style={{ color: "#4a6a8a", fontSize: 7, letterSpacing: 0.5, margin: "2px 0 0", fontFamily: "Arial, sans-serif" }}>CERTIFIÉ</p>
           </div>
 
