@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, useEffect } from "react";
 import { submitSessionReport } from "@/app/[locale]/prof/actions";
 
 type Props = {
@@ -44,6 +44,15 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+  const [canSubmit, setCanSubmit] = useState(false);
+
+  useEffect(() => {
+    if (step === totalSteps) {
+      const t = setTimeout(() => setCanSubmit(true), 400);
+      return () => clearTimeout(t);
+    }
+    setCanSubmit(false);
+  }, [step]);
 
   const totalSteps = 4;
 
@@ -208,7 +217,7 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
                 Suivant →
               </button>
             ) : (
-              <button type="submit" disabled={pending}
+              <button type="submit" disabled={pending || !canSubmit}
                 className="flex-1 py-3 rounded-2xl font-black text-sm text-white transition-all disabled:opacity-60"
                 style={{ background: "#FDB813", color: "#1B2D5E" }}>
                 {pending ? "Enregistrement..." : "✓ Valider le rapport"}
