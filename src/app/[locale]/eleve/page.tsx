@@ -41,13 +41,15 @@ export default async function EleveDashboard() {
     ? new Set((accessRows as { theme_id: string }[]).map((r) => r.theme_id))
     : null; // null = aucun accès configuré → on affiche tout (rétrocompatibilité)
 
-  const [{ data: themesRaw }, { data: chaptersRaw }, { data: lessonsRaw }, { data: progressRaw }, { data: achievementsRaw }] =
+  const [{ data: themesRaw }, { data: chaptersRaw }, { data: lessonsRaw }, { data: progressRaw }, { data: achievementsRaw }, { data: trainingsRaw }, { data: trainingProgressRaw }] =
     await Promise.all([
       (admin.from("themes") as any).select("id, title, level").eq("status", "published").order("level").order("order_index"),
       (admin.from("chapters") as any).select("id, title, theme_id, order_index").order("order_index"),
       (admin.from("lessons") as any).select("id, title, xp_reward, chapter_id").order("order_index"),
       (supabase.from("lesson_progress") as any).select("lesson_id, status").eq("student_id", student.id),
       (supabase.from("student_achievements") as any).select("badge_id, earned_at").eq("student_id", student.id).order("earned_at", { ascending: false }),
+      (admin.from("trainings") as any).select("id, lesson_id"),
+      (supabase.from("training_progress") as any).select("training_id, attempts").eq("student_id", student.id),
     ]);
 
   const allThemes: Theme[]     = themesRaw  ?? [];
@@ -78,6 +80,12 @@ export default async function EleveDashboard() {
 
   const completedCount = progress.filter((p) => p.status === "completed").length;
   const nextLesson     = lessons.find((l) => progressMap.get(l.id) !== "completed");
+
+  // Entraînements disponibles (leçon commencée) et non encore faits
+  const startedLessonIds = new Set(progress.map((p: any) => p.lesson_id));
+  const doneTrainingIds  = new Set((trainingProgressRaw ?? []).filter((tp: any) => tp.attempts > 0).map((tp: any) => tp.training_id));
+  const availableTrainings = (trainingsRaw ?? []).filter((t: any) => startedLessonIds.has(t.lesson_id) && !doneTrainingIds.has(t.id));
+  const trainingBadgeCount = availableTrainings.length;
 
   const levels = ["explorer", "builder", "architect"] as const;
   const themesByLevel = new Map<string, Theme[]>();

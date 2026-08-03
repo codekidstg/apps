@@ -1,6 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { completeTraining } from "../../actions";
 
@@ -19,47 +18,67 @@ type Props = {
   readOnly?: boolean;
 };
 
+function Stars({ score }: { score: number }) {
+  const count = score === 100 ? 3 : score >= 75 ? 2 : score >= 50 ? 1 : 0;
+  return (
+    <div className="flex items-center justify-center gap-2 my-4">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="text-4xl transition-all duration-500"
+          style={{
+            opacity: i < count ? 1 : 0.2,
+            filter: i < count ? "drop-shadow(0 0 8px #FDB813)" : "none",
+            transform: i < count ? "scale(1.1)" : "scale(0.9)",
+            animationDelay: `${i * 150}ms`,
+          }}
+        >⭐</span>
+      ))}
+    </div>
+  );
+}
+
 export default function TrainingReader({ trainingId, blocks, xpReward, previousAttempts, previousScore, readOnly = false }: Props) {
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number | null>>({});
   const [quizResults, setQuizResults] = useState<Record<string, boolean | null>>({});
-  const [codeResults, setCodeResults]  = useState<Record<string, boolean>>({});
-  const [completed, setCompleted]      = useState(false);
-  const [xpGained, setXpGained]       = useState<number | null>(null);
-  const [finalScore, setFinalScore]    = useState<number | null>(null);
-  const [isPending, startTransition]   = useTransition();
+  const [codeResults, setCodeResults] = useState<Record<string, boolean>>({});
+  const [completed, setCompleted]     = useState(false);
+  const [xpGained, setXpGained]      = useState<number | null>(null);
+  const [finalScore, setFinalScore]   = useState<number | null>(null);
+  const [isPending, startTransition]  = useTransition();
 
-  const quizBlocks   = blocks.filter(b => b.type === "quiz");
-  const codeBlocks   = blocks.filter(b => b.type === "code_challenge");
+  const quizBlocks    = blocks.filter(b => b.type === "quiz");
+  const codeBlocks    = blocks.filter(b => b.type === "code_challenge");
   const blocklyBlocks = blocks.filter(b => b.type === "blockly_challenge");
 
-  const allQuizDone = quizBlocks.every(b => {
-    type QQ = { questions?: { answer: number }[] };
-    const raw = b.content as QQ;
+  // — Progression —
+  const allQuizKeys = quizBlocks.flatMap(b => {
+    const raw = b.content as { questions?: { answer: number }[] };
     const count = raw.questions?.length ?? 1;
-    return Array.from({ length: count }, (_, qi) => `${b.id}-${qi}`).every(k => quizResults[k] != null);
+    return Array.from({ length: count }, (_, qi) => `${b.id}-${qi}`);
   });
-  const allCodeDone = codeBlocks.every(b => {
-    const cfg = b.content as { required?: boolean };
-    return !cfg.required || codeResults[b.id];
-  });
-  const allBlocklyDone = blocklyBlocks.every(b => {
-    const cfg = b.content as { required?: boolean };
-    return !cfg.required || codeResults[b.id];
-  });
-  const canFinish = allQuizDone && allCodeDone && allBlocklyDone;
+  const doneQuiz    = allQuizKeys.filter(k => quizResults[k] != null).length;
+  const totalQuiz   = allQuizKeys.length;
+  const doneCode    = codeBlocks.filter(b => codeResults[b.id]).length;
+  const doneBlockly = blocklyBlocks.filter(b => codeResults[b.id]).length;
 
-  // Score calculé : % de bonnes réponses quiz
-  const computeScore = useCallback(() => {
-    const quizKeys = quizBlocks.flatMap(b => {
-      type QQ = { questions?: { answer: number }[] };
-      const raw = b.content as QQ;
-      const count = raw.questions?.length ?? 1;
-      return Array.from({ length: count }, (_, qi) => `${b.id}-${qi}`);
-    });
-    if (quizKeys.length === 0) return 100;
-    const correct = quizKeys.filter(k => quizResults[k] === true).length;
-    return Math.round((correct / quizKeys.length) * 100);
-  }, [quizBlocks, quizResults]);
+  const requiredCode    = codeBlocks.filter(b => (b.content as any).required);
+  const requiredBlockly = blocklyBlocks.filter(b => (b.content as any).required);
+  const allQuizDone     = totalQuiz === 0 || doneQuiz === totalQuiz;
+  const allCodeDone     = requiredCode.every(b => codeResults[b.id]);
+  const allBlocklyDone  = requiredBlockly.every(b => codeResults[b.id]);
+  const canFinish       = allQuizDone && allCodeDone && allBlocklyDone;
+
+  // Progression globale pour la barre
+  const totalSteps = totalQuiz + requiredCode.length + requiredBlockly.length;
+  const doneSteps  = doneQuiz + doneCode + doneBlockly;
+  const progressPct = totalSteps > 0 ? Math.round((doneSteps / totalSteps) * 100) : 100;
+
+  function computeScore() {
+    if (allQuizKeys.length === 0) return 100;
+    const correct = allQuizKeys.filter(k => quizResults[k] === true).length;
+    return Math.round((correct / allQuizKeys.length) * 100);
+  }
 
   function handleComplete() {
     if (readOnly) { setCompleted(true); return; }
@@ -84,41 +103,96 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Attempt badge */}
-      {previousAttempts > 0 && !completed && (
-        <div className="mb-6 flex items-center gap-3 bg-blue-900/20 border border-blue-800/40 rounded-xl px-5 py-3">
-          <span className="text-xl">🔄</span>
-          <div className="text-sm text-blue-300">
-            <span className="font-black">Nouvelle tentative</span>
-            <span className="text-blue-400 ml-2">· {previousAttempts} déjà effectuée{previousAttempts > 1 ? "s" : ""}</span>
-            {previousScore != null && <span className="text-blue-400 ml-2">· Meilleur score : {previousScore}%</span>}
+
+      {/* ── Barre de progression ── */}
+      {!completed && totalSteps > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between text-xs font-mono mb-2" style={{ color: "#475569" }}>
+            <span>Progression</span>
+            <span style={{ color: progressPct === 100 ? "#10b981" : "#FDB813" }}>{progressPct}%</span>
+          </div>
+          <div className="h-2 rounded-full overflow-hidden" style={{ background: "#1e293b" }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${progressPct}%`,
+                background: progressPct === 100
+                  ? "linear-gradient(90deg, #10b981, #34d399)"
+                  : "linear-gradient(90deg, #FDB813, #f97316)",
+              }}
+            />
+          </div>
+          <div className="flex items-center gap-4 mt-1.5 text-[10px] font-mono" style={{ color: "#334155" }}>
+            {totalQuiz > 0 && <span>🧠 Quiz {doneQuiz}/{totalQuiz}</span>}
+            {requiredCode.length > 0 && <span>💻 Code {doneCode}/{requiredCode.length}</span>}
+            {requiredBlockly.length > 0 && <span>🧱 Blocs {doneBlockly}/{requiredBlockly.length}</span>}
           </div>
         </div>
       )}
 
-      {/* Completed banner */}
+      {/* ── Badge tentative précédente ── */}
+      {previousAttempts > 0 && !completed && (
+        <div className="mb-6 flex items-center gap-3 rounded-xl px-5 py-3"
+          style={{ background: "#1e2a45", border: "1px solid #2a3a5a" }}>
+          <span className="text-xl">🔄</span>
+          <div className="text-sm" style={{ color: "#8aaed4" }}>
+            <span className="font-black">Nouvelle tentative</span>
+            <span className="ml-2">· {previousAttempts} effectuée{previousAttempts > 1 ? "s" : ""}</span>
+            {previousScore != null && <span className="ml-2">· Meilleur : <span className="font-black text-white">{previousScore}%</span></span>}
+          </div>
+        </div>
+      )}
+
+      {/* ── Écran résultat animé ── */}
       {completed && (
-        <div className="mb-8 bg-emerald-900/60 border border-emerald-700 rounded-2xl px-8 py-6">
-          <div className="flex items-center gap-5 mb-4">
-            <div className="text-5xl">{finalScore != null && finalScore >= 80 ? "🏆" : finalScore != null && finalScore >= 50 ? "💪" : "📚"}</div>
-            <div>
-              <div className="font-black text-emerald-300 text-xl">Entraînement terminé !</div>
-              {xpGained != null && <div className="text-sm text-emerald-400 mt-1">+{xpGained} XP gagnés</div>}
+        <div className="mb-8 rounded-2xl overflow-hidden" style={{ border: "1px solid #10b98140" }}>
+          <div className="px-8 py-6 text-center" style={{ background: "linear-gradient(135deg, #0a1628, #0e2020)" }}>
+            <div className="text-5xl mb-2">
+              {finalScore != null && finalScore === 100 ? "🏆" : finalScore != null && finalScore >= 75 ? "🎯" : finalScore != null && finalScore >= 50 ? "💪" : "📚"}
+            </div>
+            <div className="font-black text-2xl text-white mb-1">Entraînement terminé !</div>
+            {finalScore != null && <Stars score={finalScore} />}
+            <div className="flex items-center justify-center gap-6 mt-4 flex-wrap">
               {finalScore != null && (
-                <div className="text-sm text-emerald-400">Score : <span className="font-black text-white">{finalScore}%</span></div>
+                <div className="text-center">
+                  <div className="text-3xl font-black" style={{ color: finalScore >= 75 ? "#10b981" : finalScore >= 50 ? "#FDB813" : "#f97316" }}>
+                    {finalScore}%
+                  </div>
+                  <div className="text-xs font-mono mt-0.5" style={{ color: "#475569" }}>Score</div>
+                </div>
+              )}
+              {xpGained != null && xpGained > 0 && (
+                <div className="text-center">
+                  <div className="text-3xl font-black" style={{ color: "#FDB813" }}>+{xpGained}</div>
+                  <div className="text-xs font-mono mt-0.5" style={{ color: "#475569" }}>XP gagnés</div>
+                </div>
+              )}
+              {previousScore != null && finalScore != null && finalScore > previousScore && (
+                <div className="text-center">
+                  <div className="text-3xl font-black" style={{ color: "#a78bfa" }}>+{finalScore - previousScore}%</div>
+                  <div className="text-xs font-mono mt-0.5" style={{ color: "#475569" }}>Progression</div>
+                </div>
               )}
             </div>
+            {finalScore != null && finalScore < 50 && (
+              <p className="text-sm mt-4 font-medium" style={{ color: "#64748b" }}>Continue à t&apos;entraîner, tu vas y arriver ! 💪</p>
+            )}
+            {finalScore != null && finalScore === 100 && (
+              <p className="text-sm mt-4 font-black" style={{ color: "#10b981" }}>Score parfait ! Tu maîtrises cette leçon ! 🌟</p>
+            )}
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="px-8 py-4 flex flex-col sm:flex-row gap-3" style={{ background: "#0f172a" }}>
             <button
               onClick={handleRestart}
-              className="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white font-black py-3 rounded-xl text-sm transition-colors"
+              className="flex-1 font-black py-3 rounded-xl text-sm transition-colors"
+              style={{ background: "#1e293b", color: "#94a3b8", border: "1px solid #334155" }}
             >
-              🔄 Recommencer l&apos;entraînement
+              🔄 Recommencer
             </button>
             <a
               href="/eleve/entrainement"
-              className="flex-1 border border-slate-600 text-slate-300 font-bold py-3 rounded-xl text-sm text-center hover:bg-slate-800 transition-colors"
+              className="flex-1 font-black py-3 rounded-xl text-sm text-center transition-colors"
+              style={{ background: "#FDB813", color: "#0f172a" }}
             >
               ← Tous les entraînements
             </a>
@@ -126,23 +200,24 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
         </div>
       )}
 
-      {/* Blocks */}
+      {/* ── Blocs ── */}
       <div className="space-y-6">
         {blocks.map((block) => {
 
-          /* ── Texte ── */
+          /* Texte */
           if (block.type === "text") {
             const c = block.content as { html?: string; markdown?: string };
             const html = c.html ?? (c.markdown ? simpleMarkdown(c.markdown) : "");
             return (
               <div key={block.id}
-                className="lesson-prose bg-slate-800/60 rounded-2xl p-6 border border-slate-700/60"
+                className="lesson-prose rounded-2xl p-6 border"
+                style={{ background: "#1e293b", borderColor: "#334155" }}
                 dangerouslySetInnerHTML={{ __html: html }}
               />
             );
           }
 
-          /* ── Quiz ── */
+          /* Quiz */
           if (block.type === "quiz") {
             type QQ = { question: string; choices: string[]; answer: number; explanation?: string };
             const raw = block.content as { questions?: QQ[] } & QQ;
@@ -150,20 +225,21 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
               question: raw.question, choices: raw.choices,
               answer: raw.answer, explanation: raw.explanation,
             }];
+            const answered = questions.filter((_, qi) => quizResults[`${block.id}-${qi}`] != null).length;
 
             return (
-              <div key={block.id} className="rounded-2xl border border-violet-800/40 overflow-hidden">
-                <div className="bg-violet-900/25 border-b border-violet-800/40 px-6 py-4 flex items-center gap-3">
+              <div key={block.id} className="rounded-2xl overflow-hidden" style={{ border: "1px solid #4c1d9540" }}>
+                <div className="px-6 py-4 flex items-center gap-3" style={{ background: "#1e103a" }}>
                   <span className="text-2xl">🧠</span>
-                  <div>
+                  <div className="flex-1">
                     <div className="font-black text-white">Quiz flash</div>
-                    <div className="text-xs text-violet-300 mt-0.5">{questions.length} question{questions.length > 1 ? "s" : ""}</div>
+                    <div className="text-xs mt-0.5" style={{ color: "#a78bfa" }}>{questions.length} question{questions.length > 1 ? "s" : ""}</div>
                   </div>
-                  <div className="ml-auto text-xs text-violet-400 font-bold">
-                    {Object.keys(quizResults).filter(k => k.startsWith(block.id) && quizResults[k] != null).length}/{questions.length} répondu{questions.length > 1 ? "es" : "e"}
+                  <div className="text-xs font-mono" style={{ color: answered === questions.length ? "#10b981" : "#a78bfa" }}>
+                    {answered}/{questions.length} répondu{questions.length > 1 ? "es" : "e"}
                   </div>
                 </div>
-                <div className="bg-slate-800/80 divide-y divide-slate-700/50">
+                <div className="divide-y" style={{ background: "#0f0a1e", borderColor: "#2a1a4a" }}>
                   {questions.map((q, qi) => {
                     const qKey = `${block.id}-${qi}`;
                     const chosen = quizAnswers[qKey] ?? null;
@@ -172,9 +248,8 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                       <div key={qKey} className="px-6 py-5">
                         <div className="flex items-start gap-3 mb-4">
                           <span className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black ${
-                            result === true ? "bg-emerald-500 text-white" :
-                            result === false ? "bg-red-500 text-white" :
-                            "bg-slate-600 text-slate-300"}`}>
+                            result === true  ? "bg-emerald-500 text-white" :
+                            result === false ? "bg-red-500 text-white" : "bg-slate-700 text-slate-300"}`}>
                             {result === true ? "✓" : result === false ? "✗" : qi + 1}
                           </span>
                           <p className="font-bold text-white text-base leading-snug">{q.question}</p>
@@ -183,35 +258,37 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                           {(q.choices ?? []).map((choice, ci) => {
                             const isChosen  = chosen === ci;
                             const isCorrect = ci === q.answer;
-                            let cls = "bg-slate-700/80 hover:bg-slate-600/80 text-slate-200 border-slate-600";
+                            let bg = "#1e293b", border = "#334155", color = "#cbd5e1";
                             if (result != null) {
-                              if (isCorrect) cls = "bg-emerald-900/60 text-emerald-200 border-emerald-600";
-                              else if (isChosen) cls = "bg-red-900/60 text-red-200 border-red-600";
-                              else cls = "bg-slate-800/60 text-slate-500 border-slate-700";
+                              if (isCorrect)      { bg = "#052e16"; border = "#10b981"; color = "#6ee7b7"; }
+                              else if (isChosen)  { bg = "#2d0a0a"; border = "#ef4444"; color = "#fca5a5"; }
+                              else                { bg = "#0f172a"; border = "#1e293b"; color = "#334155"; }
                             }
                             return (
                               <button key={ci}
                                 onClick={() => {
                                   if (result != null || completed) return;
-                                  const newAnswers = { ...quizAnswers, [qKey]: ci };
-                                  const newResults = { ...quizResults, [qKey]: ci === q.answer };
-                                  setQuizAnswers(newAnswers);
-                                  setQuizResults(newResults);
+                                  setQuizAnswers({ ...quizAnswers, [qKey]: ci });
+                                  setQuizResults({ ...quizResults, [qKey]: ci === q.answer });
                                 }}
                                 disabled={result != null || completed}
-                                className={`w-full text-left px-5 py-3 rounded-xl font-semibold text-sm border transition-all ${cls}`}
+                                className="w-full text-left px-5 py-3 rounded-xl font-semibold text-sm transition-all"
+                                style={{ background: bg, border: `1px solid ${border}`, color }}
                               >
-                                <span className="text-slate-500 mr-2">{["A","B","C","D"][ci]}.</span>
+                                <span className="mr-2" style={{ color: "#475569" }}>{["A","B","C","D"][ci]}.</span>
                                 {isCorrect && result != null ? "✓ " : ""}{choice}
                               </button>
                             );
                           })}
                         </div>
                         {result != null && q.explanation && (
-                          <div className={`mt-4 ml-10 text-sm rounded-xl px-5 py-3 border-l-4 ${
-                            result ? "bg-emerald-900/40 text-emerald-300 border-emerald-500" :
-                                     "bg-amber-900/40 text-amber-300 border-amber-500"}`}>
-                            {result ? "✅ Bonne réponse ! " : "💡 "}{q.explanation}
+                          <div className="mt-4 ml-10 text-sm rounded-xl px-5 py-3"
+                            style={{
+                              background: result ? "#052e16" : "#2d1a00",
+                              borderLeft: `4px solid ${result ? "#10b981" : "#f59e0b"}`,
+                              color: result ? "#6ee7b7" : "#fcd34d",
+                            }}>
+                            {result ? "✅ " : "💡 "}{q.explanation}
                           </div>
                         )}
                       </div>
@@ -222,7 +299,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
             );
           }
 
-          /* ── Code ── */
+          /* Code */
           if (block.type === "code_challenge") {
             const cfg = block.content as {
               instructions?: string; starter_code?: string;
@@ -231,18 +308,18 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
             };
             const done = codeResults[block.id];
             return (
-              <div key={block.id} className="rounded-2xl border border-emerald-800/40 overflow-hidden">
-                <div className="bg-emerald-900/25 border-b border-emerald-800/40 px-6 py-4 flex items-center gap-3">
+              <div key={block.id} className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${done ? "#10b98140" : "#065f4640"}` }}>
+                <div className="px-6 py-4 flex items-center gap-3" style={{ background: done ? "#052e16" : "#0a1f1a" }}>
                   <span className="text-2xl">💻</span>
                   <div>
                     <div className="font-black text-white">Mini-défi code</div>
-                    <div className="text-xs text-emerald-300 mt-0.5">{cfg.language ?? "python"}</div>
+                    <div className="text-xs mt-0.5" style={{ color: "#10b981" }}>{cfg.language ?? "python"}</div>
                   </div>
-                  {done && <span className="ml-auto text-xs font-black text-emerald-400 bg-emerald-900/50 border border-emerald-800/40 px-3 py-1 rounded-full">✅ Réussi !</span>}
+                  {done && <span className="ml-auto text-xs font-black px-3 py-1 rounded-full" style={{ background: "#052e16", color: "#10b981", border: "1px solid #10b98140" }}>✅ Réussi !</span>}
                 </div>
-                <div className="bg-slate-800/80 p-6 space-y-4">
+                <div className="p-6 space-y-4" style={{ background: "#0a0f1a" }}>
                   {cfg.instructions && (
-                    <div className="text-slate-200 text-sm leading-relaxed [&_code]:text-amber-300 [&_code]:bg-slate-700 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_strong]:text-white"
+                    <div className="text-sm leading-relaxed" style={{ color: "#cbd5e1" }}
                       dangerouslySetInnerHTML={{ __html: cfg.instructions }} />
                   )}
                   <PythonRunner
@@ -250,16 +327,14 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                     hiddenTests={cfg.hidden_tests}
                     expectedOutput={cfg.expected_output}
                     language={cfg.language ?? "python"}
-                    onSuccess={() => {
-                      if (!completed) setCodeResults(prev => ({ ...prev, [block.id]: true }));
-                    }}
+                    onSuccess={() => { if (!completed) setCodeResults(prev => ({ ...prev, [block.id]: true })); }}
                   />
                 </div>
               </div>
             );
           }
 
-          /* ── Blockly Kodi ── */
+          /* Blockly */
           if (block.type === "blockly_challenge") {
             const cfg = block.content as {
               instructions?: string;
@@ -271,21 +346,16 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
             };
             const done = !!codeResults[block.id];
             return (
-              <div key={block.id} className="rounded-2xl border border-orange-800/40 overflow-hidden">
-                <div className="bg-orange-900/20 border-b border-orange-800/40 px-6 py-4 flex items-center gap-3">
+              <div key={block.id} className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${done ? "#10b98140" : "#78350f40"}` }}>
+                <div className="px-6 py-4 flex items-center gap-3" style={{ background: done ? "#052e16" : "#1a0f05" }}>
                   <span className="text-2xl">🧱</span>
                   <div>
                     <div className="font-black text-white">Défi blocs — Kodi</div>
-                    <div className="text-xs text-orange-300 mt-0.5">Programme visuel</div>
+                    <div className="text-xs mt-0.5" style={{ color: "#f97316" }}>Programme visuel</div>
                   </div>
-                  {done && <span className="ml-auto text-xs font-black text-emerald-400 bg-emerald-900/50 border border-emerald-800/40 px-3 py-1 rounded-full">✅ Réussi !</span>}
+                  {done && <span className="ml-auto text-xs font-black px-3 py-1 rounded-full" style={{ background: "#052e16", color: "#10b981", border: "1px solid #10b98140" }}>✅ Réussi !</span>}
                 </div>
-                <div className="bg-slate-900/80 p-4">
-                  {done && (
-                    <div className="mb-3 bg-emerald-900/50 border border-emerald-700 rounded-xl px-4 py-3 flex items-center gap-3 text-sm font-black text-emerald-300">
-                      <span className="text-xl">🎉</span> Défi résolu ! Super travail !
-                    </div>
-                  )}
+                <div className="p-4" style={{ background: "#050a12" }}>
                   <BlocklyKodi
                     config={{
                       instructions: cfg.instructions ?? "",
@@ -294,9 +364,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                       max_blocks: cfg.max_blocks,
                       available_blocks: cfg.available_blocks,
                     }}
-                    onSolved={() => {
-                      if (!completed) setCodeResults(prev => ({ ...prev, [block.id]: true }));
-                    }}
+                    onSolved={() => { if (!completed) setCodeResults(prev => ({ ...prev, [block.id]: true })); }}
                   />
                 </div>
               </div>
@@ -307,9 +375,9 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
         })}
       </div>
 
-      {/* Finish */}
+      {/* ── Bouton terminer ── */}
       {!completed && (
-        <div className="mt-10 pt-6 border-t border-slate-700/60 space-y-3">
+        <div className="mt-10 pt-6 space-y-3" style={{ borderTop: "1px solid #1e293b" }}>
           {readOnly ? (
             <div className="rounded-2xl px-6 py-4 text-center font-bold text-sm"
               style={{ background: "#1e293b", border: "1px solid #334155", color: "#94a3b8" }}>
@@ -318,14 +386,18 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
           ) : (
             <>
               {!canFinish && (
-                <p className="text-center text-sm text-slate-500 font-semibold">
+                <p className="text-center text-sm font-semibold" style={{ color: "#475569" }}>
                   {!allQuizDone ? "🧠 Réponds à toutes les questions pour terminer" : ""}
                 </p>
               )}
               <button
                 onClick={handleComplete}
                 disabled={!canFinish || isPending}
-                className="w-full bg-brand-orange hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:border disabled:border-slate-700 text-white font-black py-5 rounded-2xl text-lg transition-all"
+                className="w-full font-black py-5 rounded-2xl text-lg transition-all"
+                style={canFinish && !isPending
+                  ? { background: "#FDB813", color: "#0f172a", boxShadow: "0 0 30px #FDB81330" }
+                  : { background: "#1e293b", color: "#334155", border: "1px solid #1e293b" }
+                }
               >
                 {isPending ? "Enregistrement…" : canFinish ? `✅ Terminer l'entraînement · +${xpReward} XP` : "Entraînement en cours…"}
               </button>
@@ -337,6 +409,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
   );
 }
 
+/* ── Markdown helpers ── */
 function parseTable(block: string): string {
   const lines = block.trim().split("\n").filter(Boolean);
   if (lines.length < 2) return block;
@@ -344,8 +417,7 @@ function parseTable(block: string): string {
   if (!isSep(lines[1])) return block;
   const tdStyle = `border:1px solid rgba(71,85,105,0.6);padding:6px 12px;color:#cbd5e1`;
   const thStyle = `${tdStyle};color:#f1f5f9;font-weight:700;text-align:left`;
-  const cells = (line: string) =>
-    line.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+  const cells = (line: string) => line.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
   const headers = cells(lines[0]).map(h => `<th style="${thStyle}">${h}</th>`).join("");
   const rows = lines.slice(2).map((l, i) =>
     `<tr style="background:${i % 2 === 0 ? "rgba(30,41,59,0.4)" : "transparent"}">${cells(l).map(c => `<td style="${tdStyle}">${c}</td>`).join("")}</tr>`
@@ -354,7 +426,6 @@ function parseTable(block: string): string {
 }
 
 function simpleMarkdown(md: string): string {
-  // Tables first (before other transforms)
   md = md.replace(/(^\|.+\n)(^\|[\s\-|:]+\|\n)((?:^\|.+\n?)*)/gm, (m) => parseTable(m));
   return md
     .replace(/^### (.+)$/gm, "<h3>$1</h3>")

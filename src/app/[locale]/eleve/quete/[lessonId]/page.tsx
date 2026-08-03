@@ -56,6 +56,13 @@ export default async function QuestePage({ params }: { params: Promise<{ lessonI
     if (idx >= 0 && idx < allLessons.length - 1) nextLessonId = allLessons[idx + 1].id;
   }
 
+  // Entraînements liés à cette leçon
+  const { data: trainingsRaw } = await (supabase.from("trainings") as any)
+    .select("id, title, xp_reward")
+    .eq("lesson_id", lessonId)
+    .order("created_at");
+  const trainings = (trainingsRaw ?? []) as { id: string; title: string; xp_reward: number }[];
+
   const { data: progress } = await (supabase.from("lesson_progress") as any)
     .select("status, block_progress")
     .eq("student_id", student.id)
@@ -113,6 +120,7 @@ export default async function QuestePage({ params }: { params: Promise<{ lessonI
         nextLessonId={nextLessonId}
         themeId={chapter?.theme_id ?? ""}
         savedBlockProgress={savedBlockProgress}
+        trainings={trainings}
       />
     </div>
   );

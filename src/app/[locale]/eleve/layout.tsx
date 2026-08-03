@@ -37,6 +37,19 @@ export default async function EleveLayout({ children }: { children: React.ReactN
 
   const xp = student?.xp ?? 0;
 
+  // Badge entraînements disponibles non encore faits
+  let trainingBadgeCount = 0;
+  if (student) {
+    const [{ data: allTrainings }, { data: lessonProg }, { data: trainingProg }] = await Promise.all([
+      (supabase.from("trainings") as any).select("id, lesson_id"),
+      (supabase.from("lesson_progress") as any).select("lesson_id").eq("student_id", student.id),
+      (supabase.from("training_progress") as any).select("training_id").eq("student_id", student.id).gt("attempts", 0),
+    ]);
+    const startedIds = new Set((lessonProg ?? []).map((r: any) => r.lesson_id));
+    const doneIds    = new Set((trainingProg ?? []).map((r: any) => r.training_id));
+    trainingBadgeCount = (allTrainings ?? []).filter((t: any) => startedIds.has(t.lesson_id) && !doneIds.has(t.id)).length;
+  }
+
   const { data: avatarRaw } = student
     ? await (supabase.from("student_avatar") as any)
         .select("base, hat, accessory, color")
@@ -109,17 +122,26 @@ export default async function EleveLayout({ children }: { children: React.ReactN
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-3 space-y-1">
-          {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all hover:bg-slate-800"
-              style={{ color: "#94a3b8" }}
-            >
-              <span className="text-base">{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
+          {nav.map((item) => {
+            const isTraining = item.href === "/eleve/entrainement";
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all hover:bg-slate-800"
+                style={{ color: "#94a3b8" }}
+              >
+                <span className="text-base">{item.icon}</span>
+                <span className="flex-1">{item.label}</span>
+                {isTraining && trainingBadgeCount > 0 && (
+                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
+                    style={{ background: "#FDB813", color: "#0f172a" }}>
+                    {trainingBadgeCount}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
         </nav>
 
       </aside>
