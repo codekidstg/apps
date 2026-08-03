@@ -4,22 +4,25 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 
 export default async function ProgressionPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ locale: string }>;
   searchParams: Promise<{ child?: string }>;
 }) {
+  const { locale } = await params;
   const { child: childParam } = await searchParams;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/fr/connexion");
+  if (!user) redirect(`/${locale}/connexion`);
 
   const { data: links } = await (supabase.from("parent_children") as any)
     .select("student_id, students(id, xp, level_num, profiles(display_name))")
     .eq("parent_id", user.id);
 
   const children = (links ?? []).map((l: any) => l.students).filter(Boolean);
-  if (children.length === 0) redirect("/fr/suivi");
+  if (children.length === 0) redirect(`/${locale}/suivi`);
 
   // Sélection de l'enfant via ?child=<id>, sinon le premier
   const child = children.find((c: any) => c.id === childParam) ?? children[0];
@@ -66,7 +69,7 @@ export default async function ProgressionPage({
             return (
               <Link
                 key={c.id}
-                href={`/fr/suivi/progression?child=${c.id}`}
+                href={`/${locale}/suivi/progression?child=${c.id}`}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
                   active
                     ? "bg-brand-navy text-white border border-blue-600"
