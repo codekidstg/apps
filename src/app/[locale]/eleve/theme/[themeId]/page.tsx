@@ -36,6 +36,15 @@ export default async function ThemePage({
   const theme = themeRaw as { id: string; title: string; level: string } | null;
   if (!theme) redirect("/fr/eleve");
 
+  // Vérifier l'accès au thème (si des accès sont configurés pour cet élève)
+  const { data: accessRows } = await (admin.from("student_theme_access") as any)
+    .select("theme_id")
+    .eq("student_id", student.id);
+  if (accessRows && accessRows.length > 0) {
+    const hasAccess = accessRows.some((r: { theme_id: string }) => r.theme_id === themeId);
+    if (!hasAccess) redirect("/fr/eleve");
+  }
+
   const { data: chaptersRaw } = await admin
     .from("chapters")
     .select("id, title, order_index")

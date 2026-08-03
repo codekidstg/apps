@@ -41,8 +41,16 @@ export default async function ProfCoursPage() {
   const levelNums = [...new Set(students.map((s: any) => s.level_num ?? 1))];
   const levelStrings = (levelNums as number[]).map((n) => LEVEL_MAP[n]).filter(Boolean);
 
+  // Thèmes activés pour au moins un élève de ce prof
+  const { data: accessRows } = await (admin.from("student_theme_access") as any)
+    .select("theme_id")
+    .in("student_id", students.map((s: any) => s.id));
+  const activatedThemeIds = accessRows?.length
+    ? [...new Set((accessRows as { theme_id: string }[]).map((r) => r.theme_id))]
+    : null; // null = aucun accès configuré → on affiche tous les thèmes du niveau
+
   // Thèmes publiés correspondant aux niveaux des élèves
-  const { data: themes } = await (admin.from("themes") as any)
+  let themesQuery = (admin.from("themes") as any)
     .select(`
       id, title, level,
       chapters (
@@ -53,6 +61,10 @@ export default async function ProfCoursPage() {
     .eq("status", "published")
     .in("level", levelStrings)
     .order("title");
+  if (activatedThemeIds) {
+    themesQuery = themesQuery.in("id", activatedThemeIds);
+  }
+  const { data: themes } = await themesQuery;
 
   // Progression de TOUS les élèves
   const studentIds = students.map((s: any) => s.id);

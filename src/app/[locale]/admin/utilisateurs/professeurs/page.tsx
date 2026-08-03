@@ -5,6 +5,7 @@ import UnassignButton from "./UnassignButton";
 import SessionForm from "./SessionForm";
 import DeleteSessionButton from "./DeleteSessionButton";
 import ProfSearchBar from "./ProfSearchBar";
+import ThemeAccessToggles from "./ThemeAccessToggles";
 
 const LEVEL_NAMES: Record<number, string> = { 1: "Explorateur", 2: "Bâtisseur", 3: "Architecte" };
 const LEVEL_COLORS: Record<number, string> = {
@@ -58,6 +59,27 @@ export default async function ProfesseursPage() {
     display_name: s.profiles?.display_name ?? "Élève",
     teacher_id: s.teacher_id,
   }));
+
+  // Thèmes publiés (pour les toggles d'accès)
+  const { data: allThemes } = await (admin.from("themes") as any)
+    .select("id, title, level")
+    .eq("status", "published")
+    .order("level").order("order_index");
+
+  // Accès thèmes existants pour tous les élèves
+  const allStudentIds = (allStudents ?? []).map((s: any) => s.id);
+  const { data: allAccess } = allStudentIds.length
+    ? await (admin.from("student_theme_access") as any)
+        .select("student_id, theme_id")
+        .in("student_id", allStudentIds)
+    : { data: [] };
+
+  // index: studentId → Set<themeId>
+  const accessByStudent = new Map<string, Set<string>>();
+  for (const a of allAccess ?? []) {
+    if (!accessByStudent.has(a.student_id)) accessByStudent.set(a.student_id, new Set());
+    accessByStudent.get(a.student_id)!.add(a.theme_id);
+  }
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -161,24 +183,32 @@ export default async function ProfesseursPage() {
                   </div>
 
                   {students.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-4">
                       {students.map((s: any) => (
-                        <div key={s.id} className="group flex items-center gap-3 p-2.5 rounded-2xl hover:bg-gray-50 transition-colors">
-                          <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-base shrink-0">
-                            {s.level_num === 3 ? "🏛️" : s.level_num === 2 ? "🔨" : "🧭"}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-bold text-gray-800 text-sm truncate">{s.profiles?.display_name ?? "—"}</div>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${LEVEL_COLORS[s.level_num ?? 1]}`}>
-                                {LEVEL_NAMES[s.level_num ?? 1]}
-                              </span>
-                              <span className="text-[10px] text-gray-400">{s.xp ?? 0} XP</span>
+                        <div key={s.id}>
+                          <div className="group flex items-center gap-3 p-2.5 rounded-2xl hover:bg-gray-50 transition-colors">
+                            <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-base shrink-0">
+                              {s.level_num === 3 ? "🏛️" : s.level_num === 2 ? "🔨" : "🧭"}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-gray-800 text-sm truncate">{s.profiles?.display_name ?? "—"}</div>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${LEVEL_COLORS[s.level_num ?? 1]}`}>
+                                  {LEVEL_NAMES[s.level_num ?? 1]}
+                                </span>
+                                <span className="text-[10px] text-gray-400">{s.xp ?? 0} XP</span>
+                              </div>
+                            </div>
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              <UnassignButton studentId={s.id} studentName={s.profiles?.display_name ?? "cet élève"} />
                             </div>
                           </div>
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            <UnassignButton studentId={s.id} studentName={s.profiles?.display_name ?? "cet élève"} />
-                          </div>
+                          <ThemeAccessToggles
+                            studentId={s.id}
+                            studentName={s.profiles?.display_name ?? "Élève"}
+                            themes={allThemes ?? []}
+                            activeThemeIds={accessByStudent.get(s.id) ?? new Set()}
+                          />
                         </div>
                       ))}
                     </div>

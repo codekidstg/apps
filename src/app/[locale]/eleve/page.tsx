@@ -33,6 +33,14 @@ export default async function EleveDashboard() {
 
   const admin = createAdminClient();
 
+  // Thèmes accessibles à cet élève
+  const { data: accessRows } = await (admin.from("student_theme_access") as any)
+    .select("theme_id")
+    .eq("student_id", student.id);
+  const accessibleThemeIds = accessRows?.length
+    ? new Set((accessRows as { theme_id: string }[]).map((r) => r.theme_id))
+    : null; // null = aucun accès configuré → on affiche tout (rétrocompatibilité)
+
   const [{ data: themesRaw }, { data: chaptersRaw }, { data: lessonsRaw }, { data: progressRaw }, { data: achievementsRaw }] =
     await Promise.all([
       (admin.from("themes") as any).select("id, title, level").eq("status", "published").order("level").order("order_index"),
@@ -42,7 +50,10 @@ export default async function EleveDashboard() {
       (supabase.from("student_achievements") as any).select("badge_id, earned_at").eq("student_id", student.id).order("earned_at", { ascending: false }),
     ]);
 
-  const themes: Theme[]       = themesRaw  ?? [];
+  const allThemes: Theme[]     = themesRaw  ?? [];
+  const themes: Theme[]       = accessibleThemeIds
+    ? allThemes.filter((t) => accessibleThemeIds.has(t.id))
+    : allThemes;
   const chapters: Chapter[]   = chaptersRaw ?? [];
   const lessons: LessonRow[]  = lessonsRaw  ?? [];
   const progress: ProgressRow[]= progressRaw ?? [];
