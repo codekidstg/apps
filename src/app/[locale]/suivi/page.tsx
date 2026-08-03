@@ -43,15 +43,9 @@ export default async function SuiviDashboard({
 
   const childIds = children.map((c: any) => c.id);
 
-  const { data: publishedLessons } = await (admin.from("lessons") as any)
-    .select("id")
-    .eq("status", "published");
-  const publishedLessonIds = new Set((publishedLessons ?? []).map((l: any) => l.id));
-  const totalPublished = publishedLessonIds.size;
-
   const { data: progressRaw } = childIds.length
     ? await (admin.from("lesson_progress") as any)
-        .select("student_id, status, lesson_id, completed_at")
+        .select("student_id, status, lesson_id, completed_at, updated_at")
         .in("student_id", childIds)
     : { data: [] };
 
@@ -62,38 +56,42 @@ export default async function SuiviDashboard({
   const weeklyByChild = new Map<string, { lessons: number; activeDays: Set<string> }>();
   for (const c of children) weeklyByChild.set(c.id, { lessons: 0, activeDays: new Set() });
 
-  const progressByChild = new Map<string, { total: number; done: number }>();
+  // Progression : on compte depuis lesson_progress directement (done/total des leçons tentées)
+  const progressByChild = new Map<string, { total: number; done: number; lastActivity: Date | null }>();
   for (const p of progressRaw ?? []) {
-    if (!publishedLessonIds.has(p.lesson_id)) continue;
-    const cur = progressByChild.get(p.student_id) ?? { total: totalPublished, done: 0 };
+    const cur = progressByChild.get(p.student_id) ?? { total: 0, done: 0, lastActivity: null };
+    cur.total++;
     if (p.status === "completed") {
       cur.done++;
-      if (p.completed_at && new Date(p.completed_at) >= weekAgo) {
+      const at = p.completed_at ? new Date(p.completed_at) : null;
+      if (at && (!cur.lastActivity || at > cur.lastActivity)) cur.lastActivity = at;
+      if (at && at >= weekAgo) {
         const w = weeklyByChild.get(p.student_id);
-        if (w) {
-          w.lessons++;
-          w.activeDays.add(p.completed_at.slice(0, 10));
-        }
+        if (w) { w.lessons++; w.activeDays.add(p.completed_at.slice(0, 10)); }
       }
     }
     progressByChild.set(p.student_id, cur);
   }
   for (const c of children) {
-    if (!progressByChild.has(c.id)) progressByChild.set(c.id, { total: totalPublished, done: 0 });
+    if (!progressByChild.has(c.id)) progressByChild.set(c.id, { total: 0, done: 0, lastActivity: null });
   }
 
-  // Training progress this week
+  // Training progress : cette semaine + dernière activité
   const { data: trainingProgressRaw } = childIds.length
     ? await (admin.from("training_progress") as any)
         .select("student_id, completed_at")
         .in("student_id", childIds)
-        .gte("completed_at", weekAgo.toISOString())
         .not("completed_at", "is", null)
     : { data: [] };
 
   const weeklyTrainingsByChild = new Map<string, number>();
   for (const tp of trainingProgressRaw ?? []) {
-    weeklyTrainingsByChild.set(tp.student_id, (weeklyTrainingsByChild.get(tp.student_id) ?? 0) + 1);
+    const at = new Date(tp.completed_at);
+    if (at >= weekAgo)
+      weeklyTrainingsByChild.set(tp.student_id, (weeklyTrainingsByChild.get(tp.student_id) ?? 0) + 1);
+    // Mettre à jour lastActivity si plus récent
+    const cur = progressByChild.get(tp.student_id);
+    if (cur && (!cur.lastActivity || at > cur.lastActivity)) cur.lastActivity = at;
   }
 
   const teacherIds = [...new Set(children.map((c: any) => c.teacher_id).filter(Boolean))];
@@ -173,13 +171,25 @@ export default async function SuiviDashboard({
         const xp     = child.xp ?? 0;
         const lvl    = LEVELS.find((l) => l.num === (child.level_num ?? 1)) ?? LEVELS[0];
         const { pct } = xpProgressInLevel(xp);
-        const prog   = progressByChild.get(child.id) ?? { total: 0, done: 0 };
+        const prog   = progressByChild.get(child.id) ?? { total: 0, done: 0, lastActivity: null };
         const badges = (badgesByChild.get(child.id) ?? []).slice(0, 4);
         const sub         = activeSubs.get(child.id);
         const hasConsent  = consentedIds.has(child.id);
         const nextSessions = getChildSessions(child.id, child.teacher_id ?? null);
         const weekly = weeklyByChild.get(child.id) ?? { lessons: 0, activeDays: new Set<string>() };
         const weeklyTrainings = weeklyTrainingsByChild.get(child.id) ?? 0;
+
+        // Dernière activité (relative)
+        const lastAt = prog.lastActivity;
+        function relativeDate(d: Date | null): string {
+          if (!d) return "Aucune activité";
+          const diffMs = Date.now() - d.getTime();
+          const diffDays = Math.floor(diffMs / 86400000);
+          if (diffDays === 0) return "Aujourd'hui";
+          if (diffDays === 1) return "Hier";
+          if (diffDays < 7) return `Il y a ${diffDays} jours`;
+          return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+        }
 
         return (
           <div key={child.id} className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 md:p-6 space-y-5">
@@ -237,8 +247,8 @@ export default async function SuiviDashboard({
                 <div className="text-xs text-slate-400 mt-0.5">Leçons</div>
               </div>
               <div className="bg-slate-900/60 rounded-xl p-3 text-center">
-                <div className="text-2xl font-black text-white">{child.streak_days ?? 0}</div>
-                <div className="text-xs text-slate-400 mt-0.5">Jours 🔥</div>
+                <div className="text-sm font-black text-white leading-tight">{relativeDate(lastAt)}</div>
+                <div className="text-xs text-slate-400 mt-0.5">Dernière activité</div>
               </div>
             </div>
 

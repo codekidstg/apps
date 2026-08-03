@@ -35,6 +35,8 @@ export default async function ProgressionPage({
   const progMap = new Map<string, { status: string; score?: number; attempts?: number }>(
     (progRaw ?? []).map((p: any) => [p.lesson_id, p])
   );
+  // Leçons commencées par l'enfant
+  const startedLessonIds = new Set((progRaw ?? []).map((p: any) => p.lesson_id));
 
   const LEVEL_MAP: Record<number, string> = { 1: "explorer", 2: "builder", 3: "architect" };
   const childLevel = LEVEL_MAP[child.level_num ?? 1] ?? "explorer";
@@ -46,11 +48,18 @@ export default async function ProgressionPage({
     .eq("level", childLevel)
     .order("title");
 
-  const hasAnyProgress = (themes ?? []).some((theme: any) =>
-    (theme.chapters ?? []).some((ch: any) =>
-      (ch.lessons ?? []).some((l: any) => progMap.has(l.id))
-    )
-  );
+  // Filtrer : garder seulement les chapitres/leçons que l'enfant a commencés
+  const filteredThemes = (themes ?? []).map((theme: any) => ({
+    ...theme,
+    chapters: (theme.chapters ?? [])
+      .map((ch: any) => ({
+        ...ch,
+        lessons: (ch.lessons ?? []).filter((l: any) => startedLessonIds.has(l.id)),
+      }))
+      .filter((ch: any) => ch.lessons.length > 0),
+  })).filter((theme: any) => theme.chapters.length > 0);
+
+  const hasAnyProgress = filteredThemes.length > 0;
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -84,7 +93,7 @@ export default async function ProgressionPage({
         </div>
       )}
 
-      {(themes ?? []).map((theme: any) => {
+      {filteredThemes.map((theme: any) => {
         const chapters = [...(theme.chapters ?? [])].sort((a: any, b: any) => a.order_index - b.order_index);
 
         return (

@@ -48,7 +48,7 @@ export default async function CertificatsPage() {
         const name = child.profiles?.display_name ?? "Élève";
         const childCerts = certsByChild.get(child.id) ?? [];
         const validated = childCerts.filter((c) => !!c.validated_at);
-        const pending   = childCerts.filter((c) => !c.validated_at);
+        const pendingCount = childCerts.filter((c) => !c.validated_at).length;
 
         return (
           <div key={child.id} className="space-y-4">
@@ -57,56 +57,46 @@ export default async function CertificatsPage() {
               <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-lg">👦</div>
               <h2 className="text-lg font-black text-white">{name}</h2>
               <span className="text-xs font-bold text-slate-500 bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full">
-                {childCerts.length} certificat{childCerts.length !== 1 ? "s" : ""}
+                {validated.length} certificat{validated.length !== 1 ? "s" : ""}
               </span>
             </div>
 
-            {childCerts.length === 0 && (
+            {validated.length === 0 && pendingCount === 0 && (
               <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 text-center text-sm text-slate-500">
                 Aucun certificat pour l'instant
               </div>
             )}
 
-            {/* En attente */}
-            {pending.length > 0 && (
-              <div className="space-y-2">
-                {pending.map((c: any) => (
-                  <div key={c.id} className="flex items-center justify-between bg-amber-900/20 border border-amber-800/50 rounded-xl px-4 py-3">
-                    <div>
-                      <div className="font-bold text-amber-300 text-sm">
-                        {c.cert_type === "theme" ? "📜" : "🎓"} {certTitle(c)}
-                      </div>
-                      <div className="text-xs text-amber-500 mt-0.5">Émis le {new Date(c.issued_at).toLocaleDateString("fr-FR")}</div>
-                    </div>
-                    <span className="text-xs font-bold text-amber-500 bg-amber-900/40 px-2 py-1 rounded-full whitespace-nowrap">⏳ En attente prof</span>
-                  </div>
-                ))}
+            {validated.length === 0 && pendingCount > 0 && (
+              <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 text-center text-sm text-slate-500">
+                Aucun certificat validé pour l'instant.<br />
+                <span className="text-amber-500/80">{pendingCount} en cours de validation par le professeur.</span>
               </div>
             )}
 
-            {/* Validés */}
+            {/* Validés uniquement */}
             {validated.length > 0 && (
               <div className="space-y-3">
                 {validated.map((c: any) => (
                   <div key={c.id} className="flex items-center justify-between bg-slate-800/60 border border-slate-700 rounded-2xl px-5 py-4">
-                    <div className="flex items-center gap-4">
-                      <div className="text-3xl">{c.cert_type === "theme" ? "📜" : "🎓"}</div>
-                      <div>
-                        <div className="font-black text-white">{certTitle(c)}</div>
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="text-3xl shrink-0">{c.cert_type === "theme" ? "📜" : "🎓"}</div>
+                      <div className="min-w-0">
+                        <div className="font-black text-white truncate">{certTitle(c)}</div>
                         <div className="text-xs text-slate-400 mt-0.5">Score {c.score}/100 · {c.total_xp} XP</div>
                         <div className="text-xs text-slate-500 mt-0.5">
-                          Validé le {new Date(c.validated_at).toLocaleDateString("fr-FR")} · Hash : {c.verify_hash}
+                          Validé le {new Date(c.validated_at).toLocaleDateString("fr-FR")}
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex gap-2 shrink-0 ml-3">
                       <a
                         href={`/api/certificats/${c.id}?preview=1`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold px-3 py-2.5 rounded-xl transition-colors"
                       >
-                        <span>👁</span> Aperçu
+                        <span>👁</span> <span className="hidden sm:inline">Aperçu</span>
                       </a>
                       <a
                         href={`/api/certificats/${c.id}`}
@@ -118,6 +108,11 @@ export default async function CertificatsPage() {
                     </div>
                   </div>
                 ))}
+                {pendingCount > 0 && (
+                  <p className="text-xs text-slate-500 text-center pt-1">
+                    + {pendingCount} certificat{pendingCount > 1 ? "s" : ""} en cours de validation par le professeur
+                  </p>
+                )}
               </div>
             )}
           </div>
