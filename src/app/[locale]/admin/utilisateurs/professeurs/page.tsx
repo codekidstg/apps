@@ -206,6 +206,7 @@ export default async function ProfesseursPage() {
                           <ThemeAccessToggles
                             studentId={s.id}
                             studentName={s.profiles?.display_name ?? "Élève"}
+                            studentLevel={["explorer","builder","architect"][Math.max(0,(s.level_num??1)-1)]}
                             themes={allThemes ?? []}
                             activeThemeIds={accessByStudent.get(s.id) ?? new Set()}
                           />
