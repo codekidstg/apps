@@ -108,6 +108,28 @@ export async function assignTeacherToStudent(studentId: string, teacherProfileId
   return { success: true };
 }
 
+export async function updateUser(userId: string, data: { display_name?: string; email?: string; role?: Role }) {
+  const admin = createAdminClient();
+
+  const authUpdate: Record<string, unknown> = {};
+  if (data.email) authUpdate.email = data.email;
+  if (data.role)  authUpdate.app_metadata = { role: data.role };
+  if (Object.keys(authUpdate).length) {
+    const { error } = await admin.auth.admin.updateUserById(userId, authUpdate);
+    if (error) return { error: error.message };
+  }
+
+  const profileUpdate: Record<string, unknown> = {};
+  if (data.display_name) profileUpdate.display_name = data.display_name;
+  if (data.role)         profileUpdate.role = data.role;
+  if (Object.keys(profileUpdate).length) {
+    await (admin.from("profiles") as any).update(profileUpdate).eq("id", userId);
+  }
+
+  revalidatePath("/admin/utilisateurs");
+  return { success: true };
+}
+
 export async function toggleUserActive(userId: string, active: boolean) {
   const admin = createAdminClient();
   await (admin.from("profiles") as any).update({ active }).eq("id", userId);

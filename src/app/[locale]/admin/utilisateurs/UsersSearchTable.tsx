@@ -6,6 +6,7 @@ import { CopyCell } from "./CopyCell";
 import { ResetPasswordCell } from "./ResetPasswordCell";
 import { toggleUserActive } from "./actions";
 import { useTransition } from "react";
+import EditUserModal from "./EditUserModal";
 
 type UserRow = {
   id: string;
@@ -51,6 +52,7 @@ const DASHBOARD: Record<string, string> = {
 export default function UsersSearchTable({ users }: { users: UserRow[] }) {
   const [q, setQ] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
 
   const filtered = useMemo(() => {
     const lower = q.toLowerCase().trim();
@@ -67,6 +69,9 @@ export default function UsersSearchTable({ users }: { users: UserRow[] }) {
 
   return (
     <div className="space-y-4">
+      {editingUser && (
+        <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} />
+      )}
       {/* Barre de recherche + filtres */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-52">
@@ -150,7 +155,16 @@ export default function UsersSearchTable({ users }: { users: UserRow[] }) {
                     <span className="text-xs text-gray-400">{new Date(u.created_at).toLocaleDateString("fr-FR")}</span>
                   </td>
                   <td className="px-5 py-3">
-                    <ToggleButton userId={u.id} active={u.active} />
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setEditingUser(u)}
+                        className="text-xs font-bold text-brand-navy hover:text-brand-navy/70 transition-colors"
+                        title="Modifier"
+                      >
+                        ✏️ Modifier
+                      </button>
+                      <ToggleButton userId={u.id} active={u.active} />
+                    </div>
                   </td>
                 </tr>
               );
