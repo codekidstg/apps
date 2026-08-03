@@ -4,43 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-
-type Training = {
-  id: string;
-  title: string;
-  description: string | null;
-  xp_reward: number;
-  lesson_id: string;
-  lesson_title: string;
-  theme_id: string;
-  theme_title: string;
-  theme_level: string;
-  attempts: number;
-  last_completed_at: string | null;
-  best_score: number | null;
-};
-
-function getFreshness(last: string | null, attempts: number): "new" | "hot" | "done" | "revision" {
-  if (attempts === 0) return "new";
-  if (!last) return "done";
-  const days = (Date.now() - new Date(last).getTime()) / (1000 * 60 * 60 * 24);
-  if (days <= 7)  return "hot";
-  if (days <= 30) return "done";
-  return "revision";
-}
-
-const FRESHNESS: Record<string, { icon: string; label: string; color: string; bg: string }> = {
-  new:      { icon: "✨", label: "Nouveau",  color: "#FDB813", bg: "#FDB81320" },
-  hot:      { icon: "🔥", label: "Chaud",    color: "#f97316", bg: "#f9731620" },
-  done:     { icon: "✅", label: "Fait",     color: "#10b981", bg: "#10b98120" },
-  revision: { icon: "📚", label: "Révision", color: "#a78bfa", bg: "#a78bfa20" },
-};
-
-const LEVEL_META: Record<string, { icon: string; color: string; label: string }> = {
-  explorer:  { icon: "🌱", color: "#10b981", label: "Explorateur" },
-  builder:   { icon: "🔨", color: "#a78bfa", label: "Bâtisseur" },
-  architect: { icon: "🏛️", color: "#60a5fa", label: "Architecte" },
-};
+import TrainingAccordion from "./TrainingAccordion";
 
 export default async function EntrainementPage() {
   const supabase = await createClient();
@@ -68,59 +32,68 @@ export default async function EntrainementPage() {
     .select("training_id, score, attempts, completed_at")
     .eq("student_id", student.id);
 
-  const lessonProgressMap = new Map((lessonProgress ?? []).map((lp: any) => [lp.lesson_id, lp]));
+  const lessonProgressMap  = new Map((lessonProgress  ?? []).map((lp: any) => [lp.lesson_id,     lp]));
   const trainingProgressMap = new Map((trainingProgress ?? []).map((tp: any) => [tp.training_id, tp]));
 
-  const allTrainings: (Training & { lesson_started: boolean })[] = (trainingsRaw ?? []).map((t: any) => {
+  // Trouver la leçon la plus récemment terminée (pour l'ouvrir par défaut)
+  const completedLessons = (lessonProgress ?? [])
+    .filter((lp: any) => lp.status === "completed" && lp.completed_at)
+    .sort((a: any, b: any) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime());
+  const lastCompletedLessonId: string | null = completedLessons[0]?.lesson_id ?? null;
+
+  type Training = {
+    id: string; title: string; description: string | null; xp_reward: number;
+    lesson_id: string; lesson_title: string; lesson_completed_at: string | null;
+    theme_id: string; theme_title: string; theme_level: string;
+    attempts: number; last_completed_at: string | null; best_score: number | null;
+    lesson_started: boolean;
+  };
+
+  const allTrainings: Training[] = (trainingsRaw ?? []).map((t: any) => {
     const lp = lessonProgressMap.get(t.lesson_id) as any;
     const tp = trainingProgressMap.get(t.id) as any;
     const lesson = t.lessons;
-    const theme = lesson?.themes;
+    const theme  = lesson?.themes;
     return {
-      id: t.id,
-      title: t.title,
-      description: t.description ?? null,
-      xp_reward: t.xp_reward,
-      lesson_id: t.lesson_id,
-      lesson_title: lesson?.title ?? "Leçon",
-      theme_id: theme?.id ?? "",
-      theme_title: theme?.title ?? "Thème",
-      theme_level: theme?.level ?? "explorer",
-      attempts: tp?.attempts ?? 0,
-      last_completed_at: tp?.completed_at ?? null,
-      best_score: tp?.score ?? null,
-      lesson_started: !!lp,
+      id: t.id, title: t.title, description: t.description ?? null, xp_reward: t.xp_reward,
+      lesson_id: t.lesson_id, lesson_title: lesson?.title ?? "Leçon",
+      lesson_completed_at: lp?.completed_at ?? null,
+      theme_id: theme?.id ?? "", theme_title: theme?.title ?? "Thème", theme_level: theme?.level ?? "explorer",
+      attempts: tp?.attempts ?? 0, last_completed_at: tp?.completed_at ?? null,
+      best_score: tp?.score ?? null, lesson_started: !!lp,
     };
   });
 
   const available = allTrainings.filter(t => t.lesson_started);
   const locked    = allTrainings.filter(t => !t.lesson_started);
 
-  // Grouper par thème → par leçon
-  type Group = { themeId: string; themeTitle: string; themeLevel: string; lessons: { lessonId: string; lessonTitle: string; trainings: typeof available }[] };
-  const grouped: Group[] = [];
-  const themeMap = new Map<string, Group>();
+  // Grouper thème → leçon
+  type LessonGroup = { lessonId: string; lessonTitle: string; lessonCompletedAt: string | null; trainings: Training[] };
+  type ThemeGroup  = { themeId: string; themeTitle: string; themeLevel: string; lessons: LessonGroup[] };
+
+  const grouped: ThemeGroup[] = [];
+  const themeMap = new Map<string, ThemeGroup>();
 
   for (const t of available) {
     if (!themeMap.has(t.theme_id)) {
-      const g: Group = { themeId: t.theme_id, themeTitle: t.theme_title, themeLevel: t.theme_level, lessons: [] };
+      const g: ThemeGroup = { themeId: t.theme_id, themeTitle: t.theme_title, themeLevel: t.theme_level, lessons: [] };
       themeMap.set(t.theme_id, g);
       grouped.push(g);
     }
     const group = themeMap.get(t.theme_id)!;
-    let lessonGroup = group.lessons.find(l => l.lessonId === t.lesson_id);
-    if (!lessonGroup) {
-      lessonGroup = { lessonId: t.lesson_id, lessonTitle: t.lesson_title, trainings: [] };
-      group.lessons.push(lessonGroup);
+    let lg = group.lessons.find(l => l.lessonId === t.lesson_id);
+    if (!lg) {
+      lg = { lessonId: t.lesson_id, lessonTitle: t.lesson_title, lessonCompletedAt: t.lesson_completed_at, trainings: [] };
+      group.lessons.push(lg);
     }
-    lessonGroup.trainings.push(t);
+    lg.trainings.push({ id: t.id, title: t.title, description: t.description, xp_reward: t.xp_reward, attempts: t.attempts, best_score: t.best_score, last_completed_at: t.last_completed_at } as any);
   }
 
   const totalDone = available.filter(t => t.attempts > 0).length;
   const totalXP   = available.reduce((s, t) => s + t.xp_reward, 0);
 
   return (
-    <div className="p-6 lg:p-10 max-w-4xl">
+    <div className="p-6 lg:p-10 max-w-3xl">
       {/* Header */}
       <div className="mb-8">
         <div className="text-xs font-mono tracking-widest uppercase mb-1" style={{ color: "#FDB813" }}>◈ Zone d&apos;entraînement</div>
@@ -130,7 +103,7 @@ export default async function EntrainementPage() {
 
       {/* Stats */}
       {available.length > 0 && (
-        <div className="grid grid-cols-3 gap-4 mb-10">
+        <div className="grid grid-cols-3 gap-4 mb-8">
           {[
             { label: "Disponibles",  value: available.length, color: "#FDB813" },
             { label: "Complétés",    value: totalDone,        color: "#10b981" },
@@ -153,83 +126,10 @@ export default async function EntrainementPage() {
         </div>
       )}
 
-      {/* Groupés par thème → leçon */}
-      {grouped.map((group) => {
-        const meta = LEVEL_META[group.themeLevel] ?? LEVEL_META.explorer;
-        const doneInTheme = group.lessons.flatMap(l => l.trainings).filter(t => t.attempts > 0).length;
-        const totalInTheme = group.lessons.flatMap(l => l.trainings).length;
-
-        return (
-          <section key={group.themeId} className="mb-8">
-            {/* Header thème */}
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-lg">{meta.icon}</span>
-              <div className="flex-1">
-                <div className="font-black text-white">{group.themeTitle}</div>
-                <div className="text-xs font-mono mt-0.5" style={{ color: meta.color }}>{meta.label}</div>
-              </div>
-              <span className="text-xs font-mono" style={{ color: "#475569" }}>
-                {doneInTheme}/{totalInTheme} faits
-              </span>
-              {/* Progress bar mini */}
-              <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: "#1e293b" }}>
-                <div className="h-full rounded-full transition-all" style={{ width: `${Math.round((doneInTheme/totalInTheme)*100)}%`, background: meta.color }} />
-              </div>
-            </div>
-
-            {/* Leçons */}
-            <div className="space-y-4 pl-4 border-l-2" style={{ borderColor: `${meta.color}30` }}>
-              {group.lessons.map((lesson) => (
-                <div key={lesson.lessonId}>
-                  {/* Label leçon */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md" style={{ background: "#1e293b", color: "#475569" }}>
-                      📖 {lesson.lessonTitle}
-                    </span>
-                  </div>
-
-                  {/* Trainings de cette leçon */}
-                  <div className="space-y-2">
-                    {lesson.trainings.map((t) => {
-                      const freshness = getFreshness(t.last_completed_at, t.attempts);
-                      const f = FRESHNESS[freshness];
-                      return (
-                        <Link key={t.id} href={`/eleve/entrainement/${t.id}`}
-                          className="block rounded-2xl p-4 transition-all hover:scale-[1.005]"
-                          style={{ background: "#1e293b", border: `1px solid ${f.bg}`, borderColor: t.attempts > 0 ? "#10b98130" : "#334155" }}>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xl shrink-0">{f.icon}</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                                <span className="text-xs font-black px-2 py-0.5 rounded-full"
-                                  style={{ background: f.bg, color: f.color }}>
-                                  {f.label}
-                                </span>
-                              </div>
-                              <div className="font-black text-sm text-white">{t.title}</div>
-                              {t.description && <p className="text-xs mt-0.5" style={{ color: "#64748b" }}>{t.description}</p>}
-                            </div>
-                            <div className="text-right shrink-0 space-y-1">
-                              <div className="text-xs font-mono font-bold" style={{ color: "#FDB813" }}>+{t.xp_reward} XP</div>
-                              {t.best_score != null && (
-                                <div className="text-xs font-mono" style={{ color: "#10b981" }}>⭐ {t.best_score}%</div>
-                              )}
-                              {t.attempts > 0 && (
-                                <div className="text-xs font-mono" style={{ color: "#334155" }}>{t.attempts}×</div>
-                              )}
-                            </div>
-                            <span style={{ color: "#334155" }}>→</span>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        );
-      })}
+      {/* Accordion thème → leçon */}
+      {grouped.length > 0 && (
+        <TrainingAccordion groups={grouped} defaultOpenLessonId={lastCompletedLessonId} />
+      )}
 
       {/* Verrouillés */}
       {locked.length > 0 && (
