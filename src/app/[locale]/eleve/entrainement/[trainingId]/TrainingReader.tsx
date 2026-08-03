@@ -1,5 +1,17 @@
 "use client";
 import { useState, useTransition } from "react";
+
+/* Mélange déterministe basé sur l'id du bloc (stable entre re-renders) */
+function seededShuffle<T>(arr: T[], seed: string): T[] {
+  const result = [...arr];
+  let h = seed.split("").reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0);
+  for (let i = result.length - 1; i > 0; i--) {
+    h = ((h << 5) - h + i) | 0;
+    const j = Math.abs(h) % (i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
 import dynamic from "next/dynamic";
 import { completeTraining } from "../../actions";
 
@@ -51,6 +63,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
   const [matchDone,    setMatchDone]    = useState<Record<string, boolean>>({});
   // swipe_sort : blockId-itemIndex → chosen category
   const [swipeResults, setSwipeResults] = useState<Record<string, { chosen: string; correct: boolean } | null>>({});
+  const [swipeHintOpen, setSwipeHintOpen] = useState<Record<string, boolean>>({});  // blockId → helper ouvert
   // drag_to_bin : blockId-itemId → chosen binId
   const [dragResults,  setDragResults]  = useState<Record<string, { chosen: string; correct: boolean } | null>>({});
   const [dragSelected, setDragSelected] = useState<Record<string, string | null>>({});  // blockId → selected itemId
@@ -159,6 +172,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
     setMatchPairs({});
     setMatchDone({});
     setSwipeResults({});
+    setSwipeHintOpen({});
     setDragResults({});
     setDragSelected({});
     setCompleted(false);
@@ -439,7 +453,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
 
           /* ── fill_blank ── */
           if (block.type === "fill_blank") {
-            type Sentence = { id: string; before: string; after?: string; options: string[]; correct: number };
+            type Sentence = { id: string; before: string; after?: string; options: string[]; correct: number; explanation?: string };
             const raw = block.content as { title?: string; sentences: Sentence[] };
             const answered = raw.sentences.filter((_, i) => fillResults[`${block.id}-${i}`] != null).length;
             return (
@@ -491,9 +505,15 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                           </div>
                         )}
                         {result != null && (
-                          <div className="mt-3 ml-10 text-sm rounded-xl px-4 py-2.5"
+                          <div className="mt-3 ml-10 text-sm rounded-xl px-4 py-2.5 space-y-1"
                             style={{ background: result ? "#052e16" : "#2d1a00", borderLeft: `4px solid ${result ? "#10b981" : "#f59e0b"}`, color: result ? "#6ee7b7" : "#fcd34d" }}>
-                            {result ? "✅ Bonne réponse !" : `💡 La bonne réponse était : ${s.options[s.correct]}`}
+                            {result
+                              ? <span>✅ Bonne réponse !</span>
+                              : <>
+                                  <div>💡 La bonne réponse était : <strong>{s.options[s.correct]}</strong></div>
+                                  {s.explanation && <div className="text-xs mt-1 opacity-80">→ {s.explanation}</div>}
+                                </>
+                            }
                           </div>
                         )}
                       </div>
@@ -511,12 +531,17 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
             const bMatchPairs  = matchPairs[block.id] ?? {};
             const bMatchSel    = matchSel[block.id] ?? null;
             const isDone       = !!matchDone[block.id];
-            // shuffle right side once (stable via index)
-            const shuffledRight = raw.pairs.map((p, i) => ({ label: p.right, id: `r${i}` }))
-              .sort((a, b) => (a.id > b.id ? 1 : -1)); // stable alphabetical by id = original order shuffled visually
+            // Mélange déterministe basé sur l'id du bloc (stable entre re-renders)
+            const shuffledRight = seededShuffle(
+              raw.pairs.map((p, i) => ({ label: p.right, id: `r${i}` })),
+              block.id
+            );
 
             function handleMatchLeft(leftId: string) {
               if (isDone || completed) return;
+              // Si déjà apparié correctement, ne pas permettre de déséléctionner
+              const paired = (matchPairs[block.id] ?? {})[leftId];
+              if (paired && paired === leftId.replace("l", "r")) return;
               setMatchSel(prev => ({ ...prev, [block.id]: prev[block.id] === leftId ? null : leftId }));
             }
             function handleMatchRight(rightId: string) {
@@ -524,13 +549,14 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
               const newPairs = { ...bMatchPairs, [bMatchSel]: rightId };
               setMatchPairs(prev => ({ ...prev, [block.id]: newPairs }));
               setMatchSel(prev => ({ ...prev, [block.id]: null }));
-              // check if all pairs filled → mark done
               if (Object.keys(newPairs).length === raw.pairs.length) {
                 setMatchDone(prev => ({ ...prev, [block.id]: true }));
               }
             }
-            // compute which rights are already taken
             const takenRights = new Set(Object.values(bMatchPairs));
+
+            // Compte les paires correctes pour le score affiché
+            const correctPairsCount = raw.pairs.filter((_, pi) => bMatchPairs[`l${pi}`] === `r${pi}`).length;
 
             return (
               <div key={block.id} className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${isDone ? "#10b98140" : "#4f1d9640"}` }}>
@@ -538,8 +564,10 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                   <span className="text-2xl">🔗</span>
                   <div className="flex-1">
                     <div className="font-black text-white">{raw.title ?? "Associe les paires"}</div>
-                    <div className="text-xs mt-0.5" style={{ color: "#a78bfa" }}>
-                      {isDone ? "✅ Toutes les paires trouvées !" : `${Object.keys(bMatchPairs).length}/${raw.pairs.length} paires reliées`}
+                    <div className="text-xs mt-0.5" style={{ color: isDone ? "#10b981" : "#a78bfa" }}>
+                      {isDone
+                        ? `✅ ${correctPairsCount}/${raw.pairs.length} paires correctes`
+                        : `${Object.keys(bMatchPairs).length}/${raw.pairs.length} paires reliées`}
                     </div>
                   </div>
                   {!isDone && bMatchSel && (
@@ -556,44 +584,52 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                       {raw.pairs.map((p, pi) => {
                         const leftId = `l${pi}`;
                         const paired = bMatchPairs[leftId];
-                        const pairedRight = paired ? raw.pairs.find((_, i) => `r${i}` === paired) : null;
-                        const isCorrect = paired && paired === `r${pi}`;
+                        const isCorrect = paired === `r${pi}`;
+                        const isWrong   = paired && paired !== `r${pi}`;
                         const isSelected = bMatchSel === leftId;
+                        // Une fois révélé correct, verrouillé ; si faux → peut re-cliquer
+                        const isLocked = isCorrect;
                         return (
                           <button key={leftId}
-                            onClick={() => handleMatchLeft(leftId)}
-                            disabled={isDone || completed}
+                            onClick={() => { if (!isLocked) handleMatchLeft(leftId); }}
+                            disabled={(isLocked && !isDone) || (isDone) || completed}
                             className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all"
                             style={{
-                              background: isCorrect ? "#052e16" : isSelected ? "#2d1a5e" : paired ? "#1a1a3a" : "#1e293b",
-                              border: `2px solid ${isCorrect ? "#10b981" : isSelected ? "#a78bfa" : paired ? "#4f1d96" : "#334155"}`,
-                              color: isCorrect ? "#6ee7b7" : isSelected ? "#e9d5ff" : "#cbd5e1",
+                              background: isCorrect ? "#052e16" : isWrong ? "#2d0a0a" : isSelected ? "#2d1a5e" : "#1e293b",
+                              border: `2px solid ${isCorrect ? "#10b981" : isWrong ? "#ef4444" : isSelected ? "#a78bfa" : "#334155"}`,
+                              color: isCorrect ? "#6ee7b7" : isWrong ? "#fca5a5" : isSelected ? "#e9d5ff" : "#cbd5e1",
                               transform: isSelected ? "scale(1.02)" : "scale(1)",
                             }}>
                             <div>{p.left}</div>
-                            {paired && !isDone && <div className="text-[10px] mt-1 opacity-60">→ {pairedRight?.right}</div>}
+                            {isCorrect && <div className="text-[10px] mt-0.5 opacity-70">✓ bien associé</div>}
+                            {isWrong && !isDone && <div className="text-[10px] mt-0.5 opacity-70">✗ mauvaise association — réessaie</div>}
                           </button>
                         );
                       })}
                     </div>
-                    {/* Colonne droite */}
+                    {/* Colonne droite — mélangée */}
                     <div className="space-y-2">
                       <div className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: "#6b21a8" }}>Définition</div>
                       {shuffledRight.map(({ label, id: rightId }) => {
-                        const isTaken = takenRights.has(rightId);
                         const pi = parseInt(rightId.replace("r", ""));
+                        // Correctement associé = la paire gauche correspondante pointe vers ce rightId
                         const isCorrectlyPaired = bMatchPairs[`l${pi}`] === rightId;
+                        // Pris par une mauvaise paire (une gauche différente pointe ici)
+                        const takenByLeft = Object.entries(bMatchPairs).find(([, v]) => v === rightId)?.[0];
+                        const isTakenCorrectly = isCorrectlyPaired;
+                        const isTakenWrongly   = !!takenByLeft && !isCorrectlyPaired;
+                        const isTaken = isTakenCorrectly || isTakenWrongly;
                         return (
                           <button key={rightId}
-                            onClick={() => handleMatchRight(rightId)}
-                            disabled={isTaken || isDone || completed || !bMatchSel}
+                            onClick={() => { if (!isTakenCorrectly) handleMatchRight(rightId); }}
+                            disabled={isTakenCorrectly || isDone || completed || !bMatchSel}
                             className="w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all"
                             style={{
-                              background: isCorrectlyPaired && isDone ? "#052e16" : isTaken ? "#0f172a" : bMatchSel ? "#1e293b" : "#0f172a",
-                              border: `2px solid ${isCorrectlyPaired && isDone ? "#10b981" : isTaken ? "#1e293b" : bMatchSel ? "#a78bfa60" : "#1e293b"}`,
-                              color: isCorrectlyPaired && isDone ? "#6ee7b7" : isTaken ? "#334155" : "#94a3b8",
-                              opacity: isTaken && !isCorrectlyPaired ? 0.4 : 1,
-                              cursor: isTaken || !bMatchSel ? "default" : "pointer",
+                              background: isTakenCorrectly ? "#052e16" : isTakenWrongly ? "#2d0a0a" : bMatchSel ? "#1e293b" : "#0f172a",
+                              border: `2px solid ${isTakenCorrectly ? "#10b981" : isTakenWrongly ? "#ef4444" : bMatchSel && !isTaken ? "#a78bfa60" : "#1e293b"}`,
+                              color: isTakenCorrectly ? "#6ee7b7" : isTakenWrongly ? "#fca5a5" : "#94a3b8",
+                              opacity: isTakenCorrectly ? 1 : isTakenWrongly ? 0.6 : 1,
+                              cursor: isTakenCorrectly || (!bMatchSel && !isTakenWrongly) ? "default" : "pointer",
                               transform: bMatchSel && !isTaken ? "scale(1.01)" : "scale(1)",
                             }}>
                             {label}
@@ -602,12 +638,22 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                       })}
                     </div>
                   </div>
+
+                  {/* Message fin */}
                   {isDone && (
                     <div className="mt-4 text-center text-sm font-black rounded-xl py-3"
-                      style={{ background: "#052e16", color: "#10b981", border: "1px solid #10b98140" }}>
-                      🎯 Parfait ! Tu as bien associé tous les éléments.
+                      style={{
+                        background: correctPairsCount === raw.pairs.length ? "#052e16" : "#2d1a00",
+                        color: correctPairsCount === raw.pairs.length ? "#10b981" : "#fcd34d",
+                        border: `1px solid ${correctPairsCount === raw.pairs.length ? "#10b98140" : "#f59e0b40"}`,
+                      }}>
+                      {correctPairsCount === raw.pairs.length
+                        ? "🎯 Parfait ! Tu as bien associé tous les éléments."
+                        : `💪 ${correctPairsCount}/${raw.pairs.length} correctes — relis les associations en rouge pour mieux retenir.`}
                     </div>
                   )}
+
+                  {/* Recommencer si pas fini */}
                   {!isDone && Object.keys(bMatchPairs).length > 0 && (
                     <button onClick={() => {
                       setMatchPairs(prev => ({ ...prev, [block.id]: {} }));
@@ -625,15 +671,17 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
 
           /* ── swipe_sort ── */
           if (block.type === "swipe_sort") {
-            type SwipeItem = { id: string; label: string; emoji?: string; correct: string };
+            type SwipeItem = { id: string; label: string; emoji?: string; correct: string; hint?: string };
             type Category  = { id: string; label: string; color: string; emoji?: string };
-            const raw = block.content as { title?: string; instruction?: string; categories: Category[]; items: SwipeItem[] };
+            type SwipeHelper = { title: string; criteria: string[] };
+            const raw = block.content as { title?: string; instruction?: string; helper?: SwipeHelper; categories: Category[]; items: SwipeItem[] };
             const blockResults = raw.items.map((item, i) => swipeResults[`${block.id}-${i}`] ?? null);
             const answeredCount = blockResults.filter(r => r != null).length;
-            const currentIdx = answeredCount; // next unanswered item
+            const currentIdx = answeredCount;
             const allAnswered = answeredCount >= raw.items.length;
             const correctCount = blockResults.filter(r => r?.correct).length;
             const currentItem = !allAnswered ? raw.items[currentIdx] : null;
+            const isHintOpen = swipeHintOpen[block.id] ?? false;
 
             return (
               <div key={block.id} className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${allAnswered ? "#10b98140" : "#b4530040"}` }}>
@@ -648,7 +696,32 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                 </div>
                 <div className="p-6" style={{ background: "#0a0800" }}>
                   {raw.instruction && !allAnswered && (
-                    <p className="text-sm text-center mb-5 font-medium" style={{ color: "#94a3b8" }}>{raw.instruction}</p>
+                    <p className="text-sm text-center mb-4 font-medium" style={{ color: "#94a3b8" }}>{raw.instruction}</p>
+                  )}
+
+                  {/* ── Aide collapsible "Comment décider ?" ── */}
+                  {raw.helper && !allAnswered && (
+                    <div className="mb-5 rounded-xl overflow-hidden" style={{ border: "1px solid #78350f50" }}>
+                      <button
+                        onClick={() => setSwipeHintOpen(prev => ({ ...prev, [block.id]: !prev[block.id] }))}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-xs font-black transition-colors hover:bg-amber-900/20"
+                        style={{ background: "#1a0f00", color: "#fbbf24" }}
+                      >
+                        <span>{isHintOpen ? "▾" : "▸"}</span>
+                        <span>💡 {raw.helper.title}</span>
+                        <span className="ml-auto font-normal opacity-60">{isHintOpen ? "Refermer" : "Voir le rappel"}</span>
+                      </button>
+                      {isHintOpen && (
+                        <div className="px-4 py-3 space-y-1.5" style={{ background: "#120a00" }}>
+                          {raw.helper.criteria.map((c, ci) => (
+                            <div key={ci} className="flex items-start gap-2 text-xs" style={{ color: "#d97706" }}>
+                              <span className="shrink-0 mt-0.5">▸</span>
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {/* Carte courante */}
@@ -667,7 +740,12 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                             onClick={() => {
                               if (completed) return;
                               const key = `${block.id}-${currentIdx}`;
-                              setSwipeResults(prev => ({ ...prev, [key]: { chosen: cat.id, correct: cat.id === currentItem.correct } }));
+                              const isCorrect = cat.id === currentItem.correct;
+                              setSwipeResults(prev => ({ ...prev, [key]: { chosen: cat.id, correct: isCorrect } }));
+                              // Ouvre l'aide si mauvaise réponse et helper disponible
+                              if (!isCorrect && raw.helper) {
+                                setSwipeHintOpen(prev => ({ ...prev, [block.id]: true }));
+                              }
                             }}
                             className="py-4 rounded-2xl font-black text-sm transition-all hover:scale-105 active:scale-95"
                             style={{ background: `${cat.color}20`, border: `2px solid ${cat.color}60`, color: cat.color }}>
@@ -678,22 +756,30 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                     </div>
                   )}
 
-                  {/* Résultats inline après chaque réponse */}
+                  {/* Résultats inline avec hint sur erreur */}
                   {answeredCount > 0 && (
-                    <div className="space-y-2 mt-4">
+                    <div className="space-y-2 mt-2">
                       {raw.items.slice(0, answeredCount).map((item, i) => {
                         const res = swipeResults[`${block.id}-${i}`];
                         if (!res) return null;
                         const chosenCat = raw.categories.find(c => c.id === res.chosen);
                         const correctCat = raw.categories.find(c => c.id === item.correct);
                         return (
-                          <div key={i} className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm"
-                            style={{ background: res.correct ? "#052e16" : "#2d0a0a", border: `1px solid ${res.correct ? "#10b98130" : "#ef444430"}` }}>
-                            <span>{res.correct ? "✅" : "❌"}</span>
-                            <span className="font-bold text-white">{item.emoji} {item.label}</span>
-                            <span className="ml-auto text-xs" style={{ color: res.correct ? "#10b981" : "#ef4444" }}>
-                              {res.correct ? chosenCat?.label : `${chosenCat?.label} → ${correctCat?.label}`}
-                            </span>
+                          <div key={i} className="rounded-xl overflow-hidden"
+                            style={{ border: `1px solid ${res.correct ? "#10b98130" : "#ef444330"}` }}>
+                            <div className="flex items-center gap-3 px-4 py-2.5 text-sm"
+                              style={{ background: res.correct ? "#052e16" : "#2d0a0a" }}>
+                              <span>{res.correct ? "✅" : "❌"}</span>
+                              <span className="font-bold text-white">{item.emoji} {item.label}</span>
+                              <span className="ml-auto text-xs shrink-0" style={{ color: res.correct ? "#10b981" : "#ef4444" }}>
+                                {res.correct ? chosenCat?.label : `${chosenCat?.label} → ${correctCat?.label}`}
+                              </span>
+                            </div>
+                            {!res.correct && item.hint && (
+                              <div className="px-4 py-2 text-xs" style={{ background: "#1a0800", color: "#d97706", borderTop: "1px solid #78350f40" }}>
+                                💡 {item.hint}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -703,7 +789,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                   {allAnswered && (
                     <div className="mt-4 text-center rounded-xl py-4 font-black"
                       style={{ background: correctCount === raw.items.length ? "#052e16" : "#1e293b", color: correctCount === raw.items.length ? "#10b981" : "#FDB813" }}>
-                      {correctCount === raw.items.length ? "🏆 Parfait !" : `💪 ${correctCount}/${raw.items.length} — Tu peux rejouer en recommençant l'entraînement`}
+                      {correctCount === raw.items.length ? "🏆 Parfait !" : `💪 ${correctCount}/${raw.items.length} — Relis les explications en rouge pour bien retenir !`}
                     </div>
                   )}
                 </div>
@@ -713,7 +799,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
 
           /* ── drag_to_bin ── */
           if (block.type === "drag_to_bin") {
-            type DragItem = { id: string; label: string; emoji?: string; correct: string };
+            type DragItem = { id: string; label: string; emoji?: string; correct: string; hint?: string };
             type Bin      = { id: string; label: string; color: string; emoji?: string };
             const raw = block.content as { title?: string; instruction?: string; bins: Bin[]; items: DragItem[] };
             const bDragSelected = dragSelected[block.id] ?? null;
@@ -808,10 +894,30 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                   )}
 
                   {allAnswered && (
-                    <div className="mt-4 text-center rounded-xl py-4 font-black"
-                      style={{ background: correctCount === raw.items.length ? "#052e16" : "#1e293b", color: correctCount === raw.items.length ? "#10b981" : "#FDB813" }}>
-                      {correctCount === raw.items.length ? "🏆 Parfait — tout bien classé !" : `💪 ${correctCount}/${raw.items.length} bien placés`}
-                    </div>
+                    <>
+                      <div className="mt-4 text-center rounded-xl py-4 font-black"
+                        style={{ background: correctCount === raw.items.length ? "#052e16" : "#1e293b", color: correctCount === raw.items.length ? "#10b981" : "#FDB813" }}>
+                        {correctCount === raw.items.length ? "🏆 Parfait — tout bien classé !" : `💪 ${correctCount}/${raw.items.length} bien placés`}
+                      </div>
+                      {/* Corrections pour les erreurs */}
+                      {raw.items.some(item => dragResults[`${block.id}-${item.id}`]?.correct === false) && (
+                        <div className="mt-3 space-y-2">
+                          <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#f59e0b" }}>💡 À retenir</div>
+                          {raw.items.filter(item => dragResults[`${block.id}-${item.id}`]?.correct === false).map(item => {
+                            const correctBin = raw.bins.find(b => b.id === item.correct);
+                            return (
+                              <div key={item.id} className="rounded-xl px-4 py-2.5 text-xs"
+                                style={{ background: "#1a0f00", border: "1px solid #78350f40", color: "#d97706" }}>
+                                <span className="font-bold">{item.emoji} {item.label}</span>
+                                <span style={{ color: "#475569" }}> → devait aller dans </span>
+                                <span className="font-bold" style={{ color: correctBin?.color ?? "#FDB813" }}>{correctBin?.label}</span>
+                                {item.hint && <div className="mt-1 opacity-80">→ {item.hint}</div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
