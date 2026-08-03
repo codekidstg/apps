@@ -164,7 +164,7 @@ export default async function SuiviTrainingDetailPage({
 
   // Vérifier que le child appartient bien à ce parent
   const { data: link } = await (supabase.from("parent_children") as any)
-    .select("student_id, students(id, profiles(display_name))")
+    .select("student_id, students(id, profiles!students_profile_id_fkey(display_name))")
     .eq("parent_id", user.id)
     .eq("student_id", childId ?? "")
     .maybeSingle();

@@ -21,7 +21,7 @@ export default async function SuiviDashboard({
       student_id,
       students (
         id, xp, level_num, streak_days, teacher_id,
-        profiles ( display_name )
+        profiles!students_profile_id_fkey ( display_name )
       )
     `)
     .eq("parent_id", user.id);

@@ -8,7 +8,7 @@ export default async function CertificatsPage() {
 
   // Enfants du parent
   const { data: links } = await (supabase.from("parent_children") as any)
-    .select("student_id, students(id, profiles(display_name))")
+    .select("student_id, students(id, profiles!students_profile_id_fkey(display_name))")
     .eq("parent_id", user.id);
 
   const children = (links ?? []).map((l: any) => l.students).filter(Boolean);
