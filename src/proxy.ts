@@ -6,7 +6,7 @@ import { routing } from "./i18n/routing";
 const intlMiddleware = createIntlMiddleware(routing);
 
 // Routes accessibles sans connexion
-const PUBLIC_PATHS = ["/", "/connexion", "/inscription", "/test-maze", "/test-music"];
+const PUBLIC_PATHS = ["/", "/connexion", "/inscription", "/test-maze", "/test-music", "/atelier"];
 
 // Routes réservées par rôle (préfixes)
 const ROLE_ROUTES: Record<string, string[]> = {
@@ -27,7 +27,7 @@ export async function proxy(request: NextRequest) {
 
   // Laisser passer les routes publiques
   const isPublic = PUBLIC_PATHS.some(
-    (p) => pathWithoutLocale === p || pathWithoutLocale.startsWith(p + "?")
+    (p) => pathWithoutLocale === p || pathWithoutLocale.startsWith(p + "?") || pathWithoutLocale.startsWith(p + "/")
   );
 
   // Réponse de base (gestion i18n)
