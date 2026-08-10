@@ -33,7 +33,7 @@ export default async function AtelierPage({
     const supabase = await mkClient();
     const { data, error } = await (supabase.from("atelier_players") as any)
       .insert({
-        session_code: session?.toUpperCase() ?? "DEMO",
+        session_code: session?.toUpperCase() ?? null,
         name: config.name,
         avatar: config.avatar,
         config,

@@ -4,9 +4,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 export type GameConfig = {
   avatar: string;
   name: string;
-  speed: number;       // 1-5
-  obstacles: number;   // 1-5
-  gravity: number;     // 1-5 (conservé pour compat mais non utilisé)
+  speed: number;        // 1-5
+  obstacles: number;    // 1-5
+  obstacleSize: number; // 1-5
+  theme: string;        // "space" | "jungle" | "ocean" | "volcano"
   rules: Rule[];
 };
 
@@ -23,23 +24,90 @@ type Props = {
   onGameOver?: (score: number) => void;
 };
 
+// ─── Thèmes ──────────────────────────────────────────────────────────────────
+
+const THEMES: Record<string, {
+  bg: string;
+  particleColor: (o: number) => string;
+  vx: number; vy: number;
+  hintColor: string;
+}> = {
+  space:   { bg: "#030712", particleColor: o => `rgba(255,255,255,${o})`, vx: -0.4, vy: 0,    hintColor: "rgba(255,255,255,0.7)" },
+  jungle:  { bg: "#071209", particleColor: o => `rgba(80,160,50,${o})`,   vx: 0.3,  vy: 0.4,  hintColor: "rgba(120,220,80,0.7)" },
+  ocean:   { bg: "#020b18", particleColor: o => `rgba(60,160,210,${o})`,  vx: 0,    vy: -0.5, hintColor: "rgba(60,200,240,0.7)" },
+  volcano: { bg: "#120400", particleColor: o => `rgba(240,90,20,${o})`,   vx: 0.2,  vy: -0.7, hintColor: "rgba(250,140,40,0.7)" },
+};
+
+function drawObstacle(
+  ctx: CanvasRenderingContext2D,
+  a: { x: number; y: number; r: number },
+  theme: string,
+  frame: number,
+) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+
+  if (theme === "space") {
+    const g = ctx.createRadialGradient(a.x - 4, a.y - 4, 2, a.x, a.y, a.r);
+    g.addColorStop(0, "#9ca3af"); g.addColorStop(1, "#374151");
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 1; ctx.stroke();
+  } else if (theme === "jungle") {
+    ctx.fillStyle = "#2d1a0a"; ctx.fill();
+    ctx.strokeStyle = "#4a7c3f"; ctx.lineWidth = 3; ctx.stroke();
+    // Moss patch
+    ctx.beginPath(); ctx.arc(a.x - a.r * 0.3, a.y - a.r * 0.4, a.r * 0.35, 0, Math.PI * 2);
+    ctx.fillStyle = "#3a6b2f"; ctx.fill();
+  } else if (theme === "ocean") {
+    // Corps méduse
+    const g = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, a.r);
+    g.addColorStop(0, "rgba(80,200,220,0.8)");
+    g.addColorStop(1, "rgba(20,100,140,0.9)");
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = "#22d3ee"; ctx.lineWidth = 1.5; ctx.stroke();
+    // Tentacules
+    ctx.lineWidth = 1; ctx.strokeStyle = "rgba(100,220,240,0.5)";
+    for (let i = -2; i <= 2; i++) {
+      const tx = a.x + i * (a.r / 2.5);
+      const wave = Math.sin(frame * 0.05 + i) * 3;
+      ctx.beginPath();
+      ctx.moveTo(tx, a.y + a.r);
+      ctx.lineTo(tx + wave, a.y + a.r + a.r * 0.7);
+      ctx.stroke();
+    }
+  } else if (theme === "volcano") {
+    const g = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, a.r);
+    g.addColorStop(0, "#7f1d0a"); g.addColorStop(1, "#1a0500");
+    ctx.fillStyle = g; ctx.fill();
+    ctx.shadowBlur = 10; ctx.shadowColor = "#f97316";
+    ctx.strokeStyle = "#f97316"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.shadowBlur = 0;
+    // Crack
+    ctx.beginPath();
+    ctx.moveTo(a.x - a.r * 0.2, a.y - a.r * 0.5);
+    ctx.lineTo(a.x + a.r * 0.1, a.y);
+    ctx.lineTo(a.x - a.r * 0.1, a.y + a.r * 0.5);
+    ctx.strokeStyle = "rgba(251,146,60,0.7)"; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 export default function AtelierGame({ config, onScore, onGameOver }: Props) {
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const stateRef   = useRef<any>(null);
-  const rafRef     = useRef<number>(0);
-  const keysRef    = useRef<Set<string>>(new Set());
-  const touchRef   = useRef<{ y: number } | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stateRef  = useRef<any>(null);
+  const rafRef    = useRef<number>(0);
+  const keysRef   = useRef<Set<string>>(new Set());
+  const touchRef  = useRef<{ y: number } | null>(null);
 
   const [lives,   setLives]   = useState(3);
   const [score,   setScore]   = useState(0);
   const [running, setRunning] = useState(false);
   const [over,    setOver]    = useState(false);
 
-  const SHIP_COLORS: Record<string, [string, string]> = {
-    "🚀": ["#f97316", "#fb923c"], "🛸": ["#818cf8", "#a5b4fc"],
-    "⭐": ["#fbbf24", "#fde68a"], "🌙": ["#94a3b8", "#cbd5e1"],
-    "🪐": ["#c084fc", "#e879f9"], "☄️": ["#60a5fa", "#93c5fd"],
-  };
+  const theme = THEMES[config.theme] ?? THEMES.space;
 
   const startGame = useCallback(() => {
     const canvas = canvasRef.current;
@@ -49,7 +117,9 @@ export default function AtelierGame({ config, onScore, onGameOver }: Props) {
 
     const baseSpeed  = 2.5 + config.speed * 0.7;
     const spawnRate  = Math.max(40, 90 - config.obstacles * 12);
-    const shipSpeed  = 4.5;           // vitesse verticale du vaisseau
+    const minR       = 6 + config.obstacleSize * 2;
+    const maxR       = 12 + config.obstacleSize * 5;
+    const shipSpeed  = 4.5;
 
     const speedBoostRule = config.rules.find(r => r.condition === "score_boost");
     const speedBoostAt   = speedBoostRule?.value ?? 50;
@@ -59,7 +129,7 @@ export default function AtelierGame({ config, onScore, onGameOver }: Props) {
     let sc         = 0;
     let frame      = 0;
     let asteroids: { x: number; y: number; r: number; vy: number }[] = [];
-    let bgStars: { x: number; y: number; s: number; b: number }[] = Array.from({ length: 60 }, () => ({
+    let bgParticles: { x: number; y: number; s: number; b: number }[] = Array.from({ length: 60 }, () => ({
       x: Math.random() * W, y: Math.random() * H,
       s: Math.random() * 2 + 0.5, b: Math.random(),
     }));
@@ -67,32 +137,19 @@ export default function AtelierGame({ config, onScore, onGameOver }: Props) {
     stateRef.current = { alive: true };
 
     function drawShip(x: number, y: number) {
-      const [c1, c2] = SHIP_COLORS[config.avatar] ?? ["#f97316", "#fb923c"];
       ctx.save();
+      // Flamme propulseur
       ctx.beginPath();
-      ctx.ellipse(x, y, 14, 9, 0, 0, Math.PI * 2);
-      const g = ctx.createLinearGradient(x - 14, y, x + 14, y);
-      g.addColorStop(0, c1); g.addColorStop(1, c2);
-      ctx.fillStyle = g; ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(x + 14, y); ctx.lineTo(x + 22, y - 3); ctx.lineTo(x + 22, y + 3); ctx.closePath();
-      ctx.fillStyle = c2; ctx.fill();
-      ctx.beginPath();
-      ctx.arc(x + 4, y, 5, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(x - 12, y - 4); ctx.lineTo(x - 20, y); ctx.lineTo(x - 12, y + 4);
-      ctx.fillStyle = `rgba(251,146,60,${0.6 + 0.4 * Math.random()})`; ctx.fill();
-      ctx.restore();
-    }
-
-    function drawAsteroid(a: { x: number; y: number; r: number }) {
-      ctx.save();
-      ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
-      const grad = ctx.createRadialGradient(a.x - 4, a.y - 4, 2, a.x, a.y, a.r);
-      grad.addColorStop(0, "#9ca3af"); grad.addColorStop(1, "#374151");
-      ctx.fillStyle = grad; ctx.fill();
-      ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.moveTo(x - 14, y - 5);
+      ctx.lineTo(x - 24, y);
+      ctx.lineTo(x - 14, y + 5);
+      ctx.fillStyle = `rgba(251,146,60,${0.5 + 0.5 * Math.random()})`;
+      ctx.fill();
+      // Emoji vaisseau
+      ctx.font = "26px serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(config.avatar, x + 2, y);
       ctx.restore();
     }
 
@@ -100,21 +157,29 @@ export default function AtelierGame({ config, onScore, onGameOver }: Props) {
       if (!stateRef.current?.alive) return;
       frame++;
 
-      ctx.fillStyle = "#030712"; ctx.fillRect(0, 0, W, H);
-      bgStars.forEach(s => {
-        const blink = 0.5 + 0.5 * Math.sin(frame * 0.05 + s.b * 10);
-        ctx.fillStyle = `rgba(255,255,255,${blink * 0.8})`;
-        ctx.beginPath(); ctx.arc(s.x, s.y, s.s, 0, Math.PI * 2); ctx.fill();
-        s.x -= 0.4;
-        if (s.x < 0) { s.x = W; s.y = Math.random() * H; }
+      // Fond
+      ctx.fillStyle = theme.bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Particules fond (étoiles / feuilles / bulles / braises)
+      bgParticles.forEach(s => {
+        const blink = 0.5 + 0.5 * Math.sin(frame * 0.04 + s.b * 10);
+        ctx.fillStyle = theme.particleColor(blink * 0.8);
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.s, 0, Math.PI * 2);
+        ctx.fill();
+        s.x += theme.vx;
+        s.y += theme.vy;
+        if (s.x < -4) s.x = W + 4;
+        if (s.x > W + 4) s.x = -4;
+        if (s.y < -4) { s.y = H + 4; s.x = Math.random() * W; }
+        if (s.y > H + 4) { s.y = -4; s.x = Math.random() * W; }
       });
 
-      // Mouvement vaisseau — flèches ↑↓, ZQSD, ou swipe touch
+      // Mouvement vaisseau
       const keys = keysRef.current;
       const goUp   = keys.has("ArrowUp")   || keys.has("KeyW") || keys.has("KeyZ");
       const goDown = keys.has("ArrowDown")  || keys.has("KeyS");
-
-      // Swipe touch : comparer position doigt avec vaisseau
       if (touchRef.current && canvas) {
         const rect = canvas.getBoundingClientRect();
         const scaleY = H / rect.height;
@@ -125,12 +190,11 @@ export default function AtelierGame({ config, onScore, onGameOver }: Props) {
         if (goUp)   shipY -= shipSpeed;
         if (goDown) shipY += shipSpeed;
       }
-
       shipY = Math.max(20, Math.min(H - 20, shipY));
 
-      // Spawn astéroïdes
+      // Spawn
       if (frame % spawnRate === 0) {
-        const r = 10 + Math.random() * 18;
+        const r = minR + Math.random() * (maxR - minR);
         asteroids.push({
           x: W + r, y: Math.random() * (H - 60) + 30,
           r, vy: (Math.random() - 0.5) * 1.2,
@@ -138,20 +202,21 @@ export default function AtelierGame({ config, onScore, onGameOver }: Props) {
       }
 
       const currentSpeed = sc >= speedBoostAt ? baseSpeed * 1.6 : baseSpeed;
-
       asteroids = asteroids.filter(a => a.x + a.r > 0);
+
       for (const a of asteroids) {
         a.x -= currentSpeed;
         a.y += a.vy;
         a.y = Math.max(a.r, Math.min(H - a.r, a.y));
-        drawAsteroid(a);
+        drawObstacle(ctx, a, config.theme, frame);
 
-        const dx = a.x - 60, dy = a.y - shipY;
-        if (Math.sqrt(dx * dx + dy * dy) < a.r + 12) {
+        const dx = a.x - 65, dy = a.y - shipY;
+        if (Math.sqrt(dx * dx + dy * dy) < a.r + 10) {
           livesLeft--;
           setLives(livesLeft);
           asteroids = asteroids.filter(x => x !== a);
-          ctx.fillStyle = "rgba(239,68,68,0.3)"; ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = "rgba(239,68,68,0.3)";
+          ctx.fillRect(0, 0, W, H);
           if (livesLeft <= 0) {
             stateRef.current.alive = false;
             setOver(true); setRunning(false);
@@ -160,16 +225,17 @@ export default function AtelierGame({ config, onScore, onGameOver }: Props) {
         }
       }
 
-      drawShip(60, shipY);
+      drawShip(65, shipY);
 
-      if (frame % 6 === 0) { sc++; setScore(sc); onScore?.(sc); }
-
-      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      // HUD score + vies
+      ctx.fillStyle = theme.hintColor;
       ctx.font = "bold 14px monospace";
       ctx.textAlign = "left"; ctx.textBaseline = "top";
       ctx.fillText(`${sc} pts`, 10, 10);
       ctx.textAlign = "right";
       ctx.fillText("❤️".repeat(livesLeft), W - 10, 10);
+
+      if (frame % 6 === 0) { sc++; setScore(sc); onScore?.(sc); }
 
       rafRef.current = requestAnimationFrame(loop);
     }
@@ -177,22 +243,19 @@ export default function AtelierGame({ config, onScore, onGameOver }: Props) {
     setLives(3); setScore(0); setOver(false); setRunning(true);
     stateRef.current = { alive: true };
     rafRef.current = requestAnimationFrame(loop);
-  }, [config, onScore, onGameOver]);
+  }, [config, onScore, onGameOver, theme]);
 
-  // Clavier — flèches ↑↓
+  // Clavier
   useEffect(() => {
     const PREVENT = new Set(["ArrowUp", "ArrowDown", "Space"]);
-    function onDown(e: KeyboardEvent) {
-      if (PREVENT.has(e.code)) e.preventDefault();
-      keysRef.current.add(e.code);
-    }
+    function onDown(e: KeyboardEvent) { if (PREVENT.has(e.code)) e.preventDefault(); keysRef.current.add(e.code); }
     function onUp(e: KeyboardEvent) { keysRef.current.delete(e.code); }
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup", onUp);
     return () => { window.removeEventListener("keydown", onDown); window.removeEventListener("keyup", onUp); };
   }, []);
 
-  // Touch — swipe vertical
+  // Touch
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -218,8 +281,8 @@ export default function AtelierGame({ config, onScore, onGameOver }: Props) {
       <canvas
         ref={canvasRef}
         width={560} height={320}
-        className="rounded-2xl w-full border border-slate-700 bg-[#030712]"
-        style={{ touchAction: "none" }}
+        className="rounded-2xl w-full border border-slate-700"
+        style={{ touchAction: "none", background: theme.bg }}
       />
       {!running && !over && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-2xl gap-4">
@@ -240,10 +303,7 @@ export default function AtelierGame({ config, onScore, onGameOver }: Props) {
           <div className="text-4xl">💥</div>
           <div className="text-2xl font-black text-white">GAME OVER</div>
           <div className="text-orange-400 font-bold text-xl">{score} points</div>
-          <button
-            onClick={startGame}
-            className="mt-2 px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-full transition-all"
-          >
+          <button onClick={startGame} className="mt-2 px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-full transition-all">
             Rejouer
           </button>
         </div>
