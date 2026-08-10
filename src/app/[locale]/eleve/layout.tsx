@@ -66,7 +66,7 @@ export default async function EleveLayout({ children }: { children: React.ReactN
     { href: "/eleve/badges",       label: "Badges",            icon: "⭐" },
     { href: "/eleve/avatar",       label: "Mon robot",         icon: "🤖" },
     ...(student?.atelier_active
-      ? [{ href: "/atelier", label: "Séance offerte", icon: "🎟️", special: true }]
+      ? [{ href: "/atelier/lecon", label: "Séance offerte", icon: "🎟️", special: true }]
       : []),
   ] as { href: string; label: string; icon: string; special?: boolean }[];
 
