@@ -31,9 +31,9 @@ export default async function EleveLayout({ children }: { children: React.ReactN
 
   const { data: student } = await supabase
     .from("students")
-    .select("id, xp, points")
+    .select("id, xp, points, atelier_active")
     .eq("profile_id", user.id)
-    .single<{ id: string; xp: number; points: number }>();
+    .single<{ id: string; xp: number; points: number; atelier_active: boolean }>();
 
   const xp = student?.xp ?? 0;
 
@@ -60,12 +60,15 @@ export default async function EleveLayout({ children }: { children: React.ReactN
   const avatar = avatarRaw as StudentData["avatar"];
 
   const nav = [
-    { href: "/eleve",              label: "Ma Cité",      icon: "🏙️" },
-    { href: "/eleve/entrainement",  label: "Mon Entraînement", icon: "💪" },
-    { href: "/eleve/classement",   label: "Classement",   icon: "🏆" },
-    { href: "/eleve/badges",       label: "Badges",       icon: "⭐" },
-    { href: "/eleve/avatar",       label: "Mon robot",    icon: "🤖" },
-  ];
+    { href: "/eleve",              label: "Ma Cité",           icon: "🏙️" },
+    { href: "/eleve/entrainement", label: "Mon Entraînement",  icon: "💪" },
+    { href: "/eleve/classement",   label: "Classement",        icon: "🏆" },
+    { href: "/eleve/badges",       label: "Badges",            icon: "⭐" },
+    { href: "/eleve/avatar",       label: "Mon robot",         icon: "🤖" },
+    ...(student?.atelier_active
+      ? [{ href: "/atelier", label: "Séance offerte", icon: "🎟️", special: true }]
+      : []),
+  ] as { href: string; label: string; icon: string; special?: boolean }[];
 
   return (
     <div className="min-h-screen flex bg-slate-950 text-white">
@@ -124,6 +127,23 @@ export default async function EleveLayout({ children }: { children: React.ReactN
         <nav className="flex-1 px-3 py-3 space-y-1">
           {nav.map((item) => {
             const isTraining = item.href === "/eleve/entrainement";
+            if (item.special) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-black transition-all mt-2 border border-orange-500/40 hover:border-orange-400"
+                  style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}
+                >
+                  <span className="text-base">{item.icon}</span>
+                  <span className="flex-1">{item.label}</span>
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none animate-pulse"
+                    style={{ background: "#f97316", color: "white" }}>
+                    NEW
+                  </span>
+                </Link>
+              );
+            }
             return (
               <Link
                 key={item.href}

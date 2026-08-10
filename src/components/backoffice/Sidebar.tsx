@@ -24,6 +24,7 @@ const adminNav: NavItem[] = [
   { label: "Thèmes & Cours",  href: "/admin/themes",       icon: "📚" },
   { label: "Abonnements",     href: "/admin/abonnements",  icon: "📦" },
   { label: "Paiements",       href: "/admin/paiements",    icon: "💳" },
+  { label: "Démo parent",    href: "/admin/demo-parent",  icon: "🎟️" },
 ];
 
 const managerNav: NavItem[] = [
