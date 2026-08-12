@@ -53,6 +53,8 @@ type Props = { role: Role; displayName: string };
 export default function Sidebar({ role, displayName }: Props) {
   const pathname = usePathname();
   const nav = role === "admin" ? adminNav : role === "manager" ? managerNav : teacherNav;
+  const locale = pathname.split("/")[1] || "fr";
+  const homeHref = `/${locale}/${role === "admin" ? "admin" : role === "manager" ? "manager" : "prof"}`;
 
   function isActive(href: string) {
     if (href === "/admin" || href === "/manager" || href === "/prof") return pathname.endsWith(href);
@@ -69,7 +71,7 @@ export default function Sidebar({ role, displayName }: Props) {
     <aside className="w-60 shrink-0 flex flex-col h-full" style={{ background: "#1B2D5E" }}>
       {/* Logo + logout */}
       <div className="px-4 pt-4 pb-3 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-        <Link href="/">
+        <Link href={homeHref}>
           <Logo size={90} variant="white" />
         </Link>
         <form action={logout}>

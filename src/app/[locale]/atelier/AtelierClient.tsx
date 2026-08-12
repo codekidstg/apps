@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { GameConfig, Rule } from "./AtelierGame";
 import CodeReveal from "./CodeReveal";
@@ -70,10 +72,13 @@ const STEPS = [
 type Props = {
   sessionStep: number;
   shareBase: string;
+  homeHref: string;
   onSave?: (config: GameConfig, score: number) => Promise<string | null>;
 };
 
-export default function AtelierClient({ sessionStep, shareBase, onSave }: Props) {
+export default function AtelierClient({ sessionStep, shareBase, homeHref, onSave }: Props) {
+  const pathname = usePathname();
+  const locale = pathname.split("/")[1] || "fr";
   const [step, setStep]               = useState(0);
   const [name, setName]               = useState("");
   const [avatar, setAvatar]           = useState("🚀");
@@ -395,6 +400,11 @@ export default function AtelierClient({ sessionStep, shareBase, onSave }: Props)
       {/* Header */}
       <div className="relative z-10 flex items-center justify-between px-4 py-4 border-b border-slate-800">
         <div className="flex items-center gap-3">
+          <Link href={homeHref}
+            className="text-slate-500 hover:text-white text-xs font-bold px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-all"
+            title="Retour à l'accueil">
+            🏠
+          </Link>
           {step > 0 && step < 7 && (
             <button onClick={prev}
               className="text-slate-500 hover:text-white text-xs font-bold px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-all">

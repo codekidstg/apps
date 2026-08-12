@@ -16,7 +16,8 @@ type StudentData = {
   avatar: { base: string; hat: string | null; accessory: string | null; color: string } | null;
 };
 
-export default async function EleveLayout({ children }: { children: React.ReactNode }) {
+export default async function EleveLayout({ children, params }: { children: React.ReactNode; params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
@@ -85,7 +86,7 @@ export default async function EleveLayout({ children }: { children: React.ReactN
         {/* Logo */}
         <div className="px-3 pt-4 pb-3 flex items-center justify-between" style={{ borderBottom: "1px solid #1e293b" }}>
           <div className="flex flex-col items-start gap-0.5">
-            <Link href="/eleve">
+            <Link href={`/${locale}/eleve`}>
               <Logo size={90} variant="white" />
             </Link>
             <div className="text-xs font-mono tracking-widest uppercase ml-1" style={{ color: "#334155" }}>◈ Espace Élève</div>

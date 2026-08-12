@@ -1,6 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import AtelierClient from "./AtelierClient";
 
+const ROLE_HOME: Record<string, string> = {
+  student: "/eleve",
+  teacher: "/prof",
+  admin:   "/admin",
+  parent:  "/suivi",
+  manager: "/manager",
+};
+
 export default async function AtelierPage({
   params,
   searchParams,
@@ -10,11 +18,24 @@ export default async function AtelierPage({
 }) {
   const { locale }  = await params;
   const { session } = await searchParams;
+  const supabase    = await createClient();
+
+  // Détermine le lien d'accueil selon le rôle de l'utilisateur connecté
+  const { data: { user } } = await supabase.auth.getUser();
+  let homeHref = "/";
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single<{ role: string }>();
+    const dest = ROLE_HOME[profile?.role ?? ""];
+    if (dest) homeHref = `/${locale}${dest}`;
+  }
 
   // Récupère l'étape courante de la session mentor (si code fourni)
   let sessionStep = 1; // par défaut : tous les steps débloqués (mode solo)
   if (session) {
-    const supabase = await createClient();
     const { data } = await (supabase.from("atelier_sessions") as any)
       .select("current_step")
       .eq("code", session.toUpperCase())
@@ -49,6 +70,7 @@ export default async function AtelierPage({
     <AtelierClient
       sessionStep={sessionStep}
       shareBase={shareBase}
+      homeHref={homeHref}
       onSave={savePlayer}
     />
   );
