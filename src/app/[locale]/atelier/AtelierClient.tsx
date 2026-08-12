@@ -2,29 +2,69 @@
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { GameConfig, Rule } from "./AtelierGame";
-import AtelierBlocks from "./AtelierBlocks";
 import CodeReveal from "./CodeReveal";
+import CockpitPanel from "./CockpitPanel";
 
 const AtelierGame = dynamic(() => import("./AtelierGame"), { ssr: false });
 
 const AVATARS = ["🚀", "🛸", "⭐", "🌙", "🪐", "☄️"];
 
 const THEME_OPTIONS = [
-  { id: "space",   emoji: "🌌", label: "Espace",   desc: "Astéroïdes gris, étoiles",      bg: "from-slate-900 to-slate-800",    border: "border-slate-500",  active: "border-blue-400 bg-blue-900/30" },
-  { id: "jungle",  emoji: "🌿", label: "Jungle",   desc: "Rochers mossis, feuilles",       bg: "from-green-950 to-slate-900",    border: "border-slate-600",  active: "border-green-400 bg-green-900/30" },
-  { id: "ocean",   emoji: "🌊", label: "Océan",    desc: "Méduses, bulles sous-marines",   bg: "from-blue-950 to-slate-900",     border: "border-slate-600",  active: "border-cyan-400 bg-cyan-900/30" },
-  { id: "volcano", emoji: "🌋", label: "Volcan",   desc: "Rochers de lave, braises",       bg: "from-red-950 to-slate-900",      border: "border-slate-600",  active: "border-orange-500 bg-orange-900/30" },
+  {
+    id: "space",
+    emoji: "🌌",
+    label: "Espace",
+    desc: "Astéroïdes, étoiles filantes",
+    gradient: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+    border: "rgba(99,102,241,0.35)",
+    activeBorder: "rgba(129,140,248,0.7)",
+    glow: "rgba(99,102,241,0.25)",
+    preview: ["⭐", "🌟", "💫"],
+  },
+  {
+    id: "jungle",
+    emoji: "🌿",
+    label: "Jungle",
+    desc: "Rochers mossis, feuilles",
+    gradient: "linear-gradient(135deg, #052e16 0%, #14532d 100%)",
+    border: "rgba(34,197,94,0.3)",
+    activeBorder: "rgba(74,222,128,0.7)",
+    glow: "rgba(34,197,94,0.2)",
+    preview: ["🌿", "🍃", "🪨"],
+  },
+  {
+    id: "ocean",
+    emoji: "🌊",
+    label: "Océan",
+    desc: "Méduses, bulles sous-marines",
+    gradient: "linear-gradient(135deg, #082f49 0%, #0c4a6e 100%)",
+    border: "rgba(14,165,233,0.3)",
+    activeBorder: "rgba(56,189,248,0.7)",
+    glow: "rgba(14,165,233,0.2)",
+    preview: ["🌊", "🫧", "🪸"],
+  },
+  {
+    id: "volcano",
+    emoji: "🌋",
+    label: "Volcan",
+    desc: "Rochers de lave, braises",
+    gradient: "linear-gradient(135deg, #1c0500 0%, #431407 100%)",
+    border: "rgba(249,115,22,0.3)",
+    activeBorder: "rgba(251,146,60,0.7)",
+    glow: "rgba(249,115,22,0.2)",
+    preview: ["🌋", "🔥", "💥"],
+  },
 ];
 
 const STEPS = [
-  { id: 0, label: "Bienvenue",      emoji: "👋" },
-  { id: 1, label: "Ton prénom",     emoji: "✏️" },
-  { id: 2, label: "Ton vaisseau",   emoji: "🚀" },
-  { id: 3, label: "Ton univers",    emoji: "🌌" },
-  { id: 4, label: "Tes règles",     emoji: "📋" },
-  { id: 5, label: "Ton code",       emoji: "💻" },
-  { id: 6, label: "À toi de jouer", emoji: "🎮" },
-  { id: 7, label: "Partager",       emoji: "🔗" },
+  { id: 0, label: "Bienvenue",        emoji: "👋" },
+  { id: 1, label: "Ton prénom",       emoji: "✏️" },
+  { id: 2, label: "Ton vaisseau",     emoji: "🚀" },
+  { id: 3, label: "Ton univers",      emoji: "🌌" },
+  { id: 4, label: "Mission Control",  emoji: "🎛️" },
+  { id: 5, label: "Ton code",         emoji: "💻" },
+  { id: 6, label: "À toi de jouer",   emoji: "🎮" },
+  { id: 7, label: "Partager",         emoji: "🔗" },
 ];
 
 type Props = {
@@ -79,26 +119,19 @@ export default function AtelierClient({ sessionStep, shareBase, onSave }: Props)
     setSaving(true);
     try {
       const id = await onSave?.(config, finalScore);
-      if (id) { setShareId(id); } else { setShareError(true); }
-    } catch {
-      setShareError(true);
-    }
+      if (id) setShareId(id); else setShareError(true);
+    } catch { setShareError(true); }
     setSaving(false);
     setStep(7);
   }
 
   const shareUrl = shareId ? `${shareBase}/fr/atelier/partage/${shareId}` : null;
 
-  // Valeurs numériques des sliders
-  const speedVal       = (2.5 + speed * 0.7).toFixed(1);
-  const densityVal     = ((Math.max(40, 90 - obstacles * 12)) / 60).toFixed(1);
-  const minR           = 6 + obstacleSize * 2;
-  const maxR           = 12 + obstacleSize * 5;
-
-  // ─── STEP RENDERERS ───────────────────────────────────────────────────────
+  // ─── STEPS ────────────────────────────────────────────────────────────────
 
   function renderStep() {
     switch (step) {
+
       // ── 0 : Bienvenue ──
       case 0:
         return (
@@ -110,16 +143,17 @@ export default function AtelierClient({ sessionStep, shareBase, onSave }: Props)
                 <span className="text-orange-400">développeur</span>
               </h1>
               <p className="text-slate-400 mt-3 max-w-sm mx-auto">
-                Dans <strong className="text-white">60 minutes</strong>, tu auras créé un jeu vidéo que <strong className="text-white">99% des adultes</strong> dans cette salle ne savent pas faire.
+                Dans <strong className="text-white">60 minutes</strong>, tu auras créé un jeu vidéo que{" "}
+                <strong className="text-white">99% des adultes</strong> dans cette salle ne savent pas faire.
               </p>
             </div>
-            {sessionStep >= 1 && (
-              <button onClick={next} className="px-8 py-3 bg-orange-500 hover:bg-orange-400 text-white font-black rounded-full text-lg transition-all hover:scale-105 shadow-lg shadow-orange-500/30">
+            {sessionStep >= 1 ? (
+              <button onClick={next}
+                className="px-8 py-3 bg-orange-500 hover:bg-orange-400 text-white font-black rounded-full text-lg transition-all hover:scale-105 shadow-lg shadow-orange-500/30">
                 Je suis prêt →
               </button>
-            )}
-            {sessionStep < 1 && (
-              <div className="text-slate-500 text-sm flex items-center gap-2">⏳ Attends le signal du mentor pour commencer</div>
+            ) : (
+              <div className="text-slate-500 text-sm flex items-center gap-2">⏳ Attends le signal du mentor</div>
             )}
           </div>
         );
@@ -134,13 +168,11 @@ export default function AtelierClient({ sessionStep, shareBase, onSave }: Props)
               <p className="text-slate-400 mt-2 text-sm">Ton prénom apparaîtra sur ton jeu et ton certificat.</p>
             </div>
             <div className="w-full max-w-xs">
-              <input
-                autoFocus type="text" placeholder="Ton prénom..."
-                value={name} onChange={e => setName(e.target.value)}
+              <input autoFocus type="text" placeholder="Ton prénom..." value={name}
+                onChange={e => setName(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && canAdvance() && next()}
                 className="w-full bg-slate-800 border-2 border-slate-600 focus:border-orange-500 rounded-2xl px-5 py-4 text-white text-xl text-center font-bold outline-none transition-colors"
-                maxLength={20}
-              />
+                maxLength={20} />
               {name.length >= 2 && (
                 <div className="mt-3 text-slate-400 text-sm">
                   Bienvenue, <strong className="text-orange-400">{name}</strong> ! 🌟
@@ -160,7 +192,7 @@ export default function AtelierClient({ sessionStep, shareBase, onSave }: Props)
           <div className="flex flex-col items-center gap-8 text-center py-6">
             <div>
               <h2 className="text-2xl font-black text-white">Choisis ton vaisseau</h2>
-              <p className="text-slate-400 mt-2 text-sm">C'est ton personnage. Il apparaîtra exactement comme ça dans le jeu.</p>
+              <p className="text-slate-400 mt-2 text-sm">C'est ton personnage. Il apparaîtra dans le jeu.</p>
             </div>
             <div className="grid grid-cols-3 gap-4">
               {AVATARS.map(av => (
@@ -182,109 +214,70 @@ export default function AtelierClient({ sessionStep, shareBase, onSave }: Props)
           </div>
         );
 
-      // ── 3 : Univers (thème + paramètres) ──
+      // ── 3 : Univers (thème visuel uniquement) ──
       case 3:
         return (
-          <div className="flex flex-col gap-7 py-4">
+          <div className="flex flex-col gap-8 py-4">
             <div className="text-center">
-              <h2 className="text-2xl font-black text-white">Configure ton univers</h2>
-              <p className="text-slate-400 mt-2 text-sm">Choisis ton décor, puis règle les paramètres physiques.</p>
+              <h2 className="text-2xl font-black text-white">Choisis ton univers</h2>
+              <p className="text-slate-400 mt-2 text-sm">Le décor de ton jeu. Chaque univers a ses propres obstacles.</p>
             </div>
-
-            {/* Thème visuel */}
-            <div>
-              <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">🎨 Décor du jeu</div>
-              <div className="grid grid-cols-2 gap-3">
-                {THEME_OPTIONS.map(t => (
+            <div className="grid grid-cols-2 gap-4">
+              {THEME_OPTIONS.map(t => {
+                const active = theme === t.id;
+                return (
                   <button key={t.id} onClick={() => setTheme(t.id)}
-                    className={`flex flex-col items-start gap-1.5 p-4 rounded-2xl border-2 bg-gradient-to-br transition-all text-left ${t.bg} ${
-                      theme === t.id ? t.active : `${t.border} hover:border-slate-500`
-                    }`}>
-                    <span className="text-2xl">{t.emoji}</span>
-                    <span className="text-sm font-black text-white">{t.label}</span>
-                    <span className="text-[11px] text-slate-400 leading-tight">{t.desc}</span>
+                    className="flex flex-col gap-3 p-5 rounded-2xl text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    style={{
+                      background: t.gradient,
+                      border: `2px solid ${active ? t.activeBorder : t.border}`,
+                      boxShadow: active ? `0 0 24px ${t.glow}, 0 4px 16px rgba(0,0,0,0.4)` : "0 4px 16px rgba(0,0,0,0.3)",
+                    }}>
+                    {/* Preview emoji */}
+                    <div className="flex items-center gap-1 text-xl">
+                      {t.preview.map((e, i) => (
+                        <span key={i} style={{ opacity: 1 - i * 0.25 }}>{e}</span>
+                      ))}
+                    </div>
+                    <div>
+                      <div className="text-base font-black text-white">{t.emoji} {t.label}</div>
+                      <div className="text-xs text-white/50 mt-0.5">{t.desc}</div>
+                    </div>
+                    {active && (
+                      <div className="text-[10px] font-black tracking-widest px-2 py-0.5 rounded-full self-start"
+                        style={{ background: t.activeBorder, color: "#030712" }}>
+                        ✓ SÉLECTIONNÉ
+                      </div>
+                    )}
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-
-            {/* Paramètres physiques */}
-            <div>
-              <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">⚙️ Paramètres physiques</div>
-              <div className="space-y-4">
-                {/* Vitesse */}
-                <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 font-bold text-white text-sm">⚡ Vitesse des obstacles</div>
-                    <span className="text-xs font-black px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-mono">{speedVal} px/frame</span>
-                  </div>
-                  <input type="range" min={1} max={5} value={speed}
-                    onChange={e => setSpeed(parseInt(e.target.value))}
-                    className="w-full accent-orange-500" />
-                  <div className="flex justify-between text-[10px] text-slate-600 mt-1">
-                    <span>Lent (2.5)</span><span>Rapide (6.0)</span>
-                  </div>
-                </div>
-
-                {/* Densité */}
-                <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 font-bold text-white text-sm">☄️ Densité des obstacles</div>
-                    <span className="text-xs font-black px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-mono">1 / {densityVal}s</span>
-                  </div>
-                  <input type="range" min={1} max={5} value={obstacles}
-                    onChange={e => setObstacles(parseInt(e.target.value))}
-                    className="w-full accent-orange-500" />
-                  <div className="flex justify-between text-[10px] text-slate-600 mt-1">
-                    <span>Rare (1/1.3s)</span><span>Extrême (1/0.5s)</span>
-                  </div>
-                </div>
-
-                {/* Taille obstacles */}
-                <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 font-bold text-white text-sm">📏 Taille des obstacles</div>
-                    <span className="text-xs font-black px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-mono">{minR}–{maxR} px</span>
-                  </div>
-                  <input type="range" min={1} max={5} value={obstacleSize}
-                    onChange={e => setObstacleSize(parseInt(e.target.value))}
-                    className="w-full accent-orange-500" />
-                  <div className="flex justify-between text-[10px] text-slate-600 mt-1">
-                    <span>Micro (8–17px)</span><span>Énorme (16–37px)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <button onClick={next} disabled={!canAdvance()}
               className="w-full py-3 bg-orange-500 hover:bg-orange-400 disabled:opacity-30 text-white font-black rounded-2xl text-lg transition-all hover:scale-[1.02]">
-              Parfait, on continue →
+              Parfait →
             </button>
           </div>
         );
 
-      // ── 4 : Règles ──
+      // ── 4 : Mission Control (cockpit) ──
       case 4:
         return (
-          <div className="flex flex-col gap-6 py-4">
+          <div className="flex flex-col gap-4 py-2">
             <div className="text-center">
-              <h2 className="text-2xl font-black text-white">Écris les règles de ton jeu</h2>
-              <p className="text-slate-400 mt-2 text-sm max-w-sm mx-auto">
-                Ces instructions s'appellent un <strong className="text-orange-400">algorithme</strong>.
+              <h2 className="text-2xl font-black text-white">Programme ton vaisseau</h2>
+              <p className="text-slate-400 mt-2 text-sm">
+                Règle les paramètres et active tes règles. Comme un vrai développeur.
               </p>
             </div>
-            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl px-4 py-3 text-xs text-slate-400 flex items-start gap-2">
-              <span className="text-base shrink-0">💡</span>
-              <span>Clique sur une règle pour l'activer ou la désactiver. Les règles actives seront dans ton jeu.</span>
-            </div>
-            <AtelierBlocks rules={rules} onChange={setRules} />
-            <div className="text-center text-xs text-slate-500">
-              {rules.length} règle{rules.length > 1 ? "s" : ""} activée{rules.length > 1 ? "s" : ""}
-            </div>
-            <button onClick={next} disabled={!canAdvance() || rules.length === 0}
-              className="w-full py-3 bg-orange-500 hover:bg-orange-400 disabled:opacity-30 text-white font-black rounded-2xl text-lg transition-all">
-              Mes règles sont prêtes →
-            </button>
+            <CockpitPanel
+              playerName={name}
+              speed={speed} setSpeed={setSpeed}
+              obstacles={obstacles} setObstacles={setObstacles}
+              obstacleSize={obstacleSize} setObstacleSize={setObstacleSize}
+              rules={rules} setRules={setRules}
+              onLaunch={next}
+            />
           </div>
         );
 
@@ -295,7 +288,7 @@ export default function AtelierClient({ sessionStep, shareBase, onSave }: Props)
             <div className="text-center">
               <h2 className="text-2xl font-black text-white">Regarde ce que tu viens d'écrire</h2>
               <p className="text-slate-400 mt-2 text-sm">
-                Tes règles en français… <strong className="text-orange-400">traduites en JavaScript</strong>. La langue des machines.
+                Tes règles en français… <strong className="text-orange-400">traduites en JavaScript</strong>.
               </p>
             </div>
             <CodeReveal rules={rules} playerName={name} onDone={() => setCodeReady(true)} />
@@ -353,8 +346,7 @@ export default function AtelierClient({ sessionStep, shareBase, onSave }: Props)
                   <div className="bg-slate-900 rounded-xl px-4 py-3 text-xs text-orange-400 font-mono break-all text-left">
                     {shareUrl}
                   </div>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(shareUrl)}
+                  <button onClick={() => navigator.clipboard.writeText(shareUrl)}
                     className="w-full mt-3 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl text-sm transition-colors">
                     📋 Copier le lien
                   </button>
@@ -371,7 +363,8 @@ export default function AtelierClient({ sessionStep, shareBase, onSave }: Props)
             ) : shareError ? (
               <div className="space-y-4 w-full max-w-sm">
                 <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 text-sm text-slate-300">
-                  Le lien n'a pas pu être généré (pas de connexion), mais ton jeu existe bien. Note ton score : <strong className="text-orange-400">{score} pts</strong>
+                  Le lien n'a pas pu être généré, mais ton jeu existe.
+                  Score : <strong className="text-orange-400">{score} pts</strong>
                 </div>
                 <div className="bg-gradient-to-br from-orange-950/60 to-slate-900 border border-orange-700/40 rounded-2xl p-5">
                   <div className="text-3xl mb-2">{avatar}</div>
@@ -402,7 +395,6 @@ export default function AtelierClient({ sessionStep, shareBase, onSave }: Props)
       {/* Header */}
       <div className="relative z-10 flex items-center justify-between px-4 py-4 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          {/* Bouton retour */}
           {step > 0 && step < 7 && (
             <button onClick={prev}
               className="text-slate-500 hover:text-white text-xs font-bold px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-all">
