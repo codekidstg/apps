@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import AtelierClient from "./AtelierClient";
 
@@ -46,7 +47,10 @@ export default async function AtelierPage({
     sessionStep = 7; // pas de session → accès libre à toutes les étapes
   }
 
-  const shareBase = process.env.NEXT_PUBLIC_SITE_URL ?? "https://codekids.tg";
+  const hdrs  = await headers();
+  const host  = hdrs.get("host") ?? "codekids.tg";
+  const proto = hdrs.get("x-forwarded-proto") ?? "https";
+  const shareBase = `${proto}://${host}`;
 
   async function savePlayer(config: any, score: number): Promise<string | null> {
     "use server";
