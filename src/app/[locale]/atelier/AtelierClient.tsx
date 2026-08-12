@@ -427,7 +427,7 @@ export default function AtelierClient({ sessionStep, shareBase, homeHref, onSave
       </div>
 
       {/* Contenu */}
-      <div className="relative z-10 max-w-lg mx-auto px-4 py-6">
+      <div className="relative z-10 max-w-3xl mx-auto px-4 py-6">
         <div className="text-xs font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
           <span>{STEPS[step]?.emoji}</span>
           <span>Étape {step + 1}/{STEPS.length} — {STEPS[step]?.label}</span>
