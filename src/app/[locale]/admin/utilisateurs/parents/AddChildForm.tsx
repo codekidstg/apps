@@ -27,8 +27,7 @@ export default function AddChildForm({
       if ("error" in res) { setStatus("error"); setErrorMsg(res.error); return; }
       setStatus("ok");
       setStudentId("");
-      router.refresh();
-      setTimeout(() => setStatus("idle"), 2000);
+      setTimeout(() => window.location.reload(), 800);
     });
   }
 
