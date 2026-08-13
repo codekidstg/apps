@@ -26,20 +26,22 @@ export default async function EleveDashboard() {
 
   const { data: student } = await supabase
     .from("students")
-    .select("id, xp, streak_days, level")
+    .select("id, xp, streak_days, level, teacher_id")
     .eq("profile_id", user.id)
-    .single<{ id: string; xp: number; streak_days: number; level: string }>();
+    .single<{ id: string; xp: number; streak_days: number; level: string; teacher_id: string | null }>();
   if (!student) redirect("/fr/connexion");
 
   const admin = createAdminClient();
 
   // Thèmes accessibles à cet élève
+  // Si l'élève a un prof assigné → uniquement les thèmes activés pour lui (même si vide)
+  // Si pas de prof → tout afficher (accès libre)
   const { data: accessRows } = await (admin.from("student_theme_access") as any)
     .select("theme_id")
     .eq("student_id", student.id);
-  const accessibleThemeIds = accessRows?.length
-    ? new Set((accessRows as { theme_id: string }[]).map((r) => r.theme_id))
-    : null; // null = aucun accès configuré → on affiche tout (rétrocompatibilité)
+  const accessibleThemeIds = (accessRows?.length || student.teacher_id)
+    ? new Set((accessRows ?? []).map((r: { theme_id: string }) => r.theme_id))
+    : null; // null = pas de prof et aucun accès configuré → afficher tout
 
   const [{ data: themesRaw }, { data: chaptersRaw }, { data: lessonsRaw }, { data: progressRaw }, { data: achievementsRaw }, { data: trainingsRaw }, { data: trainingProgressRaw }] =
     await Promise.all([
