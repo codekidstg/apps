@@ -1,8 +1,7 @@
 // Service Worker — CodeKids
-// Pyodide: Cache-First permanent
-// Next.js statics: Cache-First
-// Lesson API: Network-First with cache fallback
-// Pages quête: Network-First with cache fallback
+// Pyodide: Cache-First permanent (gros assets ~10 Mo, offline Python)
+// Next.js statics: délégué au cache HTTP natif (hash de contenu + headers immutable)
+// Pages quête: Network-First with cache fallback (offline reading)
 
 const PYODIDE_CACHE = "pyodide-v0.27";
 const LESSON_CACHE  = "codekids-lessons-v3";
@@ -35,18 +34,42 @@ self.addEventListener("fetch", (e) => {
     return; // pas de SW cache, le navigateur gère
   }
 
-  // Lesson data API — Network-First with cache fallback
-  if (url.pathname.startsWith("/api/lessons/")) {
-    e.respondWith(networkFirst(e.request, LESSON_CACHE));
-    return;
-  }
-
   // Quête pages — Network-First with cache fallback (enables offline reading)
   if (url.pathname.includes("/quete/")) {
     e.respondWith(networkFirst(e.request, LESSON_CACHE));
     return;
   }
 });
+
+// ── Push Notifications ────────────────────────────────────────────
+
+self.addEventListener("push", (e) => {
+  if (!e.data) return;
+  const data = e.data.json();
+  e.waitUntil(
+    self.registration.showNotification(data.title ?? "CodeKids", {
+      body:    data.body  ?? "",
+      icon:    data.icon  ?? "/icons/icon-192.png",
+      badge:   "/icons/badge-72.png",
+      tag:     data.tag   ?? "codekids",
+      data:    { url: data.url ?? "/" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = e.notification.data?.url ?? "/";
+  e.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      const existing = clientList.find((c) => c.url.includes(self.location.origin));
+      if (existing) return existing.focus().then((c) => c.navigate(url));
+      return clients.openWindow(url);
+    })
+  );
+});
+
+// ── Cache helpers ─────────────────────────────────────────────────
 
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);

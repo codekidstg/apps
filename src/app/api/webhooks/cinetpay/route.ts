@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { webhookLimiter, checkRateLimit } from "@/lib/ratelimit";
 import crypto from "crypto";
 
 // Mock CinetPay webhook — vérifie la signature HMAC et active l'abonnement
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for") ?? "cinetpay";
+  const { allowed } = await checkRateLimit(webhookLimiter, `webhook:${ip}`);
+  if (!allowed) {
+    return NextResponse.json({ error: "Trop de requêtes" }, { status: 429 });
+  }
+
   const body = await req.json();
   const secret = process.env.CINETPAY_SECRET ?? "mock_secret_test";
 

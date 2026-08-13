@@ -14,7 +14,19 @@ export default async function PaiementsPage() {
 
   return (
     <div>
-      <PageHeader title="Paiements" subtitle={`${payments?.length ?? 0} paiements au total`} />
+      <PageHeader
+        title="Paiements"
+        subtitle={`${payments?.length ?? 0} paiements au total`}
+        actions={
+          <a
+            href="/api/admin/export/paiements"
+            download
+            className="flex items-center gap-1.5 text-sm font-bold px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
+            ⬇ CSV
+          </a>
+        }
+      />
 
       <div className="p-8 space-y-8 max-w-5xl">
         {/* Espèces en attente */}

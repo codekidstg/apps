@@ -61,7 +61,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Lire le rôle depuis le JWT app_metadata (identique à get_my_role() en SQL)
+  // Lire le rôle depuis le JWT app_metadata
   const role = (user.app_metadata?.role as string | undefined) ?? "student";
 
   // Vérifier les droits sur les routes protégées par rôle

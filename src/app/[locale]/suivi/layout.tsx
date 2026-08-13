@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { SuiviSidebarNav, SuiviBottomNav } from "./SuiviNav";
+import PushPermission from "@/components/PushPermission";
 
 export default async function SuiviLayout({
   children,
@@ -66,6 +67,9 @@ export default async function SuiviLayout({
 
       {/* Bottom nav — mobile only */}
       <SuiviBottomNav locale={locale} />
+
+      {/* Push notifications — demande permission au parent */}
+      <PushPermission />
     </div>
   );
 }

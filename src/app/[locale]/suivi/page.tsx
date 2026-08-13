@@ -316,15 +316,15 @@ export default async function SuiviDashboard({
               </div>
             )}
 
-            {/* Actions */}
+            {/* Actions — transmet child id pour le multi-enfants */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
-              <Link href={`/${locale}/suivi/progression`} className="text-center bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-2.5 rounded-xl transition-colors">
+              <Link href={`/${locale}/suivi/progression?child=${child.id}`} className="text-center bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-2.5 rounded-xl transition-colors">
                 📊 Progression
               </Link>
-              <Link href={`/${locale}/suivi/entrainements`} className="text-center bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-2.5 rounded-xl transition-colors">
+              <Link href={`/${locale}/suivi/entrainements?child=${child.id}`} className="text-center bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-2.5 rounded-xl transition-colors">
                 💪 Entraînements
               </Link>
-              <Link href={`/${locale}/suivi/certificats`} className="col-span-2 sm:col-span-1 text-center bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-2.5 rounded-xl transition-colors">
+              <Link href={`/${locale}/suivi/certificats?child=${child.id}`} className="col-span-2 sm:col-span-1 text-center bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-2.5 rounded-xl transition-colors">
                 🎓 Certificats
               </Link>
             </div>

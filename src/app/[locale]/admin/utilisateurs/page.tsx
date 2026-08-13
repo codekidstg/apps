@@ -39,6 +39,13 @@ export default async function UtilisateursPage() {
         subtitle={`${users?.length ?? 0} comptes enregistrés`}
         actions={
           <div className="flex gap-2">
+            <a
+              href="/api/admin/export/utilisateurs"
+              download
+              className="flex items-center gap-1.5 text-sm font-bold px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              ⬇ CSV
+            </a>
             <LinkParentForm users={(users ?? []).map((u) => ({ id: u.id, display_name: u.display_name ?? "", role: u.role }))} />
             <CreateUserForm schools={schools ?? []} />
           </div>
