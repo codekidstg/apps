@@ -27,6 +27,12 @@ export default async function SuiviEntrainenementsPage({
 
   const admin = createAdminClient();
 
+  // Thèmes accessibles à cet enfant
+  const { data: accessRows } = await (admin.from("student_theme_access") as any)
+    .select("theme_id")
+    .eq("student_id", child.id);
+  const accessibleThemeIds = new Set((accessRows ?? []).map((r: { theme_id: string }) => r.theme_id));
+
   const { data: trainingsRaw } = await (admin.from("trainings") as any)
     .select("id, title, description, xp_reward, lesson_id, lessons(id, title, theme_id, themes(id, title))")
     .order("lesson_id");
@@ -40,7 +46,7 @@ export default async function SuiviEntrainenementsPage({
   type Group = { themeTitle: string; lessons: { lessonTitle: string; trainings: any[] }[] };
   const grouped = new Map<string, Group>();
 
-  for (const t of trainingsRaw ?? []) {
+  for (const t of (trainingsRaw ?? []).filter((t: any) => accessibleThemeIds.has(t.lessons?.themes?.id))) {
     const lesson = t.lessons;
     const theme  = lesson?.themes;
     const themeId = theme?.id ?? "other";
