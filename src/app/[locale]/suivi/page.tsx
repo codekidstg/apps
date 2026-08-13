@@ -16,7 +16,7 @@ export default async function SuiviDashboard({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/${locale}/connexion`);
 
-  const { data: links } = await (supabase.from("parent_children") as any)
+  const { data: links } = await (admin.from("parent_children") as any)
     .select(`
       student_id,
       students (
