@@ -20,6 +20,12 @@ export default async function EntrainementPage() {
 
   const admin = createAdminClient();
 
+  // Thèmes accessibles à cet élève
+  const { data: accessRows } = await (admin.from("student_theme_access") as any)
+    .select("theme_id")
+    .eq("student_id", student.id);
+  const accessibleThemeIds = new Set((accessRows ?? []).map((r: { theme_id: string }) => r.theme_id));
+
   const { data: trainingsRaw } = await (admin.from("trainings") as any)
     .select("id, title, description, xp_reward, lesson_id, lessons(id, title, theme_id, themes(id, title, level))")
     .order("lesson_id");
@@ -64,8 +70,8 @@ export default async function EntrainementPage() {
     };
   });
 
-  const available = allTrainings.filter(t => t.lesson_started);
-  const locked    = allTrainings.filter(t => !t.lesson_started);
+  const available = allTrainings.filter(t => t.lesson_started && accessibleThemeIds.has(t.theme_id));
+  const locked    = allTrainings.filter(t => !t.lesson_started && accessibleThemeIds.has(t.theme_id));
 
   // Grouper thème → leçon
   type LessonGroup = { lessonId: string; lessonTitle: string; lessonCompletedAt: string | null; trainings: Training[] };
