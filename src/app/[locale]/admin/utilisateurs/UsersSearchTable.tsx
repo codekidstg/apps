@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { RoleBadge } from "@/components/backoffice/StatusBadge";
 import { CopyCell } from "./CopyCell";
 import { ResetPasswordCell } from "./ResetPasswordCell";
-import { toggleUserActive } from "./actions";
+import { toggleUserActive, resendWelcomeEmail } from "./actions";
 import { useTransition } from "react";
 import EditUserModal from "./EditUserModal";
 
@@ -15,8 +15,67 @@ type UserRow = {
   active: boolean;
   created_at: string;
   email: string;
+  temp_password: string | null;
   schools: { name: string } | null;
 };
+
+function PasswordCell({ userId, email, password }: { userId: string; email: string; password: string | null }) {
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [copiedBoth, setCopiedBoth] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+
+  if (!password) return <span className="text-xs text-gray-300 italic">—</span>;
+
+  function copyPw() {
+    navigator.clipboard.writeText(password!);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function copyBoth() {
+    navigator.clipboard.writeText(`Email : ${email}\nMot de passe : ${password}`);
+    setCopiedBoth(true);
+    setTimeout(() => setCopiedBoth(false), 2000);
+  }
+
+  async function handleResend() {
+    setSending(true);
+    setSendError(null);
+    const result = await resendWelcomeEmail(userId);
+    setSending(false);
+    if (result?.error) { setSendError(result.error); return; }
+    setSent(true);
+    setTimeout(() => setSent(false), 3000);
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-mono text-gray-500">
+          {revealed ? password : "•".repeat(Math.min(password.length, 10))}
+        </span>
+        <button onClick={() => setRevealed(r => !r)} className="text-xs text-gray-300 hover:text-gray-500 transition-colors" title={revealed ? "Masquer" : "Afficher"}>
+          {revealed ? "👁️" : "🙈"}
+        </button>
+        <button onClick={copyPw} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold transition-colors">
+          {copied ? "✓" : "Copier"}
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick={copyBoth} className="text-xs font-bold text-brand-navy hover:text-brand-navy/70 transition-colors">
+          {copiedBoth ? "✓ Copié !" : "📋 Email+MDP"}
+        </button>
+        <button onClick={handleResend} disabled={sending} className="text-xs font-bold text-brand-orange hover:text-brand-orange/70 transition-colors disabled:opacity-40">
+          {sending ? "…" : sent ? "✓ Envoyé !" : "📧 Renvoyer"}
+        </button>
+      </div>
+      {sendError && <p className="text-xs text-red-500">{sendError}</p>}
+    </div>
+  );
+}
 
 function ToggleButton({ userId, active }: { userId: string; active: boolean }) {
   const [pending, startTransition] = useTransition();
@@ -136,6 +195,7 @@ export default function UsersSearchTable({ users }: { users: UserRow[] }) {
                   <td className="px-5 py-3">
                     <div className="space-y-1.5">
                       {u.email ? <CopyCell email={u.email} /> : <span className="text-xs text-gray-400">—</span>}
+                      <PasswordCell userId={u.id} email={u.email} password={u.temp_password} />
                       <ResetPasswordCell userId={u.id} />
                       <div className="flex items-center gap-3 pt-0.5">
                         <a href={loginUrl} target="_blank" rel="noopener noreferrer"

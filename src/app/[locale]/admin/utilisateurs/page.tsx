@@ -30,6 +30,7 @@ export default async function UtilisateursPage() {
   const enriched = (users ?? []).map((u) => ({
     ...u,
     email: emailById.get(u.id) ?? "",
+    temp_password: (u as any).temp_password ?? null,
   }));
 
   return (

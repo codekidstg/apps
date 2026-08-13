@@ -31,6 +31,7 @@ export async function createUser(formData: FormData) {
     display_name: displayName,
     role: role || "student",
     school_id: schoolId || null,
+    temp_password: password,
   }).eq("id", data.user.id);
 
   // Envoyer email de bienvenue avec les identifiants
@@ -136,6 +137,32 @@ export async function updateUser(userId: string, data: { display_name?: string; 
 
   revalidatePath("/admin/utilisateurs");
   return { success: true };
+}
+
+export async function resendWelcomeEmail(userId: string) {
+  const admin = createAdminClient();
+  const { data: profile } = await (admin.from("profiles") as any)
+    .select("display_name, role, temp_password")
+    .eq("id", userId)
+    .single() as { data: { display_name: string; role: string; temp_password: string | null } | null };
+
+  if (!profile?.temp_password) return { error: "Aucun mot de passe enregistré pour cet utilisateur" };
+
+  const { data: authUser } = await admin.auth.admin.getUserById(userId);
+  const email = authUser?.user?.email;
+  if (!email) return { error: "Email introuvable" };
+
+  try {
+    await sendWelcomeEmail({
+      email,
+      displayName: profile.display_name,
+      password: profile.temp_password,
+      role: profile.role as any,
+    });
+    return { success: true };
+  } catch (e: any) {
+    return { error: e.message };
+  }
 }
 
 export async function toggleUserActive(userId: string, active: boolean) {
