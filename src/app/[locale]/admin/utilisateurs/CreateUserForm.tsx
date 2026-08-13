@@ -6,26 +6,47 @@ import { createUser } from "./actions";
 type School = { id: string; name: string };
 type Credentials = { email: string; password: string };
 
+const SPECIAL = ["@", "!", "#", "$", "%"];
+
+function generatePassword(displayName: string): string {
+  const firstName = displayName.trim().split(/\s+/)[0] || "User";
+  // Capitalize first letter, lowercase rest, max 4 chars
+  const base = firstName.charAt(0).toUpperCase() + firstName.slice(1, 4).toLowerCase();
+  const digits = Math.floor(10 + Math.random() * 90); // 2 chiffres
+  const special = SPECIAL[Math.floor(Math.random() * SPECIAL.length)];
+  const extra = String.fromCharCode(65 + Math.floor(Math.random() * 26)); // 1 lettre maj
+  // Assemble ≤ 8 chars : Base + chiffres + spécial + lettre = 4+2+1+1 = 8
+  return `${base}${digits}${special}${extra}`;
+}
+
 export default function CreateUserForm({ schools }: { schools: School[] }) {
-  const [open, setOpen]           = useState(false);
-  const [error, setError]         = useState<string | null>(null);
-  const [loading, setLoading]     = useState(false);
-  const [creds, setCreds]         = useState<Credentials | null>(null);
+  const [open, setOpen]             = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [loading, setLoading]       = useState(false);
+  const [creds, setCreds]           = useState<Credentials | null>(null);
+  const [password, setPassword]     = useState("");
+  const [displayName, setDisplayName] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
+
+  function handleGenerate() {
+    setPassword(generatePassword(displayName || "User"));
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     const fd = new FormData(e.currentTarget);
-    const email    = fd.get("email") as string;
-    const password = fd.get("password") as string;
+    const email = fd.get("email") as string;
+    const pw    = fd.get("password") as string;
     const result = await createUser(fd);
     setLoading(false);
     if (result?.error) { setError(result.error); return; }
     formRef.current?.reset();
+    setPassword("");
+    setDisplayName("");
     setOpen(false);
-    setCreds({ email, password });
+    setCreds({ email, password: pw });
   }
 
   return (
@@ -44,9 +65,44 @@ export default function CreateUserForm({ schools }: { schools: School[] }) {
             <h2 className="font-display font-black text-xl text-ink mb-6">Créer un compte</h2>
 
             <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-              <Field label="Nom affiché" name="display_name" type="text" required />
+              {/* Nom affiché */}
+              <div>
+                <label className="block text-xs font-extrabold text-ink-light mb-1.5">Nom affiché</label>
+                <input
+                  type="text"
+                  name="display_name"
+                  required
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
               <Field label="Email" name="email" type="email" required />
-              <Field label="Mot de passe" name="password" type="password" required />
+
+              {/* Mot de passe + bouton Générer */}
+              <div>
+                <label className="block text-xs font-extrabold text-ink-light mb-1.5">Mot de passe</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    name="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`${inputClass} flex-1 font-mono`}
+                    placeholder="Min. 8 caractères"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    title="Générer un mot de passe"
+                    className="shrink-0 bg-cream hover:bg-cream-border border border-cream-border text-ink-muted hover:text-ink text-xs font-extrabold px-3 rounded-xl transition-colors"
+                  >
+                    ✨ Générer
+                  </button>
+                </div>
+              </div>
 
               <div>
                 <label className="block text-xs font-extrabold text-ink-light mb-1.5">Rôle</label>
@@ -75,7 +131,7 @@ export default function CreateUserForm({ schools }: { schools: School[] }) {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={() => { setOpen(false); setPassword(""); setDisplayName(""); }}
                   className="flex-1 border-2 border-cream-border text-ink-muted font-extrabold text-sm py-2.5 rounded-xl hover:bg-cream transition-colors"
                 >
                   Annuler
@@ -85,7 +141,7 @@ export default function CreateUserForm({ schools }: { schools: School[] }) {
                   disabled={loading}
                   className="flex-1 bg-brand-orange text-white font-extrabold text-sm py-2.5 rounded-xl hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
                 >
-                  {loading ? "Création…" : "Créer"}
+                  {loading ? "Création…" : "Créer & envoyer"}
                 </button>
               </div>
             </form>
@@ -101,8 +157,11 @@ export default function CreateUserForm({ schools }: { schools: School[] }) {
               <span className="text-2xl">🔑</span>
               <h2 className="font-display font-black text-xl text-ink">Compte créé !</h2>
             </div>
-            <p className="text-sm text-ink-muted mb-6">
-              Notez ces identifiants — le mot de passe ne sera plus affiché après fermeture.
+            <p className="text-sm text-ink-muted mb-2">
+              Un email de bienvenue avec les identifiants a été envoyé à l&apos;utilisateur.
+            </p>
+            <p className="text-xs text-ink-light mb-6">
+              Conservez également ces identifiants ici — le mot de passe ne sera plus affiché après fermeture.
             </p>
 
             <div className="space-y-3">

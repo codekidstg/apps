@@ -3,6 +3,7 @@
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/supabase/types";
+import { sendWelcomeEmail } from "@/lib/email";
 
 export async function createUser(formData: FormData) {
   const email       = formData.get("email") as string;
@@ -31,6 +32,13 @@ export async function createUser(formData: FormData) {
     role: role || "student",
     school_id: schoolId || null,
   }).eq("id", data.user.id);
+
+  // Envoyer email de bienvenue avec les identifiants
+  try {
+    await sendWelcomeEmail({ email, displayName, password, role: role || "student" });
+  } catch {
+    // Ne pas bloquer la création si l'email échoue
+  }
 
   revalidatePath("/admin/utilisateurs");
   return { success: true };
