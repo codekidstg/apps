@@ -39,9 +39,8 @@ export default async function EleveDashboard() {
   const { data: accessRows } = await (admin.from("student_theme_access") as any)
     .select("theme_id")
     .eq("student_id", student.id);
-  const accessibleThemeIds = (accessRows?.length || student.teacher_id)
-    ? new Set((accessRows ?? []).map((r: { theme_id: string }) => r.theme_id))
-    : null; // null = pas de prof et aucun accès configuré → afficher tout
+  // Toujours filtrer : seuls les thèmes explicitement activés sont visibles
+  const accessibleThemeIds = new Set((accessRows ?? []).map((r: { theme_id: string }) => r.theme_id));
 
   const [{ data: themesRaw }, { data: chaptersRaw }, { data: lessonsRaw }, { data: progressRaw }, { data: achievementsRaw }, { data: trainingsRaw }, { data: trainingProgressRaw }] =
     await Promise.all([
@@ -55,9 +54,7 @@ export default async function EleveDashboard() {
     ]);
 
   const allThemes: Theme[]     = themesRaw  ?? [];
-  const themes: Theme[]       = accessibleThemeIds
-    ? allThemes.filter((t) => accessibleThemeIds.has(t.id))
-    : allThemes;
+  const themes: Theme[]       = allThemes.filter((t) => accessibleThemeIds.has(t.id));
   const chapters: Chapter[]   = chaptersRaw ?? [];
   const lessons: LessonRow[]  = lessonsRaw  ?? [];
   const progress: ProgressRow[]= progressRaw ?? [];
