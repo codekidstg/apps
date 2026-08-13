@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { linkParentToStudent } from "../actions";
 
 type Student = { id: string; display_name: string };
@@ -12,6 +13,7 @@ export default function AddChildForm({
   parentId: string;
   students: Student[];
 }) {
+  const router = useRouter();
   const [studentId, setStudentId] = useState("");
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
@@ -25,6 +27,7 @@ export default function AddChildForm({
       if ("error" in res) { setStatus("error"); setErrorMsg(res.error); return; }
       setStatus("ok");
       setStudentId("");
+      router.refresh();
       setTimeout(() => setStatus("idle"), 2000);
     });
   }

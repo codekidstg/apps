@@ -75,7 +75,7 @@ export async function linkParentToStudent(parentProfileId: string, studentProfil
   }, { onConflict: "parent_id,student_id" });
 
   if (error) return { error: error.message };
-  revalidatePath("/admin/utilisateurs");
+  revalidatePath("/admin/utilisateurs", "layout");
   return { success: true };
 }
 
