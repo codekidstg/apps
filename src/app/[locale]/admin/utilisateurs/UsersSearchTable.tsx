@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { RoleBadge } from "@/components/backoffice/StatusBadge";
 import { CopyCell } from "./CopyCell";
 import { ResetPasswordCell } from "./ResetPasswordCell";
-import { toggleUserActive, resendWelcomeEmail } from "./actions";
+import { toggleUserActive, resendWelcomeEmail, deleteUser } from "./actions";
 import { useTransition } from "react";
 import EditUserModal from "./EditUserModal";
 
@@ -86,6 +86,25 @@ function ToggleButton({ userId, active }: { userId: string; active: boolean }) {
       className="text-xs font-bold text-gray-400 hover:text-gray-700 transition-colors disabled:opacity-40"
     >
       {active ? "Désactiver" : "Réactiver"}
+    </button>
+  );
+}
+
+function DeleteButton({ userId }: { userId: string }) {
+  const [pending, startTransition] = useTransition();
+
+  function handleDelete() {
+    if (!confirm("Supprimer définitivement ce compte ? Cette action est irréversible.")) return;
+    startTransition(async () => { await deleteUser(userId); });
+  }
+
+  return (
+    <button
+      disabled={pending}
+      onClick={handleDelete}
+      className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors disabled:opacity-40"
+    >
+      {pending ? "…" : "Supprimer"}
     </button>
   );
 }
@@ -224,6 +243,7 @@ export default function UsersSearchTable({ users }: { users: UserRow[] }) {
                         ✏️ Modifier
                       </button>
                       <ToggleButton userId={u.id} active={u.active} />
+                      <DeleteButton userId={u.id} />
                     </div>
                   </td>
                 </tr>

@@ -165,6 +165,14 @@ export async function resendWelcomeEmail(userId: string) {
   }
 }
 
+export async function deleteUser(userId: string) {
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/utilisateurs");
+  return { success: true };
+}
+
 export async function toggleUserActive(userId: string, active: boolean) {
   const admin = createAdminClient();
   await (admin.from("profiles") as any).update({ active }).eq("id", userId);
