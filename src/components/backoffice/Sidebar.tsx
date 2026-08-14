@@ -22,6 +22,13 @@ const adminNav: NavItem[] = [
   },
   { label: "Écoles",          href: "/admin/ecoles",       icon: "🏫" },
   { label: "Thèmes & Cours",  href: "/admin/themes",       icon: "📚" },
+  {
+    label: "Compta",          href: "/admin/compta",       icon: "💰",
+    children: [
+      { label: "Mentors",  href: "/admin/compta/mentors" },
+      { label: "Parents",  href: "/admin/compta/parents" },
+    ],
+  },
   { label: "Abonnements",     href: "/admin/abonnements",  icon: "📦" },
   { label: "Paiements",       href: "/admin/paiements",    icon: "💳" },
   { label: "Démo parent",    href: "/admin/demo-parent",  icon: "🎟️" },
@@ -40,6 +47,13 @@ const managerNav: NavItem[] = [
   },
   { label: "Mes thèmes",      href: "/manager/themes",       icon: "📚" },
   { label: "Affectations",    href: "/manager/affectations",  icon: "📋" },
+  {
+    label: "Compta",          href: "/manager/compta",       icon: "💰",
+    children: [
+      { label: "Mentors",  href: "/manager/compta/mentors" },
+      { label: "Parents",  href: "/manager/compta/parents" },
+    ],
+  },
 ];
 
 const teacherNav: NavItem[] = [

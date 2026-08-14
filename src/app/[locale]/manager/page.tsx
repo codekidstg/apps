@@ -6,12 +6,12 @@ import Link from "next/link";
 const WEEKDAY_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
 function buildUpcomingSessions(sessions: any[], days = 7) {
-  const now = new Date();
+  const now   = new Date();
   const limit = new Date(now); limit.setDate(now.getDate() + days);
   const out: { title: string; at: Date; teacherName: string; studentName: string | null }[] = [];
 
   for (const s of sessions) {
-    const teacherName: string = s.profiles?.display_name ?? "Prof";
+    const teacherName: string   = s.profiles?.display_name ?? "Prof";
     const studentName: string | null = s.students?.profiles?.display_name ?? null;
 
     if (s.session_type === "recurring") {
@@ -35,38 +35,48 @@ export default async function ManagerDashboard() {
   if (!user) redirect("/connexion");
 
   const admin = createAdminClient();
+  const now   = new Date();
+  const month = now.getMonth() + 1;
+  const year  = now.getFullYear();
 
   const [
     { data: profiles },
-    { data: themes },
     { data: allSessions },
     { data: reports },
+    { data: mentorPendingPay },
+    { data: parentPendingPay },
   ] = await Promise.all([
     (admin.from("profiles") as any).select("role"),
-    (admin.from("themes") as any).select("id, title, status, level, updated_at").order("updated_at", { ascending: false }).limit(6),
     (admin.from("teacher_sessions") as any)
       .select("*, profiles!teacher_id(display_name), students(id, profiles!profile_id(display_name))")
       .order("weekday").order("start_time").order("scheduled_at"),
     (admin.from("session_reports") as any)
-      .select("id, title, status, created_at, teacher_id, profiles!teacher_id(display_name)")
+      .select("id, title, status, created_at, teacher_id, profiles!teacher_id(display_name), advancement, engagement")
       .order("created_at", { ascending: false })
-      .limit(8),
+      .limit(6),
+    // Paiements mentors en attente (statut to_pay)
+    (admin.from("mentor_payments") as any)
+      .select("id", { count: "exact", head: true })
+      .eq("status", "to_pay"),
+    // Paiements parents en attente
+    (admin.from("parent_session_payments") as any)
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
   ]);
 
-  const byRole = ((profiles ?? []) as { role: string }[]).reduce<Record<string, number>>(
+  const byRole   = ((profiles ?? []) as { role: string }[]).reduce<Record<string, number>>(
     (a, p) => ({ ...a, [p.role]: (a[p.role] ?? 0) + 1 }), {}
-  );
-  const byStatus = ((themes ?? []) as { status: string }[]).reduce<Record<string, number>>(
-    (a, t) => ({ ...a, [t.status]: (a[t.status] ?? 0) + 1 }), {}
   );
 
   const upcoming = buildUpcomingSessions(allSessions ?? []);
 
   const kpis = [
-    { label: "Élèves",        value: byRole.student  ?? 0, icon: "🎓", color: "#10b981" },
-    { label: "Professeurs",   value: byRole.teacher  ?? 0, icon: "👩‍🏫", color: "#a78bfa" },
-    { label: "Parents",       value: byRole.parent   ?? 0, icon: "👨‍👩‍👦", color: "#60a5fa" },
-    { label: "Sessions / 7j", value: upcoming.length,       icon: "📅", color: "#FDB813" },
+    { label: "Élèves",         value: byRole.student  ?? 0, icon: "🎓", color: "#10b981", href: "/manager/utilisateurs/eleves" },
+    { label: "Professeurs",    value: byRole.teacher  ?? 0, icon: "👩‍🏫", color: "#a78bfa", href: "/manager/utilisateurs/professeurs" },
+    { label: "Parents",        value: byRole.parent   ?? 0, icon: "👨‍👩‍👦", color: "#60a5fa", href: "/manager/utilisateurs/parents" },
+    { label: "Sessions / 7j",  value: upcoming.length,       icon: "📅", color: "#FDB813", href: `/manager/compta/mentors?month=${month}&year=${year}` },
+    { label: "À payer mentors",value: (mentorPendingPay as any)?.count ?? 0, icon: "💰", color: "#f97316", href: "/manager/compta/mentors" },
+    { label: "En attente parents", value: (parentPendingPay as any)?.count ?? 0, icon: "💳", color: "#ef4444", href: "/manager/compta/parents" },
   ];
 
   return (
@@ -74,16 +84,17 @@ export default async function ManagerDashboard() {
       <PageHeader title="Tableau de bord" subtitle="Vue d'ensemble de votre espace" />
       <div className="p-8 space-y-8">
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* KPIs cliquables */}
+        <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
           {kpis.map((k) => (
-            <div key={k.label} className="bg-white rounded-2xl border border-cream-border p-5 flex items-center gap-4">
+            <Link key={k.label} href={k.href}
+              className="bg-white rounded-2xl border border-cream-border p-5 flex items-center gap-4 hover:shadow-md transition-shadow group">
               <span className="text-3xl">{k.icon}</span>
               <div>
-                <div className="font-display font-black text-3xl" style={{ color: k.color }}>{k.value}</div>
+                <div className="font-display font-black text-3xl group-hover:scale-105 transition-transform" style={{ color: k.color }}>{k.value}</div>
                 <div className="text-sm font-bold text-ink-muted mt-0.5">{k.label}</div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
 
@@ -99,7 +110,7 @@ export default async function ManagerDashboard() {
               <div className="px-6 py-8 text-center text-ink-muted font-bold text-sm">Aucune session prévue.</div>
             ) : (
               <div className="divide-y divide-cream-border">
-                {upcoming.slice(0, 6).map((occ, i) => (
+                {upcoming.slice(0, 5).map((occ, i) => (
                   <div key={i} className="flex items-center gap-4 px-5 py-3">
                     <div className="w-10 text-center shrink-0">
                       <div className="text-[10px] font-black text-gray-400 uppercase">{WEEKDAY_SHORT[occ.at.getDay()]}</div>
@@ -119,74 +130,68 @@ export default async function ManagerDashboard() {
             )}
           </div>
 
-          {/* Rapports récents */}
+          {/* Validations récentes (rapports de séance) */}
           <div className="bg-white rounded-2xl border border-cream-border overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-cream-border">
-              <h2 className="font-display font-black text-base text-ink">📝 Rapports de séance</h2>
+              <h2 className="font-display font-black text-base text-ink">📝 Rapports de séance récents</h2>
             </div>
             {(reports ?? []).length === 0 ? (
               <div className="px-6 py-8 text-center text-ink-muted font-bold text-sm">Aucun rapport.</div>
             ) : (
               <div className="divide-y divide-cream-border">
-                {(reports as any[]).map((r) => (
-                  <div key={r.id} className="flex items-center gap-4 px-5 py-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-ink text-sm truncate">{r.title ?? "Rapport"}</div>
-                      <div className="text-xs text-ink-muted mt-0.5">
-                        👩‍🏫 {r.profiles?.display_name ?? "Prof"} · {new Date(r.created_at).toLocaleDateString("fr-FR")}
+                {(reports as any[]).map((r) => {
+                  const adv = r.advancement ?? 0;
+                  const eng = r.engagement  ?? 0;
+                  return (
+                    <div key={r.id} className="flex items-center gap-4 px-5 py-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-ink text-sm truncate">{r.title ?? "Rapport"}</div>
+                        <div className="text-xs text-ink-muted mt-0.5 flex items-center gap-2">
+                          <span>👩‍🏫 {r.profiles?.display_name ?? "Prof"}</span>
+                          <span>· {new Date(r.created_at).toLocaleDateString("fr-FR")}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-gray-400">Avancement</span>
+                          <span className="text-xs font-black" style={{ color: adv >= 3 ? "#10b981" : adv >= 2 ? "#f59e0b" : "#ef4444" }}>
+                            {"★".repeat(adv)}{"☆".repeat(Math.max(0, 5 - adv))}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-gray-400">Engagement</span>
+                          <span className="text-xs font-black" style={{ color: eng >= 3 ? "#10b981" : eng >= 2 ? "#f59e0b" : "#ef4444" }}>
+                            {"★".repeat(eng)}{"☆".repeat(Math.max(0, 5 - eng))}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <span className={`text-xs font-black px-2.5 py-1 rounded-full shrink-0 ${
-                      r.status === "validated"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-amber-100 text-amber-700"
-                    }`}>
-                      {r.status === "validated" ? "✓ Validé" : "En attente"}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
 
-        {/* Thèmes récents */}
-        <div className="bg-white rounded-2xl border border-cream-border overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-cream-border">
-            <h2 className="font-display font-black text-base text-ink">📚 Mes thèmes récents</h2>
-            <div className="flex items-center gap-4">
-              <div className="flex gap-3 text-xs font-bold text-ink-muted">
-                <span className="text-green-600">{byStatus.published ?? 0} publiés</span>
-                <span className="text-brand-blue">{byStatus.validated ?? 0} validés</span>
-                <span className="text-gray-500">{byStatus.draft ?? 0} brouillons</span>
-              </div>
-              <Link href="/manager/themes" className="text-xs font-extrabold text-brand-orange hover:underline">Voir tout →</Link>
+        {/* Mini-résumé Compta du mois */}
+        <div className="bg-brand-navy rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-black text-base text-white">💰 Compta — {new Date(year, month - 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</h2>
+            <div className="flex gap-3">
+              <Link href="/manager/compta/mentors" className="text-xs font-black text-yellow-300 hover:underline">Mentors →</Link>
+              <Link href="/manager/compta/parents" className="text-xs font-black text-yellow-300 hover:underline">Parents →</Link>
             </div>
           </div>
-          {(themes ?? []).length === 0 ? (
-            <div className="px-6 py-8 text-center text-ink-muted font-bold text-sm">
-              Aucun thème. <Link href="/manager/themes/new" className="text-brand-orange hover:underline">Créer un thème</Link>
-            </div>
-          ) : (
-            <div className="divide-y divide-cream-border">
-              {((themes ?? []) as any[]).map((t) => (
-                <Link key={t.id} href={`/manager/themes/${t.id}`}
-                  className="flex items-center gap-4 px-6 py-3 hover:bg-cream transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-ink truncate">{t.title}</div>
-                    <div className="text-xs text-ink-light capitalize">{t.level} · {new Date(t.updated_at).toLocaleDateString("fr-FR")}</div>
-                  </div>
-                  <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full shrink-0 ${
-                    t.status === "published" ? "bg-green-100 text-green-700" :
-                    t.status === "validated" ? "bg-blue-100 text-blue-700" :
-                    "bg-gray-100 text-gray-600"
-                  }`}>
-                    {t.status === "draft" ? "Brouillon" : t.status === "validated" ? "Validé" : t.status === "published" ? "Publié" : "Archivé"}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-4">
+            <Link href="/manager/compta/mentors" className="bg-white/10 hover:bg-white/20 rounded-xl p-4 transition-colors">
+              <div className="text-xs font-bold text-white/60 mb-1">Séances à payer (mentors)</div>
+              <div className="text-2xl font-black text-yellow-300">{(mentorPendingPay as any)?.count ?? 0}</div>
+            </Link>
+            <Link href="/manager/compta/parents" className="bg-white/10 hover:bg-white/20 rounded-xl p-4 transition-colors">
+              <div className="text-xs font-bold text-white/60 mb-1">Versements en attente (parents)</div>
+              <div className="text-2xl font-black text-yellow-300">{(parentPendingPay as any)?.count ?? 0}</div>
+            </Link>
+          </div>
         </div>
 
       </div>
