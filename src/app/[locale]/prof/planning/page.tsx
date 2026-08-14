@@ -26,7 +26,12 @@ function buildOccurrences(sessions: any[], from: Date, to: Date): Occurrence[] {
     const daysUntil = (s.weekday - cursor.getDay() + 7) % 7;
     cursor.setDate(cursor.getDate() + (daysUntil === 0 && cursor >= from ? 0 : daysUntil === 0 ? 7 : daysUntil));
     while (cursor <= to) {
-      if (cursor >= from && (!s.active_until || cursor <= new Date(s.active_until))) {
+      const activeFrom = s.active_from ? new Date(s.active_from) : null;
+      if (
+        cursor >= from &&
+        (!activeFrom || cursor >= activeFrom) &&
+        (!s.active_until || cursor <= new Date(s.active_until))
+      ) {
         out.push({
           sessionId: s.id,
           title: s.title,

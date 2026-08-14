@@ -45,9 +45,10 @@ export default async function ProfCoursPage() {
   const { data: accessRows } = await (admin.from("student_theme_access") as any)
     .select("theme_id")
     .in("student_id", students.map((s: any) => s.id));
+  // [] = aucun accès configuré → aucun thème visible (accès explicite requis)
   const activatedThemeIds = accessRows?.length
     ? [...new Set((accessRows as { theme_id: string }[]).map((r) => r.theme_id))]
-    : null; // null = aucun accès configuré → on affiche tous les thèmes du niveau
+    : [];
 
   // Thèmes publiés correspondant aux niveaux des élèves
   let themesQuery = (admin.from("themes") as any)
@@ -61,9 +62,20 @@ export default async function ProfCoursPage() {
     .eq("status", "published")
     .in("level", levelStrings)
     .order("title");
-  if (activatedThemeIds) {
-    themesQuery = themesQuery.in("id", activatedThemeIds);
+  if (activatedThemeIds.length === 0) {
+    // Aucun thème activé pour les élèves de ce prof → on force un résultat vide
+    return (
+      <div className="max-w-3xl">
+        <PageHeader title="Mes cours" subtitle="Progression de vos élèves par thème" />
+        <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
+          <div className="text-4xl mb-3">🔒</div>
+          <p className="font-bold text-gray-500">Aucun thème activé pour vos élèves.</p>
+          <p className="text-sm text-gray-400 mt-1">Un administrateur doit activer des thèmes pour chaque élève.</p>
+        </div>
+      </div>
+    );
   }
+  themesQuery = themesQuery.in("id", activatedThemeIds);
   const { data: themes } = await themesQuery;
 
   // Progression de TOUS les élèves

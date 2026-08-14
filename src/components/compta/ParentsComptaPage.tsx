@@ -1,4 +1,4 @@
-import { getComptaParentsData } from "@/lib/compta/actions";
+import { getComptaParentsData, getAllStudentsWithRates } from "@/lib/compta/actions";
 import MonthSelector from "./MonthSelector";
 import ParentPaymentRow from "./ParentPaymentRow";
 import RateModal from "./RateModal";
@@ -8,7 +8,10 @@ type Props = { month: number; year: number; exportHref: string };
 const MONTHS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
 export default async function ParentsComptaPage({ month, year, exportHref }: Props) {
-  const data = await getComptaParentsData(month, year);
+  const [data, allStudents] = await Promise.all([
+    getComptaParentsData(month, year),
+    getAllStudentsWithRates(),
+  ]);
 
   const grandTotal     = data.reduce((s: number, p: any) => s + p.grandDue,  0);
   const grandEncaisse  = data.reduce((s: number, p: any) => s + p.grandPaid, 0);
@@ -53,6 +56,42 @@ export default async function ParentsComptaPage({ month, year, exportHref }: Pro
           </span>
         </div>
       )}
+
+      {/* ── Configuration des tarifs élèves ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-indigo-50/40">
+          <span className="text-lg">⚙️</span>
+          <div>
+            <h2 className="font-black text-gray-900 text-sm">Tarifs par élève</h2>
+            <p className="text-xs text-gray-400">Montant facturé par séance réalisée, par élève</p>
+          </div>
+        </div>
+        {allStudents.length === 0 ? (
+          <div className="px-6 py-8 text-center text-gray-400 text-sm">Aucun élève lié à un parent.</div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {allStudents.map((s) => (
+              <div key={s.studentId} className="flex items-center gap-4 px-6 py-3">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700 font-black text-sm shrink-0">
+                  {s.studentName.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-gray-900 text-sm">{s.studentName}</div>
+                  <div className="text-xs text-gray-400">Parent : {s.parentName}</div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {s.rate > 0 ? (
+                    <span className="text-sm font-black text-indigo-700">{s.rate.toLocaleString("fr-FR")} F/séance</span>
+                  ) : (
+                    <span className="text-xs font-bold text-amber-500">⚠ Tarif non défini</span>
+                  )}
+                  <RateModal type="student" entityId={s.studentId} entityName={s.studentName} currentRate={s.rate || null} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Cartes par parent */}
       {data.length === 0 ? (

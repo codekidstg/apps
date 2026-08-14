@@ -263,6 +263,27 @@ describe("buildMonthOccurrences — session récurrente", () => {
     }
   });
 
+  it("respecte active_from : exclut les occurrences avant la date de début", () => {
+    const session: RawSession = {
+      id: "s5", teacher_id: "t1", title: "Maths",
+      session_type: "recurring",
+      weekday: 0, // dimanche
+      start_time: "09:00:00",
+      duration_min: 60,
+      active_from: "2025-08-14", // commence le 14 août (un jeudi)
+    };
+    // Dimanches août : 3, 10, 17, 24, 31
+    const from = new Date("2025-08-01T00:00:00Z");
+    const to   = new Date("2025-08-31T23:59:59Z");
+    const occs = buildMonthOccurrences([session], from, to, FUTURE);
+    // Le 3 et le 10 sont avant active_from → exclus
+    // Le 17, 24, 31 sont >= active_from → inclus
+    for (const o of occs) {
+      expect(o.at >= new Date("2025-08-14")).toBe(true);
+    }
+    expect(occs.length).toBe(3); // 17, 24, 31
+  });
+
   it("retourne [] si session récurrente sans weekday", () => {
     const session: RawSession = {
       id: "s4", teacher_id: "t1", title: "Oops",

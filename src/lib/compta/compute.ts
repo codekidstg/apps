@@ -125,11 +125,13 @@ export function buildMonthOccurrences(
         cursor.getDate() +
           (daysUntil === 0 && cursor >= from ? 0 : daysUntil === 0 ? 7 : daysUntil),
       );
+      const activeFrom  = s.active_from  ? new Date(s.active_from)  : null;
       const activeUntil = s.active_until ? new Date(s.active_until) : null;
 
       while (cursor <= to) {
         if (
           cursor >= from &&
+          (!activeFrom  || cursor >= activeFrom) &&
           (!activeUntil || cursor <= activeUntil) &&
           cursor < now
         ) {

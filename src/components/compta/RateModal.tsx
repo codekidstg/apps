@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { setTeacherRate, setStudentRate } from "@/lib/compta/actions";
 
 type Props =
@@ -8,6 +9,7 @@ type Props =
   | { type: "student"; entityId: string; entityName: string; currentRate?: number | null };
 
 export default function RateModal(props: Props) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [rate, setRate] = useState(props.currentRate ? (props.type === "teacher" ? (props.currentRate as any).rate_fcfa : props.currentRate) : 0);
   const [rateType, setRateType] = useState<"per_session" | "per_hour">(
@@ -29,7 +31,7 @@ export default function RateModal(props: Props) {
       }
       if ("error" in res) { setStatus("error"); setErrMsg(res.error); return; }
       setStatus("ok");
-      setTimeout(() => { setStatus("idle"); setOpen(false); }, 1500);
+      setTimeout(() => { setStatus("idle"); setOpen(false); router.refresh(); }, 1500);
     });
   }
 

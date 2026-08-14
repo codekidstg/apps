@@ -272,7 +272,8 @@ export async function getComptaMentorsData(month: number, year: number) {
         const daysUntil = (s.weekday - cursor.getDay() + 7) % 7;
         cursor.setDate(cursor.getDate() + (daysUntil === 0 && cursor >= from ? 0 : daysUntil === 0 ? 7 : daysUntil));
         while (cursor <= to) {
-          if (cursor >= from && (!s.active_until || cursor <= new Date(s.active_until)) && cursor < new Date()) {
+          const af = s.active_from ? new Date(s.active_from) : null;
+          if (cursor >= from && (!af || cursor >= af) && (!s.active_until || cursor <= new Date(s.active_until)) && cursor < new Date()) {
             out.push({ sessionId: s.id, teacherId: s.teacher_id, title: s.title, at: new Date(cursor), duration_min: s.duration_min, studentName: s.students?.profiles?.display_name ?? null });
           }
           cursor.setDate(cursor.getDate() + 7);
@@ -386,7 +387,8 @@ export async function getComptaParentsData(month: number, year: number) {
         const daysUntil = (s.weekday - cursor.getDay() + 7) % 7;
         cursor.setDate(cursor.getDate() + (daysUntil === 0 && cursor >= from ? 0 : daysUntil === 0 ? 7 : daysUntil));
         while (cursor <= to) {
-          if (cursor >= from && (!s.active_until || cursor <= new Date(s.active_until)) && cursor < new Date()) {
+          const af2 = s.active_from ? new Date(s.active_from) : null;
+          if (cursor >= from && (!af2 || cursor >= af2) && (!s.active_until || cursor <= new Date(s.active_until)) && cursor < new Date()) {
             out.push({ sessionId: s.id, title: s.title, at: new Date(cursor), duration_min: s.duration_min, studentId: s.student_id });
           }
           cursor.setDate(cursor.getDate() + 7);
@@ -448,4 +450,42 @@ export async function getComptaParentsData(month: number, year: number) {
   }).filter((p: any) => p.children.length > 0);
 
   return result;
+}
+
+// ── Tous les élèves avec leur tarif actuel ──────────────────────
+
+export async function getAllStudentsWithRates() {
+  const admin = createAdminClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [{ data: links }, { data: allRates }] = await Promise.all([
+    (admin.from("parent_children") as any)
+      .select("parent_id, student_id, students(id, profiles!profile_id(display_name)), profiles!parent_id(display_name)")
+      .order("student_id"),
+    (admin.from("student_session_rates") as any)
+      .select("student_id, rate_fcfa, effective_from")
+      .order("effective_from", { ascending: false }),
+  ]);
+
+  const rateByStudent = new Map<string, number>();
+  for (const r of (allRates ?? []).sort((a: any, b: any) => b.effective_from.localeCompare(a.effective_from))) {
+    if (!rateByStudent.has(r.student_id) && r.effective_from <= today) {
+      rateByStudent.set(r.student_id, r.rate_fcfa);
+    }
+  }
+
+  const seen = new Set<string>();
+  const students: { studentId: string; studentName: string; parentName: string; rate: number }[] = [];
+  for (const l of links ?? []) {
+    if (seen.has(l.student_id)) continue;
+    seen.add(l.student_id);
+    students.push({
+      studentId:   l.student_id,
+      studentName: (l.students as any)?.profiles?.display_name ?? "Élève",
+      parentName:  (l.profiles as any)?.display_name ?? "Parent",
+      rate:        rateByStudent.get(l.student_id) ?? 0,
+    });
+  }
+
+  return students.sort((a, b) => a.studentName.localeCompare(b.studentName));
 }
