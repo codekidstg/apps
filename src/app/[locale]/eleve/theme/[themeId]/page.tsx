@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { requireStudentPermission } from "@/lib/permissions/student";
 
 type Lesson   = { id: string; title: string; xp_reward: number; chapter_id: string; order_index: number };
 type Chapter  = { id: string; title: string; order_index: number };
@@ -19,6 +20,8 @@ export default async function ThemePage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
+
+  await requireStudentPermission(user.id, "student.apprendre");
 
   const { data: student } = await supabase
     .from("students")

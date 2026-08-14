@@ -12,6 +12,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin:   "Admin",
   manager: "Manager",
   teacher: "Professeur",
+  student: "Élève",
 };
 
 // ─── Toggle switch ─────────────────────────────────────────────────────────────
@@ -48,7 +49,7 @@ function RoleTab({ allRoleConfigs }: { allRoleConfigs: RoleConfigs }) {
   const isAdmin = selectedRole === "admin";
 
   function handleToggle(pageKey: string) {
-    if (isAdmin) return;
+    if (isAdmin) return; // admin toujours full-access
     const next = !(roleConfig[pageKey] ?? true);
     setConfigs(prev => ({
       ...prev,
@@ -82,7 +83,7 @@ function RoleTab({ allRoleConfigs }: { allRoleConfigs: RoleConfigs }) {
     <div>
       {/* Role selector */}
       <div className="flex items-center gap-3 mb-6">
-        {["admin", "manager", "teacher"].map(r => (
+        {["admin", "manager", "teacher", "student"].map(r => (
           <button
             key={r}
             onClick={() => setSelectedRole(r)}
@@ -114,6 +115,11 @@ function RoleTab({ allRoleConfigs }: { allRoleConfigs: RoleConfigs }) {
       {isAdmin && (
         <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm font-bold text-amber-700">
           Les administrateurs ont toujours accès à toutes les pages — leurs droits ne sont pas modifiables ici.
+        </div>
+      )}
+      {selectedRole === "student" && (
+        <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl text-sm font-bold text-blue-700">
+          Ces droits s'appliquent à tous les élèves. Utilisez l'onglet "Par utilisateur" pour des restrictions individuelles.
         </div>
       )}
 

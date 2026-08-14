@@ -5,11 +5,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import TrainingAccordion from "./TrainingAccordion";
+import { requireStudentPermission } from "@/lib/permissions/student";
 
 export default async function EntrainementPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
+
+  await requireStudentPermission(user.id, "student.entrainement");
 
   const { data: student } = await supabase
     .from("students")

@@ -8,6 +8,14 @@ export interface NavPageDef {
 }
 
 export const NAV_PAGES: NavPageDef[] = [
+  // ── Élève ────────────────────────────────────────────────────────────────────
+  { role: "student", key: "student.suivi",        label: "Suivi / Progression",    href: "/suivi/progression",     icon: "📊" },
+  { role: "student", key: "student.apprendre",    label: "Apprendre (cours)",       href: "/eleve",                 icon: "🎮" },
+  { role: "student", key: "student.entrainement", label: "Entraînement",            href: "/eleve/entrainement",    icon: "🏋️" },
+  { role: "student", key: "student.certificats",  label: "Certificats",             href: "/suivi/certificats",     icon: "🎓" },
+  { role: "student", key: "student.abonnement",   label: "Paiement / Abonnement",   href: "/suivi/abonnement",      icon: "💳" },
+
+
   // ── Admin ────────────────────────────────────────────────────────────────────
   { role: "admin", key: "admin.dashboard",                label: "Tableau de bord",  href: "/admin",                           icon: "◈" },
   { role: "admin", key: "admin.utilisateurs",             label: "Utilisateurs",     href: "/admin/utilisateurs",              icon: "👥" },

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import PaiementForm from "./PaiementForm";
+import { getEffectiveNavPermissions } from "@/lib/permissions/access";
 
 export default async function AbonnementPage() {
   const supabase = await createClient();
@@ -10,6 +11,12 @@ export default async function AbonnementPage() {
   const { data: links } = await (supabase.from("parent_children") as any)
     .select("student_id, students(id, profiles!students_profile_id_fkey(display_name))")
     .eq("parent_id", user.id);
+
+  // Vérification droits abonnement sur le premier enfant
+  if (links && links.length > 0 && links[0].student_id) {
+    const allowed = await getEffectiveNavPermissions(links[0].student_id, "student");
+    if (!allowed.has("student.abonnement")) redirect("/fr/suivi");
+  }
 
   const children = (links ?? []).map((l: any) => ({
     id: l.students?.id, name: l.students?.profiles?.display_name ?? "Enfant",

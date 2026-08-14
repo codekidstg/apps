@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { getEffectiveNavPermissions } from "@/lib/permissions/access";
 
 export default async function CertificatsPage() {
   const supabase = await createClient();
@@ -13,6 +14,15 @@ export default async function CertificatsPage() {
 
   const children = (links ?? []).map((l: any) => l.students).filter(Boolean);
   const childIds = children.map((c: any) => c.id);
+
+  // Vérifier que l'accès aux certificats est activé pour au moins un enfant
+  if (children.length > 0) {
+    const firstChildProfileId = links?.[0]?.student_id;
+    if (firstChildProfileId) {
+      const allowed = await getEffectiveNavPermissions(firstChildProfileId, "student");
+      if (!allowed.has("student.certificats")) redirect("/fr/suivi");
+    }
+  }
 
   // Certificats (RLS : parent voit les certs de ses enfants)
   const admin = createAdminClient();
