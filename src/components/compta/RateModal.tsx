@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { setTeacherRate, setStudentRate } from "@/lib/compta/actions";
 
@@ -17,6 +17,21 @@ export default function RateModal(props: Props) {
   );
   const [notes, setNotes] = useState("");
   const [pending, startTransition] = useTransition();
+
+  // Sync state from props each time the modal opens (router.refresh() met à jour les props
+  // mais useState ne se réinitialise pas — on force la resynchronisation à l'ouverture)
+  useEffect(() => {
+    if (!open) return;
+    if (props.type === "teacher" && props.currentRate) {
+      setRate((props.currentRate as any).rate_fcfa);
+      setRateType((props.currentRate as any).rate_type);
+    } else if (props.type === "student" && typeof props.currentRate === "number") {
+      setRate(props.currentRate);
+    }
+    setNotes("");
+    setStatus("idle");
+    setErrMsg("");
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
   const [errMsg, setErrMsg] = useState("");
 
