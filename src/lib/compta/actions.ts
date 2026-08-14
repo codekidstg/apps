@@ -17,11 +17,19 @@ export async function setTeacherRate(
   if (!user) return { error: "Non authentifié" };
 
   const admin = createAdminClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Supprimer le tarif du jour s'il existe déjà — évite les doublons même-date
+  await (admin.from("teacher_rates") as any)
+    .delete()
+    .eq("teacher_id", teacherId)
+    .eq("effective_from", today);
+
   const { error } = await (admin.from("teacher_rates") as any).insert({
     teacher_id: teacherId,
     rate_fcfa: rateFcfa,
     rate_type: rateType,
-    effective_from: new Date().toISOString().slice(0, 10),
+    effective_from: today,
     notes: notes || null,
     created_by: user.id,
   });
@@ -53,10 +61,18 @@ export async function setStudentRate(
   if (!user) return { error: "Non authentifié" };
 
   const admin = createAdminClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Supprimer le tarif du jour s'il existe déjà — évite les doublons même-date
+  await (admin.from("student_session_rates") as any)
+    .delete()
+    .eq("student_id", studentId)
+    .eq("effective_from", today);
+
   const { error } = await (admin.from("student_session_rates") as any).insert({
     student_id: studentId,
     rate_fcfa: rateFcfa,
-    effective_from: new Date().toISOString().slice(0, 10),
+    effective_from: today,
     notes: notes || null,
     created_by: user.id,
   });
