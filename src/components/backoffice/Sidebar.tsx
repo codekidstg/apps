@@ -29,8 +29,6 @@ const adminNav: NavItem[] = [
       { label: "Parents",  href: "/admin/compta/parents" },
     ],
   },
-  { label: "Abonnements",     href: "/admin/abonnements",  icon: "📦" },
-  { label: "Paiements",       href: "/admin/paiements",    icon: "💳" },
   { label: "Démo parent",    href: "/admin/demo-parent",  icon: "🎟️" },
 ];
 
