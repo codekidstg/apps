@@ -127,7 +127,7 @@ const DASHBOARD: Record<string, string> = {
   parent: "/fr/suivi",
 };
 
-export default function UsersSearchTable({ users }: { users: UserRow[] }) {
+export default function UsersSearchTable({ users, canDelete = true }: { users: UserRow[]; canDelete?: boolean }) {
   const [q, setQ] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
@@ -243,7 +243,7 @@ export default function UsersSearchTable({ users }: { users: UserRow[] }) {
                         ✏️ Modifier
                       </button>
                       <ToggleButton userId={u.id} active={u.active} />
-                      <DeleteButton userId={u.id} />
+                      {canDelete && <DeleteButton userId={u.id} />}
                     </div>
                   </td>
                 </tr>

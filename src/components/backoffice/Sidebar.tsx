@@ -28,9 +28,18 @@ const adminNav: NavItem[] = [
 ];
 
 const managerNav: NavItem[] = [
-  { label: "Tableau de bord", href: "/manager",             icon: "◈" },
-  { label: "Mes thèmes",      href: "/manager/themes",      icon: "📚" },
-  { label: "Affectations",    href: "/manager/affectations", icon: "📋" },
+  { label: "Tableau de bord", href: "/manager",              icon: "◈" },
+  {
+    label: "Utilisateurs",    href: "/manager/utilisateurs", icon: "👥",
+    children: [
+      { label: "Tous",        href: "/manager/utilisateurs" },
+      { label: "Parents",     href: "/manager/utilisateurs/parents" },
+      { label: "Élèves",      href: "/manager/utilisateurs/eleves" },
+      { label: "Professeurs", href: "/manager/utilisateurs/professeurs" },
+    ],
+  },
+  { label: "Mes thèmes",      href: "/manager/themes",       icon: "📚" },
+  { label: "Affectations",    href: "/manager/affectations",  icon: "📋" },
 ];
 
 const teacherNav: NavItem[] = [
