@@ -42,39 +42,63 @@ export default async function ProfDashboard() {
 
   const admin = createAdminClient();
 
-  // Sessions configurées
-  const { data: sessionsRaw } = await (admin.from("teacher_sessions") as any)
-    .select("*, students(id, profiles!profile_id(display_name))")
-    .eq("teacher_id", user.id)
-    .order("weekday").order("start_time").order("scheduled_at");
+  // Toutes les requêtes indépendantes en parallèle
+  const [
+    { data: sessionsRaw },
+    { data: classesRaw },
+    { data: assignmentsRaw },
+    { data: reportsRaw },
+    { data: allLessons },
+  ] = await Promise.all([
+    (admin.from("teacher_sessions") as any)
+      .select("*, students(id, profiles!profile_id(display_name))")
+      .eq("teacher_id", user.id)
+      .order("weekday").order("start_time").order("scheduled_at"),
+    (admin.from("classes") as any)
+      .select("id, name, level, students(id)")
+      .eq("teacher_id", user.id),
+    (admin.from("theme_assignments") as any)
+      .select("id, themes(id, title), classes(id, name)")
+      .eq("teacher_id", user.id),
+    (admin.from("session_reports") as any)
+      .select("id, session_id, occurrence_date, advancement, engagement, reported_at")
+      .eq("teacher_id", user.id)
+      .order("reported_at", { ascending: false })
+      .limit(50),
+    admin.from("lessons").select("id", { count: "exact", head: false }),
+  ]);
+
   const sessions = sessionsRaw ?? [];
-
-  // Classes
-  const { data: classesRaw } = await (admin.from("classes") as any)
-    .select("id, name, level, students(id)")
-    .eq("teacher_id", user.id);
   const classes = classesRaw ?? [];
-  const totalStudents = classes.reduce((acc: number, c: any) => acc + (c.students?.length ?? 0), 0);
-
-  // Cours affectés
-  const { data: assignmentsRaw } = await (admin.from("theme_assignments") as any)
-    .select("id, themes(id, title), classes(id, name)")
-    .eq("teacher_id", user.id);
   const assignments = assignmentsRaw ?? [];
-
-  // Rapports — sessions des 14 derniers jours
-  const studentIds = classes.flatMap((c: any) => (c.students ?? []).map((s: any) => s.id));
-  const { data: reportsRaw } = await (admin.from("session_reports") as any)
-    .select("id, session_id, occurrence_date, advancement, engagement, reported_at")
-    .eq("teacher_id", user.id)
-    .order("reported_at", { ascending: false })
-    .limit(50);
   const reports = reportsRaw ?? [];
+  const totalStudents = classes.reduce((acc: number, c: any) => acc + (c.students?.length ?? 0), 0);
+  const studentIds = classes.flatMap((c: any) => (c.students ?? []).map((s: any) => s.id));
+
+  // Requêtes dépendant de studentIds — en parallèle entre elles
+  const [certsRes, progRes] = await Promise.all([
+    studentIds.length
+      ? (admin.from("certificates") as any)
+          .select("id", { count: "exact", head: true })
+          .in("student_id", studentIds)
+          .is("validated_at", null)
+          .eq("revoked", false)
+      : Promise.resolve({ count: 0 }),
+    studentIds.length
+      ? (admin.from("lesson_progress") as any)
+          .select("student_id, status")
+          .in("student_id", studentIds)
+          .eq("status", "completed")
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const certsPending = (certsRes as any).count ?? 0;
+  const total = (allLessons?.length ?? 0) * studentIds.length;
+  const avgProgress = total > 0 ? Math.round((((progRes as any).data?.length ?? 0) / total) * 100) : 0;
 
   // Compter les occurrences passées (14j) sans rapport
   const now14 = new Date(); now14.setDate(now14.getDate() - 14);
   let pastCount = 0;
-  const reportedKeys = new Set(reports.map((r: any) => `${r.session_id}|${r.occurrence_date}`));
   for (const s of sessions) {
     if (s.session_type === "recurring") {
       const [h, m] = (s.start_time as string).split(":").map(Number);
@@ -82,36 +106,10 @@ export default async function ProfDashboard() {
       cursor.setHours(h, m, 0, 0);
       const daysUntil2 = (s.weekday - cursor.getDay() + 7) % 7;
       cursor.setDate(cursor.getDate() + (daysUntil2 === 0 ? 0 : daysUntil2));
-      while (cursor < new Date()) {
-        pastCount++;
-        cursor.setDate(cursor.getDate() + 7);
-      }
+      while (cursor < new Date()) { pastCount++; cursor.setDate(cursor.getDate() + 7); }
     }
   }
   const reportsPending = Math.max(0, pastCount - reports.length);
-
-  // Certificats en attente
-  let certsPending = 0;
-  if (studentIds.length) {
-    const { count } = await (admin.from("certificates") as any)
-      .select("id", { count: "exact", head: true })
-      .in("student_id", studentIds)
-      .is("validated_at", null)
-      .eq("revoked", false);
-    certsPending = count ?? 0;
-  }
-
-  // Progression globale élèves
-  let avgProgress = 0;
-  if (studentIds.length) {
-    const { data: prog } = await (admin.from("lesson_progress") as any)
-      .select("student_id, status")
-      .in("student_id", studentIds)
-      .eq("status", "completed");
-    const { data: allLessons } = await admin.from("lessons").select("id", { count: "exact", head: false });
-    const total = (allLessons?.length ?? 0) * studentIds.length;
-    avgProgress = total > 0 ? Math.round(((prog?.length ?? 0) / total) * 100) : 0;
-  }
 
   // Prochaine session
   const nextSession = buildNextSession(sessions);

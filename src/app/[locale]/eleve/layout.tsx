@@ -22,41 +22,32 @@ export default async function EleveLayout({ children, params }: { children: Reac
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name, role")
-    .eq("id", user.id)
-    .single<{ display_name: string; role: string }>();
+  // profile + student en parallèle
+  const [profileRes, studentRes] = await Promise.all([
+    supabase.from("profiles").select("display_name, role").eq("id", user.id).single<{ display_name: string; role: string }>(),
+    supabase.from("students").select("id, xp, points, atelier_active").eq("profile_id", user.id).single<{ id: string; xp: number; points: number; atelier_active: boolean }>(),
+  ]);
+  const profile = profileRes.data;
+  const student = studentRes.data;
 
   if (!profile || !["student", "admin"].includes(profile.role ?? "")) redirect("/fr/connexion");
 
-  const { data: student } = await supabase
-    .from("students")
-    .select("id, xp, points, atelier_active")
-    .eq("profile_id", user.id)
-    .single<{ id: string; xp: number; points: number; atelier_active: boolean }>();
-
   const xp = student?.xp ?? 0;
 
-  // Badge entraînements disponibles non encore faits
-  let trainingBadgeCount = 0;
-  if (student) {
-    const [{ data: allTrainings }, { data: lessonProg }, { data: trainingProg }] = await Promise.all([
-      (supabase.from("trainings") as any).select("id, lesson_id"),
-      (supabase.from("lesson_progress") as any).select("lesson_id").eq("student_id", student.id),
-      (supabase.from("training_progress") as any).select("training_id").eq("student_id", student.id).gt("attempts", 0),
-    ]);
-    const startedIds = new Set((lessonProg ?? []).map((r: any) => r.lesson_id));
-    const doneIds    = new Set((trainingProg ?? []).map((r: any) => r.training_id));
-    trainingBadgeCount = (allTrainings ?? []).filter((t: any) => startedIds.has(t.lesson_id) && !doneIds.has(t.id)).length;
-  }
+  // Badge entraînements + avatar en parallèle
+  const [allTrainingsRes, lessonProgRes, trainingProgRes, avatarRes] = await Promise.all([
+    (supabase.from("trainings") as any).select("id, lesson_id"),
+    student ? (supabase.from("lesson_progress") as any).select("lesson_id").eq("student_id", student.id) : Promise.resolve({ data: [] }),
+    student ? (supabase.from("training_progress") as any).select("training_id").eq("student_id", student.id).gt("attempts", 0) : Promise.resolve({ data: [] }),
+    student ? (supabase.from("student_avatar") as any).select("base, hat, accessory, color").eq("student_id", student.id).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
 
-  const { data: avatarRaw } = student
-    ? await (supabase.from("student_avatar") as any)
-        .select("base, hat, accessory, color")
-        .eq("student_id", student.id)
-        .maybeSingle()
-    : { data: null };
+  const startedIds = new Set((lessonProgRes.data ?? []).map((r: any) => r.lesson_id));
+  const doneIds    = new Set((trainingProgRes.data ?? []).map((r: any) => r.training_id));
+  const trainingBadgeCount = student
+    ? (allTrainingsRes.data ?? []).filter((t: any) => startedIds.has(t.lesson_id) && !doneIds.has(t.id)).length
+    : 0;
+  const avatarRaw = avatarRes.data;
 
   const avatar = avatarRaw as StudentData["avatar"];
 

@@ -16,38 +16,58 @@ export default async function SuiviDashboard({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/${locale}/connexion`);
 
-  const { data: links } = await (admin.from("parent_children") as any)
-    .select(`
-      student_id,
-      students (
-        id, xp, level_num, streak_days, teacher_id,
-        profiles!students_profile_id_fkey ( display_name )
-      )
-    `)
-    .eq("parent_id", user.id);
+  // Requêtes indépendantes en parallèle
+  const [linksRes, consentsRes, subsRes] = await Promise.all([
+    (admin.from("parent_children") as any)
+      .select(`student_id, students (id, xp, level_num, streak_days, teacher_id, profiles!students_profile_id_fkey ( display_name ))`)
+      .eq("parent_id", user.id),
+    (supabase.from("parental_consents") as any)
+      .select("student_id, revoked_at")
+      .eq("parent_id", user.id),
+    (supabase.from("subscriptions") as any)
+      .select("student_id, status, ends_at")
+      .eq("parent_id", user.id)
+      .eq("status", "active"),
+  ]);
 
-  const children = (links ?? []).map((l: any) => l.students).filter(Boolean);
-
-  const { data: consents } = await (supabase.from("parental_consents") as any)
-    .select("student_id, revoked_at")
-    .eq("parent_id", user.id);
+  const children = (linksRes.data ?? []).map((l: any) => l.students).filter(Boolean);
   const consentedIds = new Set(
-    (consents ?? []).filter((c: any) => !c.revoked_at).map((c: any) => c.student_id)
+    (consentsRes.data ?? []).filter((c: any) => !c.revoked_at).map((c: any) => c.student_id)
   );
-
-  const { data: subs } = await (supabase.from("subscriptions") as any)
-    .select("student_id, status, ends_at")
-    .eq("parent_id", user.id)
-    .eq("status", "active");
-  const activeSubs = new Map((subs ?? []).map((s: any) => [s.student_id, s]));
-
+  const activeSubs = new Map((subsRes.data ?? []).map((s: any) => [s.student_id, s]));
   const childIds = children.map((c: any) => c.id);
+  const teacherIds = [...new Set(children.map((c: any) => c.teacher_id).filter(Boolean))];
 
-  const { data: progressRaw } = childIds.length
-    ? await (admin.from("lesson_progress") as any)
-        .select("student_id, status, lesson_id, completed_at, updated_at")
-        .in("student_id", childIds)
-    : { data: [] };
+  // Toutes les requêtes dépendant de childIds — en parallèle
+  const [progressRes, trainingRes, sessionsRes, achivRes] = await Promise.all([
+    childIds.length
+      ? (admin.from("lesson_progress") as any)
+          .select("student_id, status, lesson_id, completed_at, updated_at")
+          .in("student_id", childIds)
+      : Promise.resolve({ data: [] }),
+    childIds.length
+      ? (admin.from("training_progress") as any)
+          .select("student_id, completed_at")
+          .in("student_id", childIds)
+          .not("completed_at", "is", null)
+      : Promise.resolve({ data: [] }),
+    teacherIds.length
+      ? (admin.from("teacher_sessions") as any)
+          .select("*, students(id)")
+          .in("teacher_id", teacherIds)
+      : Promise.resolve({ data: [] }),
+    childIds.length
+      ? (admin.from("student_achievements") as any)
+          .select("student_id, badge_id, earned_at")
+          .in("student_id", childIds)
+          .order("earned_at", { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const progressRaw = (progressRes as any).data ?? [];
+  const trainingProgressRaw = (trainingRes as any).data ?? [];
+  const sessionsRaw = (sessionsRes as any).data ?? [];
+  const achivRaw = (achivRes as any).data ?? [];
 
   // Weekly stats (7 derniers jours)
   const weekAgo = new Date();
@@ -56,9 +76,8 @@ export default async function SuiviDashboard({
   const weeklyByChild = new Map<string, { lessons: number; activeDays: Set<string> }>();
   for (const c of children) weeklyByChild.set(c.id, { lessons: 0, activeDays: new Set() });
 
-  // Progression : on compte depuis lesson_progress directement (done/total des leçons tentées)
   const progressByChild = new Map<string, { total: number; done: number; lastActivity: Date | null }>();
-  for (const p of progressRaw ?? []) {
+  for (const p of progressRaw) {
     const cur = progressByChild.get(p.student_id) ?? { total: 0, done: 0, lastActivity: null };
     cur.total++;
     if (p.status === "completed") {
@@ -76,30 +95,21 @@ export default async function SuiviDashboard({
     if (!progressByChild.has(c.id)) progressByChild.set(c.id, { total: 0, done: 0, lastActivity: null });
   }
 
-  // Training progress : cette semaine + dernière activité
-  const { data: trainingProgressRaw } = childIds.length
-    ? await (admin.from("training_progress") as any)
-        .select("student_id, completed_at")
-        .in("student_id", childIds)
-        .not("completed_at", "is", null)
-    : { data: [] };
-
   const weeklyTrainingsByChild = new Map<string, number>();
-  for (const tp of trainingProgressRaw ?? []) {
+  for (const tp of trainingProgressRaw) {
     const at = new Date(tp.completed_at);
     if (at >= weekAgo)
       weeklyTrainingsByChild.set(tp.student_id, (weeklyTrainingsByChild.get(tp.student_id) ?? 0) + 1);
-    // Mettre à jour lastActivity si plus récent
     const cur = progressByChild.get(tp.student_id);
     if (cur && (!cur.lastActivity || at > cur.lastActivity)) cur.lastActivity = at;
   }
 
-  const teacherIds = [...new Set(children.map((c: any) => c.teacher_id).filter(Boolean))];
-  const { data: sessionsRaw } = teacherIds.length
-    ? await (admin.from("teacher_sessions") as any)
-        .select("*, students(id)")
-        .in("teacher_id", teacherIds)
-    : { data: [] };
+  const badgesByChild = new Map<string, { badge_id: string; earned_at: string }[]>();
+  for (const a of achivRaw) {
+    const arr = badgesByChild.get(a.student_id) ?? [];
+    arr.push(a);
+    badgesByChild.set(a.student_id, arr);
+  }
 
   function getChildSessions(childId: string, teacherId: string | null) {
     if (!teacherId) return [];
@@ -129,20 +139,6 @@ export default async function SuiviDashboard({
       }
     }
     return occurrences.sort((a, b) => a.at.getTime() - b.at.getTime()).slice(0, 3);
-  }
-
-  const { data: achivRaw } = childIds.length
-    ? await (admin.from("student_achievements") as any)
-        .select("student_id, badge_id, earned_at")
-        .in("student_id", childIds)
-        .order("earned_at", { ascending: false })
-    : { data: [] };
-
-  const badgesByChild = new Map<string, { badge_id: string; earned_at: string }[]>();
-  for (const a of achivRaw ?? []) {
-    const arr = badgesByChild.get(a.student_id) ?? [];
-    arr.push(a);
-    badgesByChild.set(a.student_id, arr);
   }
 
   const WDAY = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
