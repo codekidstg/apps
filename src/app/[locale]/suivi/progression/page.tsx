@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
-import { getEffectiveNavPermissions } from "@/lib/permissions/access";
+import { requireParentPermission } from "@/lib/permissions/parent";
 
 export default async function ProgressionPage({
   params,
@@ -25,11 +25,7 @@ export default async function ProgressionPage({
   const children = (links ?? []).map((l: any) => l.students).filter(Boolean);
   if (children.length === 0) redirect(`/${locale}/suivi`);
 
-  // Vérifier droits suivi/progression sur le premier enfant
-  if (links && links[0]?.student_id) {
-    const allowed = await getEffectiveNavPermissions(links[0].student_id, "student");
-    if (!allowed.has("student.suivi")) redirect(`/${locale}/suivi`);
-  }
+  await requireParentPermission(user.id, "parent.progression", locale);
 
   // Sélection de l'enfant via ?child=<id>, sinon le premier
   const child = children.find((c: any) => c.id === childParam) ?? children[0];

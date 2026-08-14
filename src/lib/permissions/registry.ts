@@ -8,6 +8,14 @@ export interface NavPageDef {
 }
 
 export const NAV_PAGES: NavPageDef[] = [
+  // ── Parent ───────────────────────────────────────────────────────────────────
+  { role: "parent", key: "parent.dashboard",     label: "Tableau de bord",    href: "/suivi",                 icon: "🏠" },
+  { role: "parent", key: "parent.progression",   label: "Suivi progression",  href: "/suivi/progression",     icon: "📊" },
+  { role: "parent", key: "parent.entrainements", label: "Entraînements",      href: "/suivi/entrainements",   icon: "🏋️" },
+  { role: "parent", key: "parent.certificats",   label: "Certificats",        href: "/suivi/certificats",     icon: "🎓" },
+  { role: "parent", key: "parent.abonnement",    label: "Abonnement",         href: "/suivi/abonnement",      icon: "💳" },
+  { role: "parent", key: "parent.contact",       label: "Contact",            href: "/suivi/contact",         icon: "✉️" },
+
   // ── Élève ────────────────────────────────────────────────────────────────────
   { role: "student", key: "student.suivi",        label: "Suivi / Progression",    href: "/suivi/progression",     icon: "📊" },
   { role: "student", key: "student.apprendre",    label: "Apprendre (cours)",       href: "/eleve",                 icon: "🎮" },

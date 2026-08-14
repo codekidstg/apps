@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { requireParentPermission } from "@/lib/permissions/parent";
 
 export default async function SuiviEntrainenementsPage({
   params,
@@ -15,6 +16,8 @@ export default async function SuiviEntrainenementsPage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/${locale}/connexion`);
+
+  await requireParentPermission(user.id, "parent.entrainements", locale);
 
   const { data: links } = await (supabase.from("parent_children") as any)
     .select("student_id, students(id, profiles!students_profile_id_fkey(display_name))")

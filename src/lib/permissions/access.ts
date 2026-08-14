@@ -80,7 +80,7 @@ export async function getDroitsPageData() {
       (admin.from("user_nav_overrides") as any).select("user_id, page_key, allowed"),
       (admin.from("profiles") as any)
         .select("id, display_name, role")
-        .in("role", ["manager", "teacher", "student"])
+        .in("role", ["manager", "teacher", "parent", "student"])
         .order("display_name"),
     ]);
 
@@ -91,7 +91,7 @@ export async function getDroitsPageData() {
     allRoleConfigs[row.role][row.page_key] = row.allowed;
   }
   // Seed missing roles with defaults
-  for (const role of ["admin", "manager", "teacher", "student"]) {
+  for (const role of ["admin", "manager", "teacher", "parent", "student"]) {
     if (!allRoleConfigs[role]) {
       allRoleConfigs[role] = Object.fromEntries(
         (PAGES_BY_ROLE[role] ?? []).map(p => [p.key, true])

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { requireParentPermission } from "@/lib/permissions/parent";
 
 async function sendMessage(formData: FormData) {
   "use server";
@@ -37,6 +38,8 @@ export default async function ContactPage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/${locale}/connexion`);
+
+  await requireParentPermission(user.id, "parent.contact", locale);
 
   const { data: profile } = await supabase
     .from("profiles")

@@ -12,6 +12,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin:   "Admin",
   manager: "Manager",
   teacher: "Professeur",
+  parent:  "Parent",
   student: "Élève",
 };
 
@@ -83,7 +84,7 @@ function RoleTab({ allRoleConfigs }: { allRoleConfigs: RoleConfigs }) {
     <div>
       {/* Role selector */}
       <div className="flex items-center gap-3 mb-6">
-        {["admin", "manager", "teacher", "student"].map(r => (
+        {["admin", "manager", "teacher", "parent", "student"].map(r => (
           <button
             key={r}
             onClick={() => setSelectedRole(r)}
