@@ -9,10 +9,34 @@ import {
   computeMentorTotals,
   computeParentTotals,
   validateParentPayment,
+  rateRefDateForMonth,
   type TeacherRate,
   type StudentRate,
   type RawSession,
 } from "./compute";
+
+// ─────────────────────────────────────────────────────────────────
+// rateRefDateForMonth
+// ─────────────────────────────────────────────────────────────────
+
+describe("rateRefDateForMonth", () => {
+  it("mois passé → dernier jour du mois", () => {
+    const ref = rateRefDateForMonth(7, 2025, new Date("2026-08-14"));
+    expect(ref).toBe("2025-07-31");
+  });
+
+  it("mois courant → aujourd'hui (tarif créé ce mois visible)", () => {
+    const today = new Date("2026-08-14");
+    const ref = rateRefDateForMonth(8, 2026, today);
+    expect(ref).toBe("2026-08-14");
+  });
+
+  it("mois futur → aujourd'hui (pas de date future)", () => {
+    const today = new Date("2026-08-14");
+    const ref = rateRefDateForMonth(12, 2026, today);
+    expect(ref).toBe("2026-08-14");
+  });
+});
 
 // ─────────────────────────────────────────────────────────────────
 // getEffectiveTeacherRate
@@ -44,6 +68,24 @@ describe("getEffectiveTeacherRate", () => {
   it("retourne null si aucun tarif avant la date", () => {
     const r = getEffectiveTeacherRate(rates, "t1", "2024-12-31");
     expect(r).toBeNull();
+  });
+
+  it("tarif créé en cours de mois visible avec refDate = aujourd'hui", () => {
+    // Scénario exact du bug : tarif créé le 14 août, refDate = 14 août → doit être trouvé
+    const rates: TeacherRate[] = [
+      { teacher_id: "t1", rate_fcfa: 8000, rate_type: "per_session", effective_from: "2026-08-14" },
+    ];
+    const r = getEffectiveTeacherRate(rates, "t1", "2026-08-14");
+    expect(r).toEqual({ rate_fcfa: 8000, rate_type: "per_session" });
+  });
+
+  it("tarif créé en cours de mois invisible si refDate = début du mois (ancien comportement bugué)", () => {
+    const rates: TeacherRate[] = [
+      { teacher_id: "t1", rate_fcfa: 8000, rate_type: "per_session", effective_from: "2026-08-14" },
+    ];
+    // Simule l'ancien bug : monthStart = "2026-08-01"
+    const r = getEffectiveTeacherRate(rates, "t1", "2026-08-01");
+    expect(r).toBeNull(); // c'était le bug
   });
 
   it("retourne null pour un teacher sans tarif", () => {

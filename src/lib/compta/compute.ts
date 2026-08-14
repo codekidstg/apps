@@ -44,6 +44,11 @@ export interface Occurrence {
  * Returns the most recent rate with effective_from <= referenceDate (YYYY-MM-DD),
  * or null if none.
  */
+/**
+ * Returns the effective rate as of referenceDate.
+ * referenceDate should be: end-of-month (for past months) or today (for current month).
+ * This ensures a rate created mid-month is visible immediately.
+ */
 export function getEffectiveTeacherRate(
   rates: TeacherRate[],
   teacherId: string,
@@ -66,6 +71,19 @@ export function getEffectiveStudentRate(
     .filter(r => r.student_id === studentId && r.effective_from <= referenceDate)
     .sort((a, b) => b.effective_from.localeCompare(a.effective_from));
   return eligible.length > 0 ? eligible[0].rate_fcfa : 0;
+}
+
+/** Computes the correct referenceDate for a given month/year. */
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function rateRefDateForMonth(month: number, year: number, now: Date = new Date()): string {
+  const monthEnd = new Date(year, month, 0); // last day of month (local)
+  return toLocalDateStr(monthEnd < now ? monthEnd : now);
 }
 
 // ── Amount calculation ───────────────────────────────────────────

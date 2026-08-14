@@ -249,11 +249,16 @@ export async function getComptaMentorsData(month: number, year: number) {
     paymentsByKey.set(`${p.teacher_id}|${p.session_id}|${p.occurrence_date}`, p);
   }
 
-  // Tarif le plus récent par teacher (avant ou égal à la date du mois)
-  const monthStart = new Date(year, month - 1, 1).toISOString().slice(0, 10);
+  // Tarif le plus récent par teacher effectif dans ce mois :
+  // on prend la fin du mois (ou aujourd'hui si mois courant) comme référence,
+  // afin qu'un tarif créé en cours de mois soit immédiatement visible.
+  const now = new Date();
+  const monthEnd = new Date(year, month, 0);
+  const _ref = monthEnd < now ? monthEnd : now;
+  const rateRefDate = `${_ref.getFullYear()}-${String(_ref.getMonth()+1).padStart(2,"0")}-${String(_ref.getDate()).padStart(2,"0")}`;
   const rateByTeacher = new Map<string, { rate_fcfa: number; rate_type: string }>();
   for (const r of (allRates ?? []).sort((a: any, b: any) => b.effective_from.localeCompare(a.effective_from))) {
-    if (!rateByTeacher.has(r.teacher_id) && r.effective_from <= monthStart) {
+    if (!rateByTeacher.has(r.teacher_id) && r.effective_from <= rateRefDate) {
       rateByTeacher.set(r.teacher_id, { rate_fcfa: r.rate_fcfa, rate_type: r.rate_type });
     }
   }
@@ -366,10 +371,13 @@ export async function getComptaParentsData(month: number, year: number) {
     paymentsByKey.set(`${p.parent_id}|${p.student_id}|${p.session_id}|${p.occurrence_date}`, p);
   }
 
-  const monthStart = new Date(year, month - 1, 1).toISOString().slice(0, 10);
+  const now2 = new Date();
+  const monthEnd2 = new Date(year, month, 0);
+  const _ref2 = monthEnd2 < now2 ? monthEnd2 : now2;
+  const rateRefDate2 = `${_ref2.getFullYear()}-${String(_ref2.getMonth()+1).padStart(2,"0")}-${String(_ref2.getDate()).padStart(2,"0")}`;
   const rateByStudent = new Map<string, number>();
   for (const r of (allRates ?? []).sort((a: any, b: any) => b.effective_from.localeCompare(a.effective_from))) {
-    if (!rateByStudent.has(r.student_id) && r.effective_from <= monthStart) {
+    if (!rateByStudent.has(r.student_id) && r.effective_from <= rateRefDate2) {
       rateByStudent.set(r.student_id, r.rate_fcfa);
     }
   }
