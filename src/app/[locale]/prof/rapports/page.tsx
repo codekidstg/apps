@@ -6,28 +6,32 @@ import RapportsClient from "./RapportsClient";
 
 const WEEKDAY_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
-function buildPastOccurrences(sessions: any[], daysBack = 90) {
+function buildPastOccurrences(sessions: any[]) {
   const out: { sessionId: string; title: string; at: Date; duration_min: number; studentName: string | null; recurring: boolean }[] = [];
-  const now   = new Date();
-  const from  = new Date(now); from.setDate(now.getDate() - daysBack); from.setHours(0,0,0,0);
-  const to    = new Date(now.getTime() - 1);
+  const now = new Date();
+  const to  = new Date(now.getTime() - 1);
 
   for (const s of sessions) {
     if (s.session_type === "recurring") {
+      // Ne remonter que depuis la création réelle de la session
+      const createdAt = new Date(s.created_at);
+      createdAt.setHours(0, 0, 0, 0);
+
       const [h, m] = (s.start_time as string).split(":").map(Number);
-      const cursor = new Date(from);
+      const cursor = new Date(createdAt);
       cursor.setHours(h, m, 0, 0);
       const daysUntil = (s.weekday - cursor.getDay() + 7) % 7;
-      cursor.setDate(cursor.getDate() + (daysUntil === 0 && cursor >= from ? 0 : daysUntil === 0 ? 7 : daysUntil));
+      cursor.setDate(cursor.getDate() + (daysUntil === 0 && cursor >= createdAt ? 0 : daysUntil === 0 ? 7 : daysUntil));
+
       while (cursor <= to) {
-        if (cursor >= from && (!s.active_until || cursor <= new Date(s.active_until))) {
+        if (!s.active_until || cursor <= new Date(s.active_until)) {
           out.push({ sessionId: s.id, title: s.title, at: new Date(cursor), duration_min: s.duration_min, studentName: s.students?.profiles?.display_name ?? null, recurring: true });
         }
         cursor.setDate(cursor.getDate() + 7);
       }
     } else {
       const at = new Date(s.scheduled_at);
-      if (at >= from && at <= to) {
+      if (at <= to) {
         out.push({ sessionId: s.id, title: s.title, at, duration_min: s.duration_min, studentName: s.students?.profiles?.display_name ?? null, recurring: false });
       }
     }
@@ -44,7 +48,7 @@ export default async function RapportsPage() {
 
   const [{ data: sessions }, { data: reportsRaw }] = await Promise.all([
     (admin.from("teacher_sessions") as any)
-      .select("*, students(id, profiles!profile_id(display_name))")
+      .select("*, created_at, students(id, profiles!profile_id(display_name))")
       .eq("teacher_id", user.id)
       .order("weekday").order("start_time").order("scheduled_at"),
     (admin.from("session_reports") as any)
