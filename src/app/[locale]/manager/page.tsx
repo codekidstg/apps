@@ -39,12 +39,18 @@ export default async function ManagerDashboard() {
   const month = now.getMonth() + 1;
   const year  = now.getFullYear();
 
+  // Bornes du mois courant pour les KPIs
+  const monthStart = `${year}-${String(month).padStart(2,"0")}-01`;
+  const monthEnd   = new Date(year, month, 0).toISOString().slice(0, 10);
+
   const [
     { data: profiles },
     { data: allSessions },
     { data: reports },
-    { data: mentorPendingPay },
-    { data: parentPendingPay },
+    // KPIs réels : sessions avec rapport mais pas encore payées (mentor)
+    { data: mentorToPay },
+    // KPIs réels : séances facturées parents non encore payées ce mois
+    { data: parentPending },
   ] = await Promise.all([
     (admin.from("profiles") as any).select("role"),
     (admin.from("teacher_sessions") as any)
@@ -54,14 +60,18 @@ export default async function ManagerDashboard() {
       .select("id, title, status, created_at, teacher_id, profiles!teacher_id(display_name), advancement, engagement")
       .order("created_at", { ascending: false })
       .limit(6),
-    // Paiements mentors en attente (statut to_pay)
+    // Sessions avec rapport validé, pas encore payées ce mois
     (admin.from("mentor_payments") as any)
       .select("id", { count: "exact", head: true })
-      .eq("status", "to_pay"),
-    // Paiements parents en attente
+      .eq("status", "to_pay")
+      .gte("occurrence_date", monthStart)
+      .lte("occurrence_date", monthEnd),
+    // Paiements parents en attente ce mois
     (admin.from("parent_session_payments") as any)
       .select("id", { count: "exact", head: true })
-      .eq("status", "pending"),
+      .eq("status", "pending")
+      .gte("occurrence_date", monthStart)
+      .lte("occurrence_date", monthEnd),
   ]);
 
   const byRole   = ((profiles ?? []) as { role: string }[]).reduce<Record<string, number>>(
@@ -75,8 +85,8 @@ export default async function ManagerDashboard() {
     { label: "Professeurs",    value: byRole.teacher  ?? 0, icon: "👩‍🏫", color: "#a78bfa", href: "/manager/utilisateurs/professeurs" },
     { label: "Parents",        value: byRole.parent   ?? 0, icon: "👨‍👩‍👦", color: "#60a5fa", href: "/manager/utilisateurs/parents" },
     { label: "Sessions / 7j",  value: upcoming.length,       icon: "📅", color: "#FDB813", href: `/manager/compta/mentors?month=${month}&year=${year}` },
-    { label: "À payer mentors",value: (mentorPendingPay as any)?.count ?? 0, icon: "💰", color: "#f97316", href: "/manager/compta/mentors" },
-    { label: "En attente parents", value: (parentPendingPay as any)?.count ?? 0, icon: "💳", color: "#ef4444", href: "/manager/compta/parents" },
+    { label: "À payer mentors",value: (mentorToPay as any)?.count ?? 0, icon: "💰", color: "#f97316", href: "/manager/compta/mentors" },
+    { label: "En attente parents", value: (parentPending as any)?.count ?? 0, icon: "💳", color: "#ef4444", href: "/manager/compta/parents" },
   ];
 
   return (
@@ -185,11 +195,11 @@ export default async function ManagerDashboard() {
           <div className="grid grid-cols-2 gap-4">
             <Link href="/manager/compta/mentors" className="bg-white/10 hover:bg-white/20 rounded-xl p-4 transition-colors">
               <div className="text-xs font-bold text-white/60 mb-1">Séances à payer (mentors)</div>
-              <div className="text-2xl font-black text-yellow-300">{(mentorPendingPay as any)?.count ?? 0}</div>
+              <div className="text-2xl font-black text-yellow-300">{(mentorToPay as any)?.count ?? 0}</div>
             </Link>
             <Link href="/manager/compta/parents" className="bg-white/10 hover:bg-white/20 rounded-xl p-4 transition-colors">
               <div className="text-xs font-bold text-white/60 mb-1">Versements en attente (parents)</div>
-              <div className="text-2xl font-black text-yellow-300">{(parentPendingPay as any)?.count ?? 0}</div>
+              <div className="text-2xl font-black text-yellow-300">{(parentPending as any)?.count ?? 0}</div>
             </Link>
           </div>
         </div>

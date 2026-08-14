@@ -25,8 +25,9 @@ const adminNav: NavItem[] = [
   {
     label: "Compta",          href: "/admin/compta",       icon: "💰",
     children: [
-      { label: "Mentors",  href: "/admin/compta/mentors" },
-      { label: "Parents",  href: "/admin/compta/parents" },
+      { label: "Mentors",      href: "/admin/compta/mentors" },
+      { label: "Parents",      href: "/admin/compta/parents" },
+      { label: "Trésorerie",   href: "/admin/compta/tresorerie" },
     ],
   },
   { label: "Démo parent",    href: "/admin/demo-parent",  icon: "🎟️" },
@@ -48,8 +49,9 @@ const managerNav: NavItem[] = [
   {
     label: "Compta",          href: "/manager/compta",       icon: "💰",
     children: [
-      { label: "Mentors",  href: "/manager/compta/mentors" },
-      { label: "Parents",  href: "/manager/compta/parents" },
+      { label: "Mentors",      href: "/manager/compta/mentors" },
+      { label: "Parents",      href: "/manager/compta/parents" },
+      { label: "Trésorerie",   href: "/manager/compta/tresorerie" },
     ],
   },
 ];
