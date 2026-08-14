@@ -6,63 +6,64 @@ import { type Role } from "@/lib/supabase/types";
 import { logout } from "@/app/[locale]/auth/actions";
 import Logo from "@/components/Logo";
 
-type SubItem = { label: string; href: string };
-type NavItem = { label: string; href: string; icon: string; children?: SubItem[] };
+type SubItem = { label: string; href: string; pageKey?: string };
+type NavItem = { label: string; href: string; icon: string; pageKey?: string; children?: SubItem[] };
 
 const adminNav: NavItem[] = [
-  { label: "Tableau de bord", href: "/admin",              icon: "◈" },
+  { label: "Tableau de bord", href: "/admin",              icon: "◈",  pageKey: "admin.dashboard" },
   {
-    label: "Utilisateurs",    href: "/admin/utilisateurs", icon: "👥",
+    label: "Utilisateurs",    href: "/admin/utilisateurs", icon: "👥", pageKey: "admin.utilisateurs",
     children: [
-      { label: "Tous",         href: "/admin/utilisateurs" },
-      { label: "Parents",      href: "/admin/utilisateurs/parents" },
-      { label: "Élèves",       href: "/admin/utilisateurs/eleves" },
-      { label: "Professeurs",  href: "/admin/utilisateurs/professeurs" },
+      { label: "Tous",         href: "/admin/utilisateurs",              pageKey: "admin.utilisateurs.tous" },
+      { label: "Parents",      href: "/admin/utilisateurs/parents",      pageKey: "admin.utilisateurs.parents" },
+      { label: "Élèves",       href: "/admin/utilisateurs/eleves",       pageKey: "admin.utilisateurs.eleves" },
+      { label: "Professeurs",  href: "/admin/utilisateurs/professeurs",  pageKey: "admin.utilisateurs.professeurs" },
     ],
   },
-  { label: "Écoles",          href: "/admin/ecoles",       icon: "🏫" },
-  { label: "Thèmes & Cours",  href: "/admin/themes",       icon: "📚" },
+  { label: "Écoles",           href: "/admin/ecoles",       icon: "🏫", pageKey: "admin.ecoles" },
+  { label: "Thèmes & Cours",   href: "/admin/themes",       icon: "📚", pageKey: "admin.themes" },
   {
-    label: "Compta",          href: "/admin/compta",       icon: "💰",
+    label: "Compta",           href: "/admin/compta",       icon: "💰", pageKey: "admin.compta",
     children: [
-      { label: "Mentors",      href: "/admin/compta/mentors" },
-      { label: "Parents",      href: "/admin/compta/parents" },
-      { label: "Trésorerie",   href: "/admin/compta/tresorerie" },
+      { label: "Mentors",      href: "/admin/compta/mentors",    pageKey: "admin.compta.mentors" },
+      { label: "Parents",      href: "/admin/compta/parents",    pageKey: "admin.compta.parents" },
+      { label: "Trésorerie",   href: "/admin/compta/tresorerie", pageKey: "admin.compta.tresorerie" },
     ],
   },
-  { label: "Démo parent",    href: "/admin/demo-parent",  icon: "🎟️" },
+  { label: "Démo parent",      href: "/admin/demo-parent",  icon: "🎟️", pageKey: "admin.demo_parent" },
+  { label: "Gestion des droits", href: "/admin/droits",     icon: "🔐", pageKey: "admin.droits" },
 ];
 
 const managerNav: NavItem[] = [
-  { label: "Tableau de bord", href: "/manager",              icon: "◈" },
+  { label: "Tableau de bord", href: "/manager",              icon: "◈",  pageKey: "manager.dashboard" },
   {
-    label: "Utilisateurs",    href: "/manager/utilisateurs", icon: "👥",
+    label: "Utilisateurs",    href: "/manager/utilisateurs", icon: "👥", pageKey: "manager.utilisateurs",
     children: [
-      { label: "Tous",        href: "/manager/utilisateurs" },
-      { label: "Parents",     href: "/manager/utilisateurs/parents" },
-      { label: "Élèves",      href: "/manager/utilisateurs/eleves" },
-      { label: "Professeurs", href: "/manager/utilisateurs/professeurs" },
+      { label: "Tous",        href: "/manager/utilisateurs",              pageKey: "manager.utilisateurs.tous" },
+      { label: "Parents",     href: "/manager/utilisateurs/parents",      pageKey: "manager.utilisateurs.parents" },
+      { label: "Élèves",      href: "/manager/utilisateurs/eleves",       pageKey: "manager.utilisateurs.eleves" },
+      { label: "Professeurs", href: "/manager/utilisateurs/professeurs",  pageKey: "manager.utilisateurs.professeurs" },
     ],
   },
-  { label: "Mes thèmes",      href: "/manager/themes",       icon: "📚" },
-  { label: "Affectations",    href: "/manager/affectations",  icon: "📋" },
+  { label: "Mes thèmes",      href: "/manager/themes",       icon: "📚", pageKey: "manager.themes" },
+  { label: "Affectations",    href: "/manager/affectations",  icon: "📋", pageKey: "manager.affectations" },
   {
-    label: "Compta",          href: "/manager/compta",       icon: "💰",
+    label: "Compta",          href: "/manager/compta",       icon: "💰", pageKey: "manager.compta",
     children: [
-      { label: "Mentors",      href: "/manager/compta/mentors" },
-      { label: "Parents",      href: "/manager/compta/parents" },
-      { label: "Trésorerie",   href: "/manager/compta/tresorerie" },
+      { label: "Mentors",      href: "/manager/compta/mentors",    pageKey: "manager.compta.mentors" },
+      { label: "Parents",      href: "/manager/compta/parents",    pageKey: "manager.compta.parents" },
+      { label: "Trésorerie",   href: "/manager/compta/tresorerie", pageKey: "manager.compta.tresorerie" },
     ],
   },
 ];
 
 const teacherNav: NavItem[] = [
-  { label: "Tableau de bord", href: "/prof",              icon: "◈" },
-  { label: "Mon planning",    href: "/prof/planning",     icon: "📅" },
-  { label: "Mes rapports",    href: "/prof/rapports",     icon: "📝" },
-  { label: "Mes cours",       href: "/prof/cours",        icon: "📚" },
-  { label: "Mes classes",     href: "/prof/classes",      icon: "👨‍🏫" },
-  { label: "Certificats",     href: "/prof/certificats",  icon: "🎓" },
+  { label: "Tableau de bord", href: "/prof",              icon: "◈",  pageKey: "teacher.dashboard" },
+  { label: "Mon planning",    href: "/prof/planning",     icon: "📅", pageKey: "teacher.planning" },
+  { label: "Mes rapports",    href: "/prof/rapports",     icon: "📝", pageKey: "teacher.rapports" },
+  { label: "Mes cours",       href: "/prof/cours",        icon: "📚", pageKey: "teacher.cours" },
+  { label: "Mes classes",     href: "/prof/classes",      icon: "👨‍🏫", pageKey: "teacher.classes" },
+  { label: "Certificats",     href: "/prof/certificats",  icon: "🎓", pageKey: "teacher.certificats" },
 ];
 
 const roleLabel: Record<string, string> = {
@@ -71,13 +72,24 @@ const roleLabel: Record<string, string> = {
   teacher: "Professeur",
 };
 
-type Props = { role: Role; displayName: string };
+type Props = { role: Role; displayName: string; hiddenKeys?: string[] };
 
-export default function Sidebar({ role, displayName }: Props) {
+export default function Sidebar({ role, displayName, hiddenKeys = [] }: Props) {
   const pathname = usePathname();
-  const nav = role === "admin" ? adminNav : role === "manager" ? managerNav : teacherNav;
-  const locale = pathname.split("/")[1] || "fr";
+  const hidden   = new Set(hiddenKeys);
+  const rawNav   = role === "admin" ? adminNav : role === "manager" ? managerNav : teacherNav;
+  const locale   = pathname.split("/")[1] || "fr";
   const homeHref = `/${locale}/${role === "admin" ? "admin" : role === "manager" ? "manager" : "prof"}`;
+
+  // Filter nav based on hidden keys (admin always sees all)
+  const nav: NavItem[] = role === "admin"
+    ? rawNav
+    : rawNav
+        .filter(item => !item.pageKey || !hidden.has(item.pageKey))
+        .map(item => ({
+          ...item,
+          children: item.children?.filter(sub => !sub.pageKey || !hidden.has(sub.pageKey)),
+        }));
 
   function isActive(href: string) {
     if (href === "/admin" || href === "/manager" || href === "/prof") return pathname.endsWith(href);
@@ -85,7 +97,6 @@ export default function Sidebar({ role, displayName }: Props) {
   }
 
   function isExactActive(href: string) {
-    // strip locale prefix e.g. /fr/admin/... → /admin/...
     const stripped = pathname.replace(/^\/[a-z]{2}/, "");
     return stripped === href;
   }
@@ -146,7 +157,6 @@ export default function Sidebar({ role, displayName }: Props) {
                 )}
               </Link>
 
-              {/* Sous-menu */}
               {expanded && item.children && (
                 <div className="ml-8 mt-1 flex flex-col gap-0.5">
                   {item.children.map((sub) => {

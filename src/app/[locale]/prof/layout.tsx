@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import BackofficeShell from "@/components/backoffice/Shell";
+import { getEffectiveNavPermissions } from "@/lib/permissions/access";
+import { PAGES_BY_ROLE } from "@/lib/permissions/registry";
 
 export default async function ProfLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -15,8 +17,12 @@ export default async function ProfLayout({ children }: { children: React.ReactNo
 
   if (profile?.role !== "teacher" && profile?.role !== "admin") redirect("/fr/connexion");
 
+  const allowedKeys = await getEffectiveNavPermissions(user.id, "teacher");
+  const allKeys     = (PAGES_BY_ROLE["teacher"] ?? []).map(p => p.key);
+  const hiddenKeys  = allKeys.filter(k => !allowedKeys.has(k));
+
   return (
-    <BackofficeShell role="teacher" displayName={profile?.display_name ?? "Professeur"}>
+    <BackofficeShell role="teacher" displayName={profile?.display_name ?? "Professeur"} hiddenKeys={hiddenKeys}>
       {children}
     </BackofficeShell>
   );
