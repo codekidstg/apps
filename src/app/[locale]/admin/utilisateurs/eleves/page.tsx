@@ -11,29 +11,39 @@ const LEVELS = [
 export default async function ElevesPage() {
   const admin = createAdminClient();
 
-  const { data: students } = await (admin.from("students") as any)
-    .select("id, xp, level_num, streak_days, profile_id, profiles!profile_id(id, display_name, created_at)")
-    .order("xp", { ascending: false });
-
-  const { data: authList } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const [{ data: students }, { data: authList }] = await Promise.all([
+    (admin.from("students") as any)
+      .select("id, xp, level_num, streak_days, profile_id, profiles!profile_id(id, display_name, created_at)")
+      .order("xp", { ascending: false }),
+    admin.auth.admin.listUsers({ perPage: 1000 }),
+  ]);
   const emailByProfileId = new Map((authList?.users ?? []).map((u: any) => [u.id, u.email ?? ""]));
 
   const studentIds = (students ?? []).map((s: any) => s.id);
 
-  const { count: publishedLessonCount } = await (admin.from("lessons") as any)
-    .select("id", { count: "exact", head: true })
-    .eq("status", "published");
+  const [
+    { count: publishedLessonCount },
+    { data: publishedLessons },
+    { data: progressAll },
+    { data: inProgressRaw },
+    { data: parentLinks },
+  ] = await Promise.all([
+    (admin.from("lessons") as any).select("id", { count: "exact", head: true }).eq("status", "published"),
+    (admin.from("lessons") as any).select("id").eq("status", "published"),
+    studentIds.length
+      ? (admin.from("lesson_progress") as any).select("student_id, lesson_id, status").in("student_id", studentIds)
+      : Promise.resolve({ data: [] }),
+    studentIds.length
+      ? (admin.from("lesson_progress") as any)
+          .select("student_id, lessons!inner(chapters!inner(themes(id, title)))")
+          .in("student_id", studentIds)
+          .eq("status", "in_progress")
+      : Promise.resolve({ data: [] }),
+    (admin.from("parent_children") as any).select("student_id, parent_id, profiles!parent_id(display_name)"),
+  ]);
+
   const totalPublished = publishedLessonCount ?? 0;
-
-  const { data: publishedLessons } = await (admin.from("lessons") as any)
-    .select("id").eq("status", "published");
   const publishedLessonIds = new Set((publishedLessons ?? []).map((l: any) => l.id));
-
-  const { data: progressAll } = studentIds.length
-    ? await (admin.from("lesson_progress") as any)
-        .select("student_id, lesson_id, status")
-        .in("student_id", studentIds)
-    : { data: [] };
 
   const progressByStudent = new Map<string, { total: number; done: number }>();
   for (const p of progressAll ?? []) {
@@ -47,22 +57,12 @@ export default async function ElevesPage() {
       progressByStudent.set(s.id, { total: totalPublished, done: 0 });
   }
 
-  const { data: inProgressRaw } = studentIds.length
-    ? await (admin.from("lesson_progress") as any)
-        .select("student_id, lessons!inner(chapters!inner(themes(id, title)))")
-        .in("student_id", studentIds)
-        .eq("status", "in_progress")
-    : { data: [] };
-
   const currentThemeByStudent = new Map<string, string>();
   for (const p of inProgressRaw ?? []) {
     const title = p.lessons?.chapters?.themes?.title;
     if (title && !currentThemeByStudent.has(p.student_id))
       currentThemeByStudent.set(p.student_id, title);
   }
-
-  const { data: parentLinks } = await (admin.from("parent_children") as any)
-    .select("student_id, parent_id, profiles!parent_id(display_name)");
 
   const parentsByStudent = new Map<string, string[]>();
   for (const l of parentLinks ?? []) {

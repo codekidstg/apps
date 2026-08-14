@@ -13,16 +13,12 @@ type Profile = Database["public"]["Tables"]["profiles"]["Row"] & {
 export default async function UtilisateursPage() {
   const supabase = await createClient();
 
-  const { data: users } = await supabase
-    .from("profiles")
-    .select("*, schools(name)")
-    .order("created_at", { ascending: false })
-    .returns<Profile[]>();
-
-  const { data: schools } = await supabase.from("schools").select("id, name").order("name");
-
   const admin = createAdminClient();
-  const { data: authList } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const [{ data: users }, { data: schools }, { data: authList }] = await Promise.all([
+    supabase.from("profiles").select("*, schools(name)").order("created_at", { ascending: false }).returns<Profile[]>(),
+    supabase.from("schools").select("id, name").order("name"),
+    admin.auth.admin.listUsers({ perPage: 1000 }),
+  ]);
   const emailById = new Map<string, string>(
     (authList?.users ?? []).map((u) => [u.id, u.email ?? ""])
   );

@@ -42,18 +42,18 @@ export default async function RapportsPage() {
 
   const admin = createAdminClient();
 
-  const { data: sessions } = await (admin.from("teacher_sessions") as any)
-    .select("*, students(id, profiles!profile_id(display_name))")
-    .eq("teacher_id", user.id)
-    .order("weekday").order("start_time").order("scheduled_at");
+  const [{ data: sessions }, { data: reportsRaw }] = await Promise.all([
+    (admin.from("teacher_sessions") as any)
+      .select("*, students(id, profiles!profile_id(display_name))")
+      .eq("teacher_id", user.id)
+      .order("weekday").order("start_time").order("scheduled_at"),
+    (admin.from("session_reports") as any)
+      .select("id, session_id, occurrence_date, reported_at, advancement, engagement, difficulty_notes, help_methods, next_session_note")
+      .eq("teacher_id", user.id)
+      .order("reported_at", { ascending: false }),
+  ]);
 
   const past = buildPastOccurrences(sessions ?? []);
-
-  // Charger les rapports existants pour ce prof
-  const { data: reportsRaw } = await (admin.from("session_reports") as any)
-    .select("id, session_id, occurrence_date, reported_at, advancement, engagement, difficulty_notes, help_methods, next_session_note")
-    .eq("teacher_id", user.id)
-    .order("reported_at", { ascending: false });
 
   // Index par (session_id, occurrence_date) pour que chaque occurrence soit unique
   const reportsByKey = new Map<string, any>();

@@ -27,26 +27,27 @@ export default async function ProgressionPage({
   // Sélection de l'enfant via ?child=<id>, sinon le premier
   const child = children.find((c: any) => c.id === childParam) ?? children[0];
 
+  const LEVEL_MAP: Record<number, string> = { 1: "explorer", 2: "builder", 3: "architect" };
+  const childLevel = LEVEL_MAP[child.level_num ?? 1] ?? "explorer";
+
   const admin = createAdminClient();
-  const { data: progRaw } = await (admin.from("lesson_progress") as any)
-    .select("lesson_id, status, score, attempts, completed_at")
-    .eq("student_id", child.id);
+  const [{ data: progRaw }, { data: themes }] = await Promise.all([
+    (admin.from("lesson_progress") as any)
+      .select("lesson_id, status, score, attempts, completed_at")
+      .eq("student_id", child.id),
+    admin
+      .from("themes")
+      .select("id, title, chapters(id, title, order_index, lessons(id, title, order_index))")
+      .eq("status", "published")
+      .eq("level", childLevel)
+      .order("title"),
+  ]);
 
   const progMap = new Map<string, { status: string; score?: number; attempts?: number }>(
     (progRaw ?? []).map((p: any) => [p.lesson_id, p])
   );
   // Leçons commencées par l'enfant
   const startedLessonIds = new Set((progRaw ?? []).map((p: any) => p.lesson_id));
-
-  const LEVEL_MAP: Record<number, string> = { 1: "explorer", 2: "builder", 3: "architect" };
-  const childLevel = LEVEL_MAP[child.level_num ?? 1] ?? "explorer";
-
-  const { data: themes } = await admin
-    .from("themes")
-    .select("id, title, chapters(id, title, order_index, lessons(id, title, order_index))")
-    .eq("status", "published")
-    .eq("level", childLevel)
-    .order("title");
 
   // Filtrer : garder seulement les chapitres/leçons que l'enfant a commencés
   const filteredThemes = (themes ?? []).map((theme: any) => ({

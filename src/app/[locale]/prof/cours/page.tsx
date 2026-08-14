@@ -40,11 +40,14 @@ export default async function ProfCoursPage() {
   // Niveaux distincts des élèves
   const levelNums = [...new Set(students.map((s: any) => s.level_num ?? 1))];
   const levelStrings = (levelNums as number[]).map((n) => LEVEL_MAP[n]).filter(Boolean);
+  const studentIds = students.map((s: any) => s.id);
 
-  // Thèmes activés pour au moins un élève de ce prof
-  const { data: accessRows } = await (admin.from("student_theme_access") as any)
-    .select("theme_id")
-    .in("student_id", students.map((s: any) => s.id));
+  // Lancer accessRows + progressRaw en parallèle
+  const [{ data: accessRows }, { data: progressRaw }] = await Promise.all([
+    (admin.from("student_theme_access") as any).select("theme_id").in("student_id", studentIds),
+    (admin.from("lesson_progress") as any).select("student_id, lesson_id, status, completed_at").in("student_id", studentIds),
+  ]);
+
   // [] = aucun accès configuré → aucun thème visible (accès explicite requis)
   const activatedThemeIds = accessRows?.length
     ? [...new Set((accessRows as { theme_id: string }[]).map((r) => r.theme_id))]
@@ -77,12 +80,6 @@ export default async function ProfCoursPage() {
   }
   themesQuery = themesQuery.in("id", activatedThemeIds);
   const { data: themes } = await themesQuery;
-
-  // Progression de TOUS les élèves
-  const studentIds = students.map((s: any) => s.id);
-  const { data: progressRaw } = await (admin.from("lesson_progress") as any)
-    .select("student_id, lesson_id, status, completed_at")
-    .in("student_id", studentIds);
 
   // Index: studentId → lessonId → {status, completed_at}
   type ProgEntry = { status: string; completed_at: string | null };

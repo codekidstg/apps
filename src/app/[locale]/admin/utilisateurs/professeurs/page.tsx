@@ -19,17 +19,24 @@ const WEEKDAY_FULL  = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendr
 export default async function ProfesseursPage() {
   const admin = createAdminClient();
 
-  const { data: teachers } = await (admin.from("profiles") as any)
-    .select("id, display_name, created_at")
-    .eq("role", "teacher")
-    .order("display_name");
-
-  const { data: authList } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const [
+    { data: teachers },
+    { data: authList },
+    { data: allSessions },
+    { data: allStudents },
+    { data: allThemes },
+  ] = await Promise.all([
+    (admin.from("profiles") as any).select("id, display_name, created_at").eq("role", "teacher").order("display_name"),
+    admin.auth.admin.listUsers({ perPage: 1000 }),
+    (admin.from("teacher_sessions") as any)
+      .select("*, students(id, profiles!profile_id(display_name))")
+      .order("weekday").order("start_time").order("scheduled_at"),
+    (admin.from("students") as any)
+      .select("id, xp, level_num, teacher_id, profile_id, profiles!profile_id(id, display_name)")
+      .order("xp", { ascending: false }),
+    (admin.from("themes") as any).select("id, title, level").eq("status", "published").order("level").order("order_index"),
+  ]);
   const emailById = new Map((authList?.users ?? []).map((u: any) => [u.id, u.email ?? ""]));
-
-  const { data: allSessions } = await (admin.from("teacher_sessions") as any)
-    .select("*, students(id, profiles!profile_id(display_name))")
-    .order("weekday").order("start_time").order("scheduled_at");
 
   const sessionsByTeacher = new Map<string, any[]>();
   for (const s of allSessions ?? []) {
@@ -37,10 +44,6 @@ export default async function ProfesseursPage() {
     arr.push(s);
     sessionsByTeacher.set(s.teacher_id, arr);
   }
-
-  const { data: allStudents } = await (admin.from("students") as any)
-    .select("id, xp, level_num, teacher_id, profile_id, profiles!profile_id(id, display_name)")
-    .order("xp", { ascending: false });
 
   const studentsByTeacher = new Map<string, any[]>();
   const unassignedStudents: any[] = [];
@@ -59,12 +62,6 @@ export default async function ProfesseursPage() {
     display_name: s.profiles?.display_name ?? "Élève",
     teacher_id: s.teacher_id,
   }));
-
-  // Thèmes publiés (pour les toggles d'accès)
-  const { data: allThemes } = await (admin.from("themes") as any)
-    .select("id, title, level")
-    .eq("status", "published")
-    .order("level").order("order_index");
 
   // Accès thèmes existants pour tous les élèves
   const allStudentIds = (allStudents ?? []).map((s: any) => s.id);
