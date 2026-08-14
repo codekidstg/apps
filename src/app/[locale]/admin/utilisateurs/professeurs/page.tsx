@@ -350,6 +350,15 @@ export default async function ProfesseursPage() {
                           id: s.id,
                           display_name: s.profiles?.display_name ?? "Élève",
                         }))}
+                        existingSessions={sessions.map((s: any) => ({
+                          id: s.id,
+                          title: s.title,
+                          session_type: s.session_type,
+                          weekday: s.weekday,
+                          start_time: s.start_time,
+                          scheduled_at: s.scheduled_at,
+                          duration_min: s.duration_min,
+                        }))}
                       />
                     </div>
                   </details>
