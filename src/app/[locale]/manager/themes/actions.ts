@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 function slugify(s: string) {
@@ -161,6 +161,7 @@ export async function createLesson(chapterId: string, themeId: string, formData:
 
   if (error) return { error: error.message };
   revalidatePath(`/manager/themes/${themeId}`);
+  revalidateTag("lessons", {});
   return { id: data.id };
 }
 
@@ -169,6 +170,7 @@ export async function updateLesson(lessonId: string, themeId: string, data: { ti
   const { error } = await (supabase.from("lessons") as any).update(data).eq("id", lessonId);
   if (error) return { error: error.message };
   revalidatePath(`/manager/themes/${themeId}`);
+  revalidateTag("lessons", {});
   return { success: true };
 }
 
@@ -177,6 +179,7 @@ export async function deleteLesson(lessonId: string, themeId: string) {
   const { error } = await (supabase.from("lessons") as any).delete().eq("id", lessonId);
   if (error) return { error: error.message };
   revalidatePath(`/manager/themes/${themeId}`);
+  revalidateTag("lessons", {});
   return { success: true };
 }
 
@@ -267,6 +270,7 @@ export async function createTraining(lessonId: string, themeId: string, formData
 
   if (error) return { error: error.message };
   revalidatePath(`/manager/themes/${themeId}/lecons/${lessonId}`);
+  revalidateTag("trainings", {});
   return { id: data.id };
 }
 
@@ -274,6 +278,7 @@ export async function deleteTraining(trainingId: string, lessonId: string, theme
   const supabase = await createClient();
   await (supabase.from("trainings") as any).delete().eq("id", trainingId);
   revalidatePath(`/manager/themes/${themeId}/lecons/${lessonId}`);
+  revalidateTag("trainings", {});
   return { success: true };
 }
 

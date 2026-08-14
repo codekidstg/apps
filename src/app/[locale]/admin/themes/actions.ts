@@ -1,7 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 export type LessonStatus = "draft" | "validated" | "published" | "archived";
@@ -13,6 +13,7 @@ export async function updateLessonStatus(lessonId: string, status: LessonStatus)
     .eq("id", lessonId);
   if (error) return { error: error.message };
   revalidatePath("/admin/themes");
+  revalidateTag("lessons", {});
   return { success: true };
 }
 
@@ -70,6 +71,8 @@ export async function deleteTheme(themeId: string) {
   const { error } = await db.from("themes").delete().eq("id", themeId);
   if (error) return { error: error.message };
   revalidatePath("/admin/themes");
+  revalidateTag("lessons", {});
+  revalidateTag("trainings", {});
   return { success: true };
 }
 

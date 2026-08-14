@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { getCachedAllLessons } from "@/lib/cache/queries";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -48,7 +49,7 @@ export default async function ProfDashboard() {
     { data: classesRaw },
     { data: assignmentsRaw },
     { data: reportsRaw },
-    { data: allLessons },
+    allLessons,
   ] = await Promise.all([
     (admin.from("teacher_sessions") as any)
       .select("*, students(id, profiles!profile_id(display_name))")
@@ -65,7 +66,7 @@ export default async function ProfDashboard() {
       .eq("teacher_id", user.id)
       .order("reported_at", { ascending: false })
       .limit(50),
-    admin.from("lessons").select("id", { count: "exact", head: false }),
+    getCachedAllLessons(),
   ]);
 
   const sessions = sessionsRaw ?? [];

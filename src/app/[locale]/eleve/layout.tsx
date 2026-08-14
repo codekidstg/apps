@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCachedAllTrainings } from "@/lib/cache/queries";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import AvatarSvg from "@/components/eleve/AvatarSvg";
@@ -35,8 +36,9 @@ export default async function EleveLayout({ children, params }: { children: Reac
   const xp = student?.xp ?? 0;
 
   // Badge entraînements + avatar en parallèle
-  const [allTrainingsRes, lessonProgRes, trainingProgRes, avatarRes] = await Promise.all([
-    (supabase.from("trainings") as any).select("id, lesson_id"),
+  // allTrainings depuis le cache (5 min) — évite un aller-retour DB à chaque navigation élève
+  const [allTrainings, lessonProgRes, trainingProgRes, avatarRes] = await Promise.all([
+    getCachedAllTrainings(),
     student ? (supabase.from("lesson_progress") as any).select("lesson_id").eq("student_id", student.id) : Promise.resolve({ data: [] }),
     student ? (supabase.from("training_progress") as any).select("training_id").eq("student_id", student.id).gt("attempts", 0) : Promise.resolve({ data: [] }),
     student ? (supabase.from("student_avatar") as any).select("base, hat, accessory, color").eq("student_id", student.id).maybeSingle() : Promise.resolve({ data: null }),
@@ -45,7 +47,7 @@ export default async function EleveLayout({ children, params }: { children: Reac
   const startedIds = new Set((lessonProgRes.data ?? []).map((r: any) => r.lesson_id));
   const doneIds    = new Set((trainingProgRes.data ?? []).map((r: any) => r.training_id));
   const trainingBadgeCount = student
-    ? (allTrainingsRes.data ?? []).filter((t: any) => startedIds.has(t.lesson_id) && !doneIds.has(t.id)).length
+    ? allTrainings.filter((t) => startedIds.has(t.lesson_id) && !doneIds.has(t.id)).length
     : 0;
   const avatarRaw = avatarRes.data;
 
