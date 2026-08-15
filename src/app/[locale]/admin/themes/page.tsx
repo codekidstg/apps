@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import PageHeader from "@/components/backoffice/PageHeader";
 import { publishTheme, rejectTheme } from "./actions";
 import { SortableThemeList } from "./ThemeAccordion";
@@ -17,7 +17,7 @@ export default async function AdminThemesPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const { status } = await searchParams;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   let query = supabase
     .from("themes")
