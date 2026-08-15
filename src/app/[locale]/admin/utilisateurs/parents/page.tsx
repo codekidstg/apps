@@ -8,7 +8,7 @@ export default async function ParentsPage() {
   const [{ data: parents }, { data: authList }, { data: links }, { data: allStudents }] = await Promise.all([
     (admin.from("profiles") as any).select("id, display_name, created_at").eq("role", "parent").order("display_name"),
     admin.auth.admin.listUsers({ perPage: 1000 }),
-    (admin.from("parent_children") as any).select("parent_id, student_id, students(id, xp, level_num, profiles(id, display_name))"),
+    (admin.from("parent_children") as any).select("parent_id, student_id, students(id, xp, level_num, profiles!profile_id(id, display_name))"),
     (admin.from("profiles") as any).select("id, display_name").eq("role", "student").order("display_name"),
   ]);
   const emailById = new Map((authList?.users ?? []).map((u: any) => [u.id, u.email ?? ""]));
