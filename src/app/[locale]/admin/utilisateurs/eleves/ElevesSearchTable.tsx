@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import LevelSelect from "./LevelSelect";
 
 const LEVELS = [
@@ -23,7 +24,7 @@ type StudentRow = {
   parents: string[];
 };
 
-export default function ElevesSearchTable({ students }: { students: StudentRow[] }) {
+export default function ElevesSearchTable({ students, basePath = "/admin/utilisateurs/eleves" }: { students: StudentRow[]; basePath?: string }) {
   const [q, setQ] = useState("");
   const [levelFilter, setLevelFilter] = useState(0);
 
@@ -94,16 +95,16 @@ export default function ElevesSearchTable({ students }: { students: StudentRow[]
               return (
                 <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-black text-white"
+                    <Link href={`${basePath}/${s.id}`} className="flex items-center gap-3 group">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-black text-white shrink-0"
                         style={{ background: lvl.color }}>
                         {s.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div className="font-bold text-gray-900">{s.name}</div>
+                        <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">{s.name}</div>
                         <div className="text-xs text-gray-400 font-mono">{s.email}</div>
                       </div>
-                    </div>
+                    </Link>
                   </td>
                   <td className="px-4 py-3">
                     <LevelSelect studentId={s.id} currentLevel={s.level_num} levels={LEVELS} />

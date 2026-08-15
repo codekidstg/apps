@@ -85,7 +85,7 @@ export default async function ManagerElevesPage() {
   return (
     <div className="max-w-5xl space-y-6">
       <PageHeader title="Élèves" subtitle={`${students?.length ?? 0} élèves enregistrés`} />
-      <ElevesSearchTable students={enriched} />
+      <ElevesSearchTable students={enriched} basePath="/manager/utilisateurs/eleves" />
     </div>
   );
 }
