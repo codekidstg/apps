@@ -166,15 +166,15 @@ export function ThemeRows({
                   return (
                     <div key={lesson.id} className="flex items-center gap-3 pl-10 pr-4 py-2 rounded-lg hover:bg-white hover:shadow-sm transition-all group">
                       <span className="text-xs text-ink-muted w-4 text-right shrink-0">{n}.</span>
-                      <Link href={`/manager/themes/${theme.id}/lecons/${lesson.id}`}
+                      <Link href={`/admin/themes/${theme.id}/lecons/${lesson.id}`}
                         className="text-sm font-bold text-ink group-hover:text-brand-orange transition-colors flex-1 min-w-0 truncate">
                         {lesson.title}
                       </Link>
                       <span className="text-xs text-ink-muted shrink-0">{lesson.xp_reward} XP</span>
                       <div className="shrink-0"><LessonStatusSelect lessonId={lesson.id} current={lesson.status ?? "draft"} /></div>
-                      <Link href={`/manager/themes/${theme.id}/lecons/${lesson.id}`}
+                      <Link href={`/admin/themes/${theme.id}/lecons/${lesson.id}`}
                         className="text-xs font-bold text-brand-orange opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        Éditer →
+                        ✏️ Éditer contenu →
                       </Link>
                     </div>
                   );
