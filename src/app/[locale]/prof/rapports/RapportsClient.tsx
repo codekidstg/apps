@@ -6,10 +6,10 @@ import dynamic from "next/dynamic";
 const SessionReportForm = dynamic(() => import("@/components/prof/SessionReportForm"), { ssr: false });
 
 const ADVANCEMENT_LABEL: Record<string, { icon: string; label: string; color: string }> = {
-  completed: { icon: "✅", label: "A terminé la séance prévue",             color: "#10b981" },
-  partial:   { icon: "⏩", label: "A avancé mais pas fini",                 color: "#f59e0b" },
+  completed: { icon: "✅", label: "A terminé la séance prévue",               color: "#10b981" },
+  partial:   { icon: "⏩", label: "A avancé mais pas fini",                   color: "#f59e0b" },
   reviewed:  { icon: "🔁", label: "A revu / consolidé une séance précédente", color: "#6366f1" },
-  blocked:   { icon: "⚠️", label: "N'a pas pu avancer (blocage)",           color: "#ef4444" },
+  blocked:   { icon: "⚠️", label: "N'a pas pu avancer (blocage)",             color: "#ef4444" },
 };
 const ENGAGEMENT_LABEL: Record<string, { icon: string; label: string }> = {
   motivated:  { icon: "🚀", label: "Très motivé, curieux" },
@@ -25,6 +25,8 @@ const HELP_LABEL: Record<string, string> = {
   simplified:    "Simplifié l'exercice",
   other:         "Autre",
 };
+
+const PAGE_SIZE = 10;
 
 type Report = {
   id: string;
@@ -51,9 +53,11 @@ type Item = {
   report: Report | null;
 };
 
+// ─── Modal rapport rempli ──────────────────────────────────────────────────────
+
 function ReportReadOnly({ report, onClose }: { report: Report; onClose: () => void }) {
-  const adv = ADVANCEMENT_LABEL[report.advancement];
-  const eng = ENGAGEMENT_LABEL[report.engagement];
+  const adv  = ADVANCEMENT_LABEL[report.advancement];
+  const eng  = ENGAGEMENT_LABEL[report.engagement];
   const date = new Date(report.reported_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 
   return (
@@ -68,7 +72,6 @@ function ReportReadOnly({ report, onClose }: { report: Report; onClose: () => vo
         </div>
 
         <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
-          {/* Avancement */}
           <div>
             <div className="text-xs font-black uppercase tracking-wide mb-2" style={{ color: "#94A3B8" }}>Avancement</div>
             <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: "#f8fafc", border: "1px solid #E2E8F0" }}>
@@ -77,7 +80,6 @@ function ReportReadOnly({ report, onClose }: { report: Report; onClose: () => vo
             </div>
           </div>
 
-          {/* Engagement */}
           <div>
             <div className="text-xs font-black uppercase tracking-wide mb-2" style={{ color: "#94A3B8" }}>Engagement élève</div>
             <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: "#f8fafc", border: "1px solid #E2E8F0" }}>
@@ -86,7 +88,6 @@ function ReportReadOnly({ report, onClose }: { report: Report; onClose: () => vo
             </div>
           </div>
 
-          {/* Difficultés */}
           {report.difficulty_notes && (
             <div>
               <div className="text-xs font-black uppercase tracking-wide mb-2" style={{ color: "#94A3B8" }}>Difficultés</div>
@@ -96,7 +97,6 @@ function ReportReadOnly({ report, onClose }: { report: Report; onClose: () => vo
             </div>
           )}
 
-          {/* Méthodes */}
           {report.help_methods?.length > 0 && (
             <div>
               <div className="text-xs font-black uppercase tracking-wide mb-2" style={{ color: "#94A3B8" }}>Comment tu as aidé</div>
@@ -110,7 +110,6 @@ function ReportReadOnly({ report, onClose }: { report: Report; onClose: () => vo
             </div>
           )}
 
-          {/* Note */}
           {report.next_session_note && (
             <div>
               <div className="text-xs font-black uppercase tracking-wide mb-2" style={{ color: "#94A3B8" }}>Note pour la prochaine fois</div>
@@ -131,55 +130,160 @@ function ReportReadOnly({ report, onClose }: { report: Report; onClose: () => vo
   );
 }
 
-export default function RapportsClient({ items }: { items: Item[] }) {
-  const [openForm, setOpenForm]       = useState<Item | null>(null);
-  const [openReport, setOpenReport]   = useState<Report | null>(null);
+// ─── Ligne de rapport ─────────────────────────────────────────────────────────
 
-  const pending  = items.filter(i => !i.report);
-  const done     = items.filter(i =>  i.report);
-
-  function ItemRow({ item }: { item: Item }) {
-    const hasDone = !!item.report;
-    return (
-      <div className="flex items-center gap-4 bg-white rounded-2xl px-4 py-3 border" style={{ borderColor: "#E2E8F0" }}>
-        {/* Date */}
-        <div className="w-10 text-center shrink-0">
-          <div className="text-[10px] font-black uppercase" style={{ color: "#94A3B8" }}>{item.dayShort}</div>
-          <div className="text-lg font-black leading-none" style={{ color: "#1B2D5E" }}>{item.day}</div>
-          <div className="text-[10px]" style={{ color: "#94A3B8" }}>{item.monthShort}</div>
-        </div>
-        <div className="w-px h-8 shrink-0" style={{ background: "#E2E8F0" }} />
-
-        {/* Infos */}
-        <div className="flex-1 min-w-0">
-          <div className="font-black text-sm truncate" style={{ color: "#1B2D5E" }}>{item.title}</div>
-          <div className="text-xs mt-0.5" style={{ color: "#94A3B8" }}>
-            {item.time} · {item.duration} min
-            {item.studentName && <> · 👦 {item.studentName}</>}
-          </div>
-        </div>
-
-        {/* Action */}
-        {hasDone ? (
-          <button
-            onClick={() => setOpenReport(item.report)}
-            className="shrink-0 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-opacity hover:opacity-80"
-            style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}
-          >
-            ✓ Voir le rapport
-          </button>
-        ) : (
-          <button
-            onClick={() => setOpenForm(item)}
-            className="shrink-0 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-opacity hover:opacity-80"
-            style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}
-          >
-            ● À remplir
-          </button>
-        )}
+function ItemRow({ item, onFill, onView }: {
+  item: Item;
+  onFill: (item: Item) => void;
+  onView: (report: Report) => void;
+}) {
+  return (
+    <div className="flex items-center gap-4 bg-white rounded-2xl px-4 py-3 border" style={{ borderColor: "#E2E8F0" }}>
+      <div className="w-10 text-center shrink-0">
+        <div className="text-[10px] font-black uppercase" style={{ color: "#94A3B8" }}>{item.dayShort}</div>
+        <div className="text-lg font-black leading-none" style={{ color: "#1B2D5E" }}>{item.day}</div>
+        <div className="text-[10px]" style={{ color: "#94A3B8" }}>{item.monthShort}</div>
       </div>
-    );
+      <div className="w-px h-8 shrink-0" style={{ background: "#E2E8F0" }} />
+
+      <div className="flex-1 min-w-0">
+        <div className="font-black text-sm truncate" style={{ color: "#1B2D5E" }}>{item.title}</div>
+        <div className="text-xs mt-0.5" style={{ color: "#94A3B8" }}>
+          {item.time} · {item.duration} min
+          {item.studentName && <> · 👦 {item.studentName}</>}
+        </div>
+      </div>
+
+      {item.report ? (
+        <button
+          onClick={() => onView(item.report!)}
+          className="shrink-0 text-xs font-black px-3 py-1.5 rounded-xl transition-opacity hover:opacity-80"
+          style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}
+        >
+          ✓ Voir le rapport
+        </button>
+      ) : (
+        <button
+          onClick={() => onFill(item)}
+          className="shrink-0 text-xs font-black px-3 py-1.5 rounded-xl transition-opacity hover:opacity-80"
+          style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}
+        >
+          ● À remplir
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Section collapsible avec pagination ──────────────────────────────────────
+
+function Section({
+  title,
+  count,
+  items,
+  accentColor,
+  defaultOpen,
+  onFill,
+  onView,
+}: {
+  title: string;
+  count: number;
+  items: Item[];
+  accentColor: string;
+  defaultOpen: boolean;
+  onFill: (item: Item) => void;
+  onView: (report: Report) => void;
+}) {
+  const [open, setOpen]   = useState(defaultOpen);
+  const [page, setPage]   = useState(0);
+
+  const totalPages = Math.ceil(items.length / PAGE_SIZE);
+  const pageItems  = items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  function goTo(p: number) {
+    setPage(p);
+    // scroll vers le haut de la section
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  return (
+    <section className="rounded-2xl overflow-hidden border" style={{ borderColor: "#E2E8F0" }}>
+      {/* Header cliquable */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 transition-colors hover:bg-gray-50"
+        style={{ background: open ? "#fff" : "#fafafa" }}
+      >
+        <span className="text-sm font-black" style={{ color: accentColor }}>
+          {title} <span className="text-xs font-bold opacity-70">({count})</span>
+        </span>
+        <span className="text-xs font-black" style={{ color: "#94A3B8" }}>
+          {open ? "▲" : "▼"}
+        </span>
+      </button>
+
+      {/* Contenu */}
+      {open && (
+        <div style={{ borderTop: "1px solid #E2E8F0" }}>
+          <div className="p-3 space-y-2">
+            {pageItems.map((item, i) => (
+              <ItemRow key={i} item={item} onFill={onFill} onView={onView} />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid #E2E8F0" }}>
+              <button
+                onClick={() => goTo(page - 1)}
+                disabled={page === 0}
+                className="text-xs font-black px-3 py-1.5 rounded-lg transition-colors disabled:opacity-30"
+                style={{ background: "#f1f5f9", color: "#475569" }}
+              >
+                ← Précédent
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => goTo(i)}
+                    className="w-7 h-7 rounded-lg text-xs font-black transition-colors"
+                    style={
+                      i === page
+                        ? { background: accentColor, color: "#fff" }
+                        : { background: "#f1f5f9", color: "#64748b" }
+                    }
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => goTo(page + 1)}
+                disabled={page === totalPages - 1}
+                className="text-xs font-black px-3 py-1.5 rounded-lg transition-colors disabled:opacity-30"
+                style={{ background: "#f1f5f9", color: "#475569" }}
+              >
+                Suivant →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ─── Composant principal ──────────────────────────────────────────────────────
+
+export default function RapportsClient({ items }: { items: Item[] }) {
+  const [openForm,   setOpenForm]   = useState<Item | null>(null);
+  const [openReport, setOpenReport] = useState<Report | null>(null);
+
+  const pending = items.filter(i => !i.report);
+  const done    = items.filter(i =>  i.report);
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -191,7 +295,7 @@ export default function RapportsClient({ items }: { items: Item[] }) {
         </p>
       </div>
 
-      {/* Résumé rapide */}
+      {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl p-4 text-center" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
           <div className="text-2xl font-black" style={{ color: "#16a34a" }}>{done.length}</div>
@@ -203,34 +307,36 @@ export default function RapportsClient({ items }: { items: Item[] }) {
         </div>
       </div>
 
-      {/* Séances à remplir */}
-      {pending.length > 0 && (
-        <section>
-          <div className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#dc2626" }}>
-            ● À remplir ({pending.length})
-          </div>
-          <div className="space-y-2">
-            {pending.map((item, i) => <ItemRow key={i} item={item} />)}
-          </div>
-        </section>
-      )}
-
-      {/* Séances déjà remplies */}
-      {done.length > 0 && (
-        <section>
-          <div className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#16a34a" }}>
-            ✓ Remplis ({done.length})
-          </div>
-          <div className="space-y-2">
-            {done.map((item, i) => <ItemRow key={i} item={item} />)}
-          </div>
-        </section>
-      )}
-
       {items.length === 0 && (
         <div className="text-center py-16 text-sm font-bold" style={{ color: "#94A3B8" }}>
           Aucune séance passée trouvée.
         </div>
+      )}
+
+      {/* Section À remplir — ouverte par défaut */}
+      {pending.length > 0 && (
+        <Section
+          title="● À remplir"
+          count={pending.length}
+          items={pending}
+          accentColor="#dc2626"
+          defaultOpen={true}
+          onFill={setOpenForm}
+          onView={setOpenReport}
+        />
+      )}
+
+      {/* Section Remplis — fermée par défaut */}
+      {done.length > 0 && (
+        <Section
+          title="✓ Remplis"
+          count={done.length}
+          items={done}
+          accentColor="#16a34a"
+          defaultOpen={false}
+          onFill={setOpenForm}
+          onView={setOpenReport}
+        />
       )}
 
       {/* Modals */}
