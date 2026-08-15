@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { getCachedAllLessons } from "@/lib/cache/queries";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -33,6 +32,73 @@ function daysUntil(d: Date): string {
   return `Dans ${diff} jours`;
 }
 
+// Compte les sessions récurrentes + ponctuelles qui tombent dans la semaine courante (lun–dim)
+function countSessionsThisWeek(sessions: any[]): number {
+  const now = new Date();
+  const dow = now.getDay(); // 0=dim
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  let count = 0;
+  for (const s of sessions) {
+    if (s.session_type === "recurring") {
+      const activeFrom = new Date(s.active_from ?? s.created_at);
+      activeFrom.setHours(0, 0, 0, 0);
+      const activeUntil = s.active_until ? new Date(s.active_until) : null;
+      // jour de la semaine courante correspondant au weekday de la session
+      const offset = s.weekday === 0 ? 6 : s.weekday - 1; // offset depuis lundi
+      const occDay = new Date(monday);
+      occDay.setDate(monday.getDate() + offset);
+      occDay.setHours(0, 0, 0, 0);
+      if (occDay >= activeFrom && (!activeUntil || occDay <= activeUntil)) count++;
+    } else if (s.session_type === "once" && s.scheduled_at) {
+      const at = new Date(s.scheduled_at);
+      if (at >= monday && at <= sunday) count++;
+    }
+  }
+  return count;
+}
+
+// Compte les occurrences passées sans rapport (basé sur active_from, identique à la page rapports)
+function countPendingReports(sessions: any[], reportedKeys: Set<string>): number {
+  const now = new Date();
+  const to  = new Date(now.getTime() - 1);
+  let pending = 0;
+
+  for (const s of sessions) {
+    if (s.session_type === "recurring") {
+      const startStr = s.active_from ?? s.created_at;
+      const startDate = new Date(startStr);
+      startDate.setHours(0, 0, 0, 0);
+
+      const [h, m] = (s.start_time as string).split(":").map(Number);
+      const cursor = new Date(startDate);
+      cursor.setHours(h, m, 0, 0);
+      const daysUntil2 = (s.weekday - cursor.getDay() + 7) % 7;
+      cursor.setDate(cursor.getDate() + (daysUntil2 === 0 && cursor >= startDate ? 0 : daysUntil2 === 0 ? 7 : daysUntil2));
+
+      while (cursor <= to) {
+        if (!s.active_until || cursor <= new Date(s.active_until)) {
+          const key = `${s.id}|${cursor.toISOString().slice(0, 10)}`;
+          if (!reportedKeys.has(key)) pending++;
+        }
+        cursor.setDate(cursor.getDate() + 7);
+      }
+    } else if (s.session_type === "once" && s.scheduled_at) {
+      const at = new Date(s.scheduled_at);
+      if (at <= to) {
+        const key = `${s.id}|${at.toISOString().slice(0, 10)}`;
+        if (!reportedKeys.has(key)) pending++;
+      }
+    }
+  }
+  return pending;
+}
+
 const WEEKDAY = ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -43,80 +109,63 @@ export default async function ProfDashboard() {
 
   const admin = createAdminClient();
 
-  // Toutes les requêtes indépendantes en parallèle
   const [
     { data: sessionsRaw },
     { data: classesRaw },
-    { data: assignmentsRaw },
     { data: reportsRaw },
-    allLessons,
   ] = await Promise.all([
     (admin.from("teacher_sessions") as any)
-      .select("*, students(id, profiles!profile_id(display_name))")
+      .select("*, active_from, created_at, active_until, students(id, profiles!profile_id(display_name))")
       .eq("teacher_id", user.id)
       .order("weekday").order("start_time").order("scheduled_at"),
     (admin.from("classes") as any)
       .select("id, name, level, students(id)")
       .eq("teacher_id", user.id),
-    (admin.from("theme_assignments") as any)
-      .select("id, themes(id, title), classes(id, name)")
-      .eq("teacher_id", user.id),
     (admin.from("session_reports") as any)
-      .select("id, session_id, occurrence_date, advancement, engagement, reported_at")
+      .select("id, session_id, occurrence_date, advancement, reported_at")
       .eq("teacher_id", user.id)
       .order("reported_at", { ascending: false })
-      .limit(50),
-    getCachedAllLessons(),
+      .limit(200),
   ]);
 
   const sessions = sessionsRaw ?? [];
-  const classes = classesRaw ?? [];
-  const assignments = assignmentsRaw ?? [];
-  const reports = reportsRaw ?? [];
-  const totalStudents = classes.reduce((acc: number, c: any) => acc + (c.students?.length ?? 0), 0);
-  const studentIds = classes.flatMap((c: any) => (c.students ?? []).map((s: any) => s.id));
+  const classes  = classesRaw  ?? [];
+  const reports  = reportsRaw  ?? [];
 
-  // Requêtes dépendant de studentIds — en parallèle entre elles
-  const [certsRes, progRes] = await Promise.all([
-    studentIds.length
-      ? (admin.from("certificates") as any)
-          .select("id", { count: "exact", head: true })
-          .in("student_id", studentIds)
-          .is("validated_at", null)
-          .eq("revoked", false)
-      : Promise.resolve({ count: 0 }),
-    studentIds.length
-      ? (admin.from("lesson_progress") as any)
-          .select("student_id, status")
-          .in("student_id", studentIds)
-          .eq("status", "completed")
-      : Promise.resolve({ data: [] }),
-  ]);
+  // Élèves distincts liés via les sessions
+  const uniqueStudentIds = [...new Set(
+    sessions.filter((s: any) => s.students?.id).map((s: any) => s.students.id as string)
+  )];
+  const totalStudents = uniqueStudentIds.length;
 
+  // Sessions cette semaine
+  const sessionsThisWeek = countSessionsThisWeek(sessions);
+
+  // Rapports en attente (même logique que la page rapports, basé sur active_from)
+  const reportedKeys = new Set<string>(
+    reports.map((r: any) => `${r.session_id ?? ""}|${r.occurrence_date ?? ""}`)
+  );
+  const reportsPending = countPendingReports(sessions, reportedKeys);
+
+  // Index session_id → title pour les derniers rapports
+  const sessionTitleMap = new Map<string, string>(sessions.map((s: any) => [String(s.id), String(s.title)]));
+
+  // Certificats en attente (depuis les élèves des classes)
+  const classStudentIds = classes.flatMap((c: any) => (c.students ?? []).map((s: any) => s.id as string));
+  const certsRes = classStudentIds.length
+    ? await (admin.from("certificates") as any)
+        .select("id", { count: "exact", head: true })
+        .in("student_id", classStudentIds)
+        .is("validated_at", null)
+        .eq("revoked", false)
+    : { count: 0 };
   const certsPending = (certsRes as any).count ?? 0;
-  const total = (allLessons?.length ?? 0) * studentIds.length;
-  const avgProgress = total > 0 ? Math.round((((progRes as any).data?.length ?? 0) / total) * 100) : 0;
-
-  // Compter les occurrences passées (14j) sans rapport
-  const now14 = new Date(); now14.setDate(now14.getDate() - 14);
-  let pastCount = 0;
-  for (const s of sessions) {
-    if (s.session_type === "recurring") {
-      const [h, m] = (s.start_time as string).split(":").map(Number);
-      const cursor = new Date(now14);
-      cursor.setHours(h, m, 0, 0);
-      const daysUntil2 = (s.weekday - cursor.getDay() + 7) % 7;
-      cursor.setDate(cursor.getDate() + (daysUntil2 === 0 ? 0 : daysUntil2));
-      while (cursor < new Date()) { pastCount++; cursor.setDate(cursor.getDate() + 7); }
-    }
-  }
-  const reportsPending = Math.max(0, pastCount - reports.length);
 
   // Prochaine session
   const nextSession = buildNextSession(sessions);
 
-  // 5 derniers rapports
-  const lastReports = reports.slice(0, 5);
+  // 2 derniers rapports
+  const lastReports = reports.slice(0, 2);
 
   const ADVANCEMENT_COLORS: Record<string, { bg: string; color: string; label: string }> = {
     completed: { bg: "#f0fdf4", color: "#16a34a", label: "✅ Terminé" },
@@ -133,20 +182,27 @@ export default async function ProfDashboard() {
         <p className="text-xs font-bold mt-0.5" style={{ color: "#94A3B8" }}>Vue d'ensemble de votre activité pédagogique</p>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { value: totalStudents, label: "Élèves", icon: "👦", color: "#1B2D5E" },
-          { value: sessions.length, label: "Sessions", icon: "📅", color: "#6366f1" },
-          { value: assignments.length, label: "Cours", icon: "📚", color: "#0891b2" },
-          { value: `${avgProgress}%`, label: "Progression moy.", icon: "📊", color: "#16a34a" },
-        ].map((k) => (
-          <div key={k.label} className="bg-white rounded-2xl border p-4 text-center" style={{ borderColor: "#E2E8F0" }}>
-            <div className="text-2xl mb-0.5">{k.icon}</div>
-            <div className="text-2xl font-black" style={{ color: k.color }}>{k.value}</div>
-            <div className="text-[11px] font-bold mt-0.5" style={{ color: "#94A3B8" }}>{k.label}</div>
+      {/* KPIs — 3 colonnes */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white rounded-2xl border p-4 text-center" style={{ borderColor: "#E2E8F0" }}>
+          <div className="text-2xl mb-0.5">👦</div>
+          <div className="text-2xl font-black" style={{ color: "#1B2D5E" }}>{totalStudents}</div>
+          <div className="text-[11px] font-bold mt-0.5" style={{ color: "#94A3B8" }}>Élèves</div>
+        </div>
+
+        <div className="bg-white rounded-2xl border p-4 text-center" style={{ borderColor: "#E2E8F0" }}>
+          <div className="text-2xl mb-0.5">📅</div>
+          <div className="text-2xl font-black" style={{ color: "#6366f1" }}>{sessionsThisWeek}</div>
+          <div className="text-[11px] font-bold mt-0.5" style={{ color: "#94A3B8" }}>Sessions cette semaine</div>
+        </div>
+
+        <div className="bg-white rounded-2xl border p-4 text-center" style={{ borderColor: reportsPending > 0 ? "#fecaca" : "#E2E8F0", background: reportsPending > 0 ? "#fef2f2" : "#fff" }}>
+          <div className="text-2xl mb-0.5">📝</div>
+          <div className="text-2xl font-black" style={{ color: reportsPending > 0 ? "#dc2626" : "#16a34a" }}>{reportsPending}</div>
+          <div className="text-[11px] font-bold mt-0.5" style={{ color: reportsPending > 0 ? "#dc2626" : "#94A3B8" }}>
+            {reportsPending > 0 ? "Rapports en attente" : "Rapports à jour"}
           </div>
-        ))}
+        </div>
       </div>
 
       {/* Alertes */}
@@ -212,7 +268,7 @@ export default async function ProfDashboard() {
           )}
         </div>
 
-        {/* Classes */}
+        {/* Mes classes */}
         <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
           <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #E2E8F0" }}>
             <h2 className="font-black text-sm" style={{ color: "#1B2D5E" }}>👨‍🏫 Mes classes</h2>
@@ -238,39 +294,8 @@ export default async function ProfDashboard() {
           )}
         </div>
 
-        {/* Cours affectés */}
-        <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-          <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #E2E8F0" }}>
-            <h2 className="font-black text-sm" style={{ color: "#1B2D5E" }}>📚 Cours affectés</h2>
-            <Link href="/prof/cours" className="text-[11px] font-black" style={{ color: "#FDB813" }}>Voir tout →</Link>
-          </div>
-          {!assignments.length ? (
-            <div className="px-5 py-8 text-center text-sm" style={{ color: "#94A3B8" }}>Aucun cours affecté.</div>
-          ) : (
-            <div className="divide-y" style={{ borderColor: "#F1F5F9" }}>
-              {assignments.slice(0, 4).map((a: any) => {
-                const theme = Array.isArray(a.themes) ? a.themes[0] : a.themes;
-                const cls   = Array.isArray(a.classes) ? a.classes[0] : a.classes;
-                return (
-                  <div key={a.id} className="flex items-center gap-3 px-5 py-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-sm truncate" style={{ color: "#1B2D5E" }}>{theme?.title ?? "—"}</div>
-                      <div className="text-xs" style={{ color: "#94A3B8" }}>{cls?.name ?? "—"}</div>
-                    </div>
-                    {theme?.id && (
-                      <Link href={`/prof/cours/${theme.id}`} className="text-[11px] font-black shrink-0" style={{ color: "#FDB813" }}>
-                        Consulter →
-                      </Link>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Derniers rapports */}
-        <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+        {/* Derniers rapports — 2 maximum */}
+        <div className="bg-white rounded-2xl border overflow-hidden lg:col-span-2" style={{ borderColor: "#E2E8F0" }}>
           <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #E2E8F0" }}>
             <h2 className="font-black text-sm" style={{ color: "#1B2D5E" }}>📝 Derniers rapports</h2>
             <Link href="/prof/rapports" className="text-[11px] font-black" style={{ color: "#FDB813" }}>Tous les rapports →</Link>
@@ -278,22 +303,24 @@ export default async function ProfDashboard() {
           {!lastReports.length ? (
             <div className="px-5 py-8 text-center text-sm" style={{ color: "#94A3B8" }}>
               Aucun rapport rempli.<br />
-              <Link href="/prof/planning" className="font-bold underline" style={{ color: "#6366f1" }}>Voir les séances passées</Link>
+              <Link href="/prof/rapports" className="font-bold underline" style={{ color: "#6366f1" }}>Voir les séances passées</Link>
             </div>
           ) : (
             <div className="divide-y" style={{ borderColor: "#F1F5F9" }}>
               {lastReports.map((r: any) => {
                 const adv = ADVANCEMENT_COLORS[r.advancement] ?? ADVANCEMENT_COLORS.partial;
                 const date = r.occurrence_date
-                  ? new Date(r.occurrence_date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })
-                  : new Date(r.reported_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+                  ? new Date(r.occurrence_date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+                  : new Date(r.reported_at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+                const sessionTitle = sessionTitleMap.get(r.session_id) ?? "Séance";
                 return (
                   <div key={r.id} className="flex items-center gap-3 px-5 py-3">
                     <span className="text-xs font-black px-2 py-1 rounded-lg shrink-0" style={{ background: adv.bg, color: adv.color }}>
                       {adv.label}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold truncate" style={{ color: "#1B2D5E" }}>Séance du {date}</div>
+                      <div className="text-sm font-black truncate" style={{ color: "#1B2D5E" }}>{sessionTitle}</div>
+                      <div className="text-xs mt-0.5 capitalize" style={{ color: "#94A3B8" }}>{date}</div>
                     </div>
                   </div>
                 );
