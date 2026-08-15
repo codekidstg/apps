@@ -22,7 +22,7 @@ export default async function AdminTresoreriePage({
         subtitle="Flux financiers globaux — entrées, sorties, solde net"
       />
       <div className="mt-6">
-        <TresorerieClient data={data} from={from} to={to} />
+        <TresorerieClient data={data} from={from} to={to} isAdmin={true} />
       </div>
     </div>
   );

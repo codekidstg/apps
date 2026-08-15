@@ -38,10 +38,11 @@ function AutoLine({ name, label, date, amount, sign }: {
 }
 
 // ── Ligne manuelle éditable ────────────────────────────────────────────────
-function ManualRow({ line, type, onEdited }: {
+function ManualRow({ line, type, onEdited, isAdmin }: {
   line: ManualLine;
   type: "expense" | "income";
   onEdited: () => void;
+  isAdmin?: boolean;
 }) {
   const [editing, setEditing]   = useState(false);
   const [pending, start]        = useTransition();
@@ -100,11 +101,15 @@ function ManualRow({ line, type, onEdited }: {
     );
   }
 
+  const tooltipTitle = isAdmin && line.createdByName
+    ? `Ajouté par ${line.createdByName}`
+    : "Cliquer pour modifier";
+
   return (
     <div
       onClick={() => setEditing(true)}
-      className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer group"
-      title="Cliquer pour modifier"
+      className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer group relative"
+      title={tooltipTitle}
     >
       <div className="text-xs text-gray-400 font-semibold shrink-0 w-24 tabular-nums">{fmtDate(line.date)}</div>
       <span className="flex-1 text-sm font-semibold text-gray-700 truncate">{line.label}</span>
@@ -112,6 +117,11 @@ function ManualRow({ line, type, onEdited }: {
         {sign}{fmt(line.amount_fcfa)}
       </span>
       <div className="flex items-center gap-1 shrink-0">
+        {isAdmin && line.createdByName && (
+          <span className="hidden group-hover:inline-block text-[9px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
+            👤 {line.createdByName}
+          </span>
+        )}
         <span className="text-[10px] text-gray-300 group-hover:text-gray-400 font-bold">✎</span>
         <button
           type="button"
@@ -185,13 +195,14 @@ const PRESETS = [
 ] as const;
 
 // ── Section card ───────────────────────────────────────────────────────────
-function SectionCard({ title, total, autoLines, manualLines, type, sign }: {
+function SectionCard({ title, total, autoLines, manualLines, type, sign, isAdmin }: {
   title: string;
   total: number;
   autoLines: { id: string; name: string; label: string; date: string; amount_fcfa: number }[];
   manualLines: ManualLine[];
   type: "expense" | "income";
   sign: "+" | "−";
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -245,7 +256,7 @@ function SectionCard({ title, total, autoLines, manualLines, type, sign }: {
         )}
 
         {manualLines.map(l => (
-          <ManualRow key={l.id} line={l} type={type} onEdited={() => router.refresh()} />
+          <ManualRow key={l.id} line={l} type={type} onEdited={() => router.refresh()} isAdmin={isAdmin} />
         ))}
 
         {showForm && <AddForm type={type} onClose={() => setShowForm(false)} />}
@@ -255,9 +266,9 @@ function SectionCard({ title, total, autoLines, manualLines, type, sign }: {
 }
 
 // ── Composant principal ────────────────────────────────────────────────────
-interface Props { data: TreasuryData; from: string; to: string; }
+interface Props { data: TreasuryData; from: string; to: string; isAdmin?: boolean; }
 
-export default function TresorerieClient({ data, from, to }: Props) {
+export default function TresorerieClient({ data, from, to, isAdmin }: Props) {
   const router = useRouter();
   const [dateFrom, setDateFrom]     = useState(from);
   const [dateTo,   setDateTo]       = useState(to);
@@ -354,6 +365,7 @@ export default function TresorerieClient({ data, from, to }: Props) {
           manualLines={data.expenses}
           type="expense"
           sign="−"
+          isAdmin={isAdmin}
         />
         <SectionCard
           title="🟢 Encaissements"
@@ -362,6 +374,7 @@ export default function TresorerieClient({ data, from, to }: Props) {
           manualLines={data.incomes}
           type="income"
           sign="+"
+          isAdmin={isAdmin}
         />
       </div>
 

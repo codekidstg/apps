@@ -18,6 +18,7 @@ export interface ManualLine {
   label: string;
   amount_fcfa: number;
   date: string; // expense_date ou income_date ISO
+  createdByName: string | null;
 }
 
 export interface TreasuryData {
@@ -93,12 +94,12 @@ export async function getTreasuryData(from: string, to: string): Promise<Treasur
       .lte("occurrence_date", to)
       .order("occurrence_date", { ascending: false }),
     (admin.from("treasury_expenses") as any)
-      .select("id, label, amount_fcfa, expense_date")
+      .select("id, label, amount_fcfa, expense_date, profiles!created_by(display_name)")
       .gte("expense_date", from)
       .lte("expense_date", to)
       .order("expense_date", { ascending: false }),
     (admin.from("treasury_income") as any)
-      .select("id, label, amount_fcfa, income_date")
+      .select("id, label, amount_fcfa, income_date, profiles!created_by(display_name)")
       .gte("income_date", from)
       .lte("income_date", to)
       .order("income_date", { ascending: false }),
@@ -134,8 +135,8 @@ export async function getTreasuryData(from: string, to: string): Promise<Treasur
   return {
     mentorLines,
     parentLines,
-    expenses: (expenses ?? []).map((e: any) => ({ id: e.id, label: e.label, amount_fcfa: e.amount_fcfa, date: e.expense_date })),
-    incomes:  (incomes  ?? []).map((e: any) => ({ id: e.id, label: e.label, amount_fcfa: e.amount_fcfa, date: e.income_date  })),
+    expenses: (expenses ?? []).map((e: any) => ({ id: e.id, label: e.label, amount_fcfa: e.amount_fcfa, date: e.expense_date, createdByName: e.profiles?.display_name ?? null })),
+    incomes:  (incomes  ?? []).map((e: any) => ({ id: e.id, label: e.label, amount_fcfa: e.amount_fcfa, date: e.income_date,  createdByName: e.profiles?.display_name ?? null })),
     mentorsPaid,
     parentsPaid,
     totalOut: mentorsPaid + extraOut,
