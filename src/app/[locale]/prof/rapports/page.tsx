@@ -9,20 +9,23 @@ const WEEKDAY_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 function buildPastOccurrences(sessions: any[]) {
   const out: { sessionId: string; title: string; at: Date; duration_min: number; studentName: string | null; recurring: boolean }[] = [];
   const now = new Date();
-  const to  = new Date(now.getTime() - 1);
+  const to  = new Date(now.getTime() - 1); // jusqu'à maintenant - 1ms (passé uniquement)
 
   for (const s of sessions) {
     if (s.session_type === "recurring") {
-      // Ne remonter que depuis la création réelle de la session
-      const createdAt = new Date(s.created_at);
-      createdAt.setHours(0, 0, 0, 0);
+      // Utiliser active_from (date de début configurée par l'admin), sinon created_at
+      const startStr = s.active_from ?? s.created_at;
+      const startDate = new Date(startStr);
+      startDate.setHours(0, 0, 0, 0);
 
       const [h, m] = (s.start_time as string).split(":").map(Number);
-      const cursor = new Date(createdAt);
+      const cursor = new Date(startDate);
       cursor.setHours(h, m, 0, 0);
+      // Aligner sur le bon jour de la semaine
       const daysUntil = (s.weekday - cursor.getDay() + 7) % 7;
-      cursor.setDate(cursor.getDate() + (daysUntil === 0 && cursor >= createdAt ? 0 : daysUntil === 0 ? 7 : daysUntil));
+      cursor.setDate(cursor.getDate() + (daysUntil === 0 && cursor >= startDate ? 0 : daysUntil === 0 ? 7 : daysUntil));
 
+      // Générer TOUTES les occurrences passées depuis active_from, sans limite de temps en arrière
       while (cursor <= to) {
         if (!s.active_until || cursor <= new Date(s.active_until)) {
           out.push({ sessionId: s.id, title: s.title, at: new Date(cursor), duration_min: s.duration_min, studentName: s.students?.profiles?.display_name ?? null, recurring: true });
@@ -48,7 +51,7 @@ export default async function RapportsPage() {
 
   const [{ data: sessions }, { data: reportsRaw }] = await Promise.all([
     (admin.from("teacher_sessions") as any)
-      .select("*, created_at, students(id, profiles!profile_id(display_name))")
+      .select("*, active_from, created_at, students(id, profiles!profile_id(display_name))")
       .eq("teacher_id", user.id)
       .order("weekday").order("start_time").order("scheduled_at"),
     (admin.from("session_reports") as any)
