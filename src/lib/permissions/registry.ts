@@ -67,6 +67,8 @@ export const PAGES_BY_ROLE: Record<string, NavPageDef[]> = {
   admin:   NAV_PAGES.filter(p => p.role === "admin"),
   manager: NAV_PAGES.filter(p => p.role === "manager"),
   teacher: NAV_PAGES.filter(p => p.role === "teacher"),
+  parent:  NAV_PAGES.filter(p => p.role === "parent"),
+  student: NAV_PAGES.filter(p => p.role === "student"),
 };
 
 export const PAGE_BY_KEY: Record<string, NavPageDef> = Object.fromEntries(
