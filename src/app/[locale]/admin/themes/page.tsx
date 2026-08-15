@@ -40,13 +40,23 @@ export default async function AdminThemesPage({
 
       const chaptersWithLessons: ChapterRow[] = await Promise.all(
         (chapters ?? []).map(async (ch) => {
-          const { data: lessons } = await supabase
+          const { data: lessons, error: lessonsError } = await (supabase as any)
             .from("lessons")
             .select("id, title, xp_reward, order_index, status")
             .eq("chapter_id", ch.id)
-            .order("order_index")
-            .returns<LessonRow[]>();
-          return { ...ch, lessons: lessons ?? [] };
+            .order("order_index");
+
+          // Si status n'existe pas encore en DB, fallback sans status
+          const finalLessons: LessonRow[] = lessonsError
+            ? ((await (supabase as any)
+                .from("lessons")
+                .select("id, title, xp_reward, order_index")
+                .eq("chapter_id", ch.id)
+                .order("order_index")
+              ).data ?? []).map((l: any) => ({ ...l, status: "draft" as const }))
+            : (lessons ?? []);
+
+          return { ...ch, lessons: finalLessons };
         })
       );
 

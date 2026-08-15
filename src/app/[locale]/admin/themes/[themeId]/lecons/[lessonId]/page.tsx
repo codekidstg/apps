@@ -6,7 +6,7 @@ import AdminBlockEditor from "./AdminBlockEditor";
 import type { BlockType } from "@/lib/supabase/types";
 
 type Block  = { id: string; type: BlockType; content: Record<string, unknown>; order_index: number };
-type Lesson = { id: string; title: string; xp_reward: number; status: string; chapter_id: string };
+type Lesson = { id: string; title: string; xp_reward: number; status?: string; chapter_id: string };
 
 export default async function AdminLessonPage({
   params,
@@ -18,7 +18,7 @@ export default async function AdminLessonPage({
 
   const [lessonRes, themeRes, blocksRes] = await Promise.all([
     (admin.from("lessons") as any)
-      .select("id, title, xp_reward, status, chapter_id")
+      .select("id, title, xp_reward, chapter_id")
       .eq("id", lessonId)
       .single(),
 
