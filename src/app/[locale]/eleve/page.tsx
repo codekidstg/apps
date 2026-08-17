@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
+import type { ThemeProgress } from "@/components/eleve/VillageMap";
+import VillageMapClient from "@/components/eleve/VillageMapClient";
 
 type LessonRow    = { id: string; title: string; xp_reward: number; chapter_id: string };
 type ProgressRow  = { lesson_id: string; status: string };
@@ -95,6 +98,44 @@ export default async function EleveDashboard() {
 
   const studentLevel = student.level ?? "explorer";
 
+  // IDs des 5 thèmes Explorer (ordre fixe)
+  const EXPLORER_THEME_IDS = [
+    "8979e87c-058c-4003-95fd-1531c649bd1d", // T1 — Labyrinthe (Routes)
+    "b82126de-7df6-410a-8089-5c39330a035d", // T2 — Musique (Griot)
+    "9277a050-62d8-4920-80a1-9114ae315e63", // T3 — Python (Bibliothèque)
+    "8cfcf715-b35b-446d-b5d7-a480952c3a2d", // T4 — Décisions (Palais)
+    "7c497d11-0cbf-4cb3-9f6f-43721b63e418", // T5 — Pixel Art (Galerie)
+  ];
+
+  function themeProgressLevel(themeId: string): number {
+    const tl = themeLessons(themeId);
+    if (!tl.length) return 0;
+    const done = tl.filter((l) => progressMap.get(l.id) === "completed").length;
+    if (done === 0) return accessibleThemeIds.has(themeId) ? 1 : 0;
+    if (done >= tl.length) return 2;
+    return 1;
+  }
+
+  const villageProgress: ThemeProgress = {
+    theme1: themeProgressLevel(EXPLORER_THEME_IDS[0]),
+    theme2: themeProgressLevel(EXPLORER_THEME_IDS[1]),
+    theme3: themeProgressLevel(EXPLORER_THEME_IDS[2]),
+    theme4: themeProgressLevel(EXPLORER_THEME_IDS[3]),
+    theme5: themeProgressLevel(EXPLORER_THEME_IDS[4]),
+  };
+
+  // Message Kodi pour la leçon suivante (thème 1)
+  const KODI_BRIEFS: Record<string, string> = {
+    "L'ordinateur, la machine magique": "Amavi… je ne sais plus bouger. Apprends-moi ce qu'est une instruction.",
+    "Mon premier algorithme": "Si tu m'apprends à suivre un chemin pas à pas, je pourrai quitter cette case.",
+    "Gauche ou droite ?": "Il y a un croisement devant moi. Comment je sais où aller ?",
+    "Le débogage — Deviens détective du code": "J'ai suivi le chemin mais je me suis coincé. Trouve mon erreur.",
+    "La répétition — Kirikou dit moins pour faire plus": "Il y a 40 lampes à allumer. Si tu m'apprends à répéter, je les allume toutes d'un coup.",
+    "La boucle qui fait tout": "Regarde — les routes s'éclairent. Tu m'as rendu mes jambes.",
+    "Plan avant code": "Maintenant planifions ensemble le prochain quartier du village.",
+  };
+  const kodiMessage = nextLesson ? (KODI_BRIEFS[nextLesson.title] ?? undefined) : undefined;
+
   return (
     <div className="p-8 space-y-8 max-w-4xl">
       {/* Top HUD */}
@@ -113,6 +154,15 @@ export default async function EleveDashboard() {
           </span>
         </div>
       </div>
+
+      {/* Carte du Village Numérique */}
+      {studentLevel === "explorer" && (
+        <div className="flex justify-center">
+          <Suspense fallback={<div className="w-full h-48 rounded-2xl animate-pulse" style={{ background: "#1e293b" }} />}>
+            <VillageMapClient progress={villageProgress} kodiMessage={kodiMessage} />
+          </Suspense>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
