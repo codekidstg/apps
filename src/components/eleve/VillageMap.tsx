@@ -1,386 +1,448 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-// Progression par thème : 0 (verrouillé) → 1 (débloqué en cours) → 2 (complété)
 export type ThemeProgress = {
-  theme1: number; // Routes
-  theme2: number; // Case du Griot
-  theme3: number; // Bibliothèque
-  theme4: number; // Palais
-  theme5: number; // Galerie
+  theme1: 0 | 1 | 2;
+  theme2: 0 | 1 | 2;
+  theme3: 0 | 1 | 2;
+  theme4: 0 | 1 | 2;
+  theme5: 0 | 1 | 2;
 };
 
-type Props = {
+const SPOTS = [
+  { id: "theme1" as const, label: "Routes du Village", short: "Routes", x: 390, y: 272, color: "#f59e0b" },
+  { id: "theme2" as const, label: "Case du Griot",     short: "Griot",  x: 148, y: 200, color: "#a78bfa" },
+  { id: "theme3" as const, label: "Bibliothèque",      short: "Biblio", x: 548, y: 148, color: "#60a5fa" },
+  { id: "theme4" as const, label: "Palais",            short: "Palais", x: 648, y: 286, color: "#10b981" },
+  { id: "theme5" as const, label: "Galerie des Œuvres",short: "Galerie",x: 332, y: 408, color: "#ec4899" },
+];
+
+const STARS: [number, number][] = [
+  [50,25],[110,18],[195,42],[308,12],[418,32],[528,18],[648,38],[718,22],[778,48],
+  [75,75],[168,62],[258,82],[378,68],[488,58],[598,72],[698,52],[758,88],
+  [28,108],[138,118],[228,98],[348,112],[458,92],[578,108],[678,98],[748,78],
+  [88,140],[158,132],[448,125],[568,138],[728,128],
+];
+
+const TREES: [number, number, number, number][] = [
+  [60,170,1.1,0],[95,188,0.85,1],[110,175,0.9,2],
+  [235,148,1.0,3],[290,165,1.2,4],[320,158,0.8,5],
+  [475,210,0.9,6],[498,228,1.1,7],
+  [614,188,1.0,8],[630,172,0.85,9],[645,195,1.1,10],
+  [710,340,0.9,11],[730,358,1.1,12],[750,325,0.8,13],
+  [55,380,1.1,14],[75,418,0.9,15],[245,452,1.0,16],[262,432,0.85,17],
+  [448,445,0.9,18],[465,460,1.1,19],[582,435,1.0,20],[605,452,0.8,21],
+  [490,160,0.7,22],[505,172,0.85,23],
+];
+
+export default function VillageMap({
+  progress,
+  kodiMessage,
+}: {
   progress: ThemeProgress;
   kodiMessage?: string;
-};
-
-// Flamme animée
-function Torch({ x, y, lit }: { x: number; y: number; lit: boolean }) {
-  return (
-    <g transform={`translate(${x},${y})`}>
-      {/* Poteau */}
-      <rect x="-1.5" y="0" width="3" height="12" rx="1" fill="#8B5E3C" />
-      {/* Flamme */}
-      {lit && (
-        <g>
-          <ellipse cx="0" cy="-4" rx="4" ry="6" fill="#FDB813" opacity="0.9">
-            <animate attributeName="ry" values="6;7;5;6" dur="1.2s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.9;1;0.8;0.9" dur="1.2s" repeatCount="indefinite" />
-          </ellipse>
-          <ellipse cx="0" cy="-5" rx="2.5" ry="4" fill="#f97316" opacity="0.8">
-            <animate attributeName="cy" values="-5;-6;-5" dur="0.9s" repeatCount="indefinite" />
-          </ellipse>
-          <ellipse cx="0" cy="-7" rx="1.2" ry="2" fill="#fef9c3" opacity="0.7">
-            <animate attributeName="opacity" values="0.7;1;0.5;0.7" dur="0.7s" repeatCount="indefinite" />
-          </ellipse>
-        </g>
-      )}
-      {!lit && <ellipse cx="0" cy="-2" rx="3" ry="2" fill="#334155" opacity="0.5" />}
-    </g>
-  );
-}
-
-// Étoile scintillante
-function Star({ x, y, delay = 0 }: { x: number; y: number; delay?: number }) {
-  return (
-    <circle cx={x} cy={y} r="1.2" fill="white" opacity="0.7">
-      <animate attributeName="opacity" values="0.7;0.2;0.9;0.7" dur="2s" begin={`${delay}s`} repeatCount="indefinite" />
-    </circle>
-  );
-}
-
-// Arbre/palmier simple dessiné
-function Palm({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
-  return (
-    <g transform={`translate(${x},${y}) scale(${scale})`}>
-      <rect x="-2" y="0" width="4" height="16" rx="2" fill="#7c5c3a" />
-      <ellipse cx="0" cy="0" rx="9" ry="5" fill="#15803d" transform="rotate(-20)" />
-      <ellipse cx="0" cy="0" rx="9" ry="5" fill="#16a34a" transform="rotate(20)" />
-      <ellipse cx="0" cy="-2" rx="7" ry="4" fill="#22c55e" />
-    </g>
-  );
-}
-
-// Baobab
-function Baobab({ x, y }: { x: number; y: number }) {
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <rect x="-5" y="0" width="10" height="18" rx="5" fill="#92400e" />
-      <rect x="-8" y="-2" width="16" height="10" rx="8" fill="#92400e" />
-      <ellipse cx="0" cy="-4" rx="12" ry="7" fill="#15803d" />
-      <ellipse cx="-6" cy="-2" rx="7" ry="4" fill="#166534" />
-      <ellipse cx="6" cy="-2" rx="7" ry="4" fill="#166534" />
-    </g>
-  );
-}
-
-// Buisson
-function Bush({ x, y, color = "#16a34a" }: { x: number; y: number; color?: string }) {
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <ellipse cx="0" cy="0" rx="7" ry="5" fill={color} />
-      <ellipse cx="-4" cy="1" rx="5" ry="4" fill={color} />
-      <ellipse cx="4" cy="1" rx="5" ry="4" fill={color} />
-    </g>
-  );
-}
-
-// Case ronde (maison africaine)
-function RoundHut({ x, y, lit, color = "#d97706", label = "" }: { x: number; y: number; lit: boolean; color?: string; label?: string }) {
-  const wallColor = lit ? color : "#334155";
-  const roofColor = lit ? "#92400e" : "#1e293b";
-  const glow = lit ? color : "none";
-  return (
-    <g transform={`translate(${x},${y})`}>
-      {lit && <ellipse cx="0" cy="12" rx="20" ry="6" fill={glow} opacity="0.15">
-        <animate attributeName="opacity" values="0.15;0.25;0.15" dur="3s" repeatCount="indefinite" />
-      </ellipse>}
-      {/* Mur circulaire */}
-      <ellipse cx="0" cy="8" rx="16" ry="10" fill={wallColor} />
-      {/* Toit en cône */}
-      <polygon points="0,-6 -18,8 18,8" fill={roofColor} />
-      {/* Porte */}
-      <ellipse cx="0" cy="12" rx="5" ry="7" fill={lit ? "#78350f" : "#0f172a"} />
-      {/* Fenêtre lumineuse */}
-      {lit && <ellipse cx="9" cy="6" rx="3" ry="2.5" fill="#fef3c7" opacity="0.9">
-        <animate attributeName="opacity" values="0.9;0.6;0.9" dur="2s" repeatCount="indefinite" />
-      </ellipse>}
-      {label && <text x="0" y="28" textAnchor="middle" fontSize="8" fill={lit ? "white" : "#475569"} fontWeight="bold">{label}</text>}
-    </g>
-  );
-}
-
-// Bâtiment rectangulaire (bibliothèque, galerie)
-function Building({ x, y, w, h, lit, color, roofColor, label = "", windows = 2 }: {
-  x: number; y: number; w: number; h: number; lit: boolean;
-  color: string; roofColor: string; label?: string; windows?: number;
 }) {
-  const wallC = lit ? color : "#1e293b";
-  const rC = lit ? roofColor : "#0f172a";
-  return (
-    <g transform={`translate(${x},${y})`}>
-      {lit && <ellipse cx="0" cy={h + 6} rx={w * 0.8} ry="6" fill={color} opacity="0.2">
-        <animate attributeName="opacity" values="0.2;0.35;0.2" dur="3s" repeatCount="indefinite" />
-      </ellipse>}
-      <rect x={-w / 2} y={0} width={w} height={h} rx="3" fill={wallC} />
-      {/* Toit */}
-      <rect x={-w / 2 - 3} y={-8} width={w + 6} height="10" rx="2" fill={rC} />
-      {/* Fenêtres */}
-      {Array.from({ length: windows }).map((_, i) => {
-        const wx = -w / 2 + 8 + i * ((w - 16) / (windows > 1 ? windows - 1 : 1));
-        return (
-          <rect key={i} x={wx - 5} y={8} width="10" height="12" rx="2"
-            fill={lit ? "#fef3c7" : "#0f172a"} opacity={lit ? 0.9 : 0.4}>
-            {lit && <animate attributeName="opacity" values="0.9;0.6;0.9" dur={`${1.5 + i * 0.4}s`} repeatCount="indefinite" />}
-          </rect>
-        );
-      })}
-      {/* Porte */}
-      <rect x="-6" y={h - 14} width="12" height="14" rx="2" fill={lit ? "#78350f" : "#0f172a"} />
-      {label && <text x="0" y={h + 18} textAnchor="middle" fontSize="8" fill={lit ? "white" : "#475569"} fontWeight="bold">{label}</text>}
-    </g>
-  );
-}
+  const [avatarIdx, setAvatarIdx] = useState(0);
+  const [moving, setMoving] = useState(false);
+  const [bubble, setBubble] = useState<string | null>(kodiMessage ?? null);
 
-// Kodi SVG simple
-function KodiCharacter({ x, y, animated }: { x: number; y: number; animated: boolean }) {
-  return (
-    <g transform={`translate(${x},${y})`}>
-      {/* Corps */}
-      <rect x="-8" y="8" width="16" height="20" rx="4" fill="#3b82f6" />
-      {/* Tête */}
-      <rect x="-9" y="-8" width="18" height="18" rx="5" fill="#60a5fa" />
-      {/* Yeux */}
-      <rect x="-5" y="-4" width="4" height="5" rx="2" fill="#0f172a" />
-      <rect x="1" y="-4" width="4" height="5" rx="2" fill="#0f172a" />
-      {/* Lueur yeux */}
-      <circle cx="-3" cy="-2" r="1" fill="white" opacity="0.8" />
-      <circle cx="3" cy="-2" r="1" fill="white" opacity="0.8" />
-      {/* Bouche */}
-      <path d="M -3 3 Q 0 5 3 3" stroke="#0f172a" strokeWidth="1.5" fill="none" />
-      {/* Bras */}
-      <rect x="-16" y="10" width="8" height="4" rx="2" fill="#3b82f6" />
-      <rect x="8" y="10" width="8" height="4" rx="2" fill="#3b82f6" />
-      {/* Jambes */}
-      <rect x="-6" y="26" width="5" height="10" rx="2" fill="#1d4ed8" />
-      <rect x="1" y="26" width="5" height="10" rx="2" fill="#1d4ed8" />
-      {/* Antenne */}
-      <line x1="0" y1="-8" x2="0" y2="-16" stroke="#60a5fa" strokeWidth="2" />
-      <circle cx="0" cy="-17" r="3" fill="#FDB813">
-        {animated && <animate attributeName="r" values="3;4;3" dur="1s" repeatCount="indefinite" />}
-        {animated && <animate attributeName="opacity" values="1;0.6;1" dur="1s" repeatCount="indefinite" />}
-      </circle>
-      {/* Fissures si endommagé — disparaissent progressivement */}
-    </g>
-  );
-}
+  const av = SPOTS[avatarIdx];
 
-// Kodi avec état de réparation
-function KodiWithState({ x, y, repairLevel }: { x: number; y: number; repairLevel: number }) {
-  // repairLevel 0-5 : 0 = tout cassé, 5 = complet
-  const animated = repairLevel > 0;
+  function goTo(idx: number) {
+    if (idx === avatarIdx || moving) return;
+    const spot = SPOTS[idx];
+    if (progress[spot.id] === 0) return;
+    setBubble(null);
+    setMoving(true);
+    setAvatarIdx(idx);
+    setTimeout(() => {
+      setMoving(false);
+      setBubble(spot.label);
+      setTimeout(() => setBubble(null), 3500);
+    }, 1300);
+  }
+
   return (
-    <g>
-      <KodiCharacter x={x} y={y} animated={animated} />
-      {/* Fissures visibles si non réparé */}
-      {repairLevel < 2 && (
-        <g transform={`translate(${x},${y})`} opacity={1 - repairLevel * 0.4}>
-          <line x1="-4" y1="-6" x2="0" y2="0" stroke="#ef4444" strokeWidth="1" opacity="0.7" />
-          <line x1="3" y1="-4" x2="6" y2="2" stroke="#ef4444" strokeWidth="1" opacity="0.7" />
-          <line x1="-2" y1="10" x2="2" y2="18" stroke="#ef4444" strokeWidth="1" opacity="0.5" />
+    <div style={{ width: "100%", borderRadius: 16, overflow: "hidden", background: "#060b24" }}>
+      <svg viewBox="0 0 800 500" style={{ width: "100%", display: "block" }} xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="vSky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#060b24" />
+            <stop offset="55%" stopColor="#0f1a40" />
+            <stop offset="100%" stopColor="#1a2d15" />
+          </linearGradient>
+          <radialGradient id="vMoonHalo" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#fef3c7" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#fef3c7" stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id="vGround" cx="45%" cy="35%" r="70%">
+            <stop offset="0%" stopColor="#2a4418" />
+            <stop offset="100%" stopColor="#111d0a" />
+          </radialGradient>
+          <filter id="vShadow">
+            <feDropShadow dx="2" dy="5" stdDeviation="5" floodColor="#000" floodOpacity="0.55" />
+          </filter>
+          <filter id="vGlow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="6" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <filter id="vSoft" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <filter id="vLock">
+            <feColorMatrix type="saturate" values="0" result="g" />
+            <feComponentTransfer in="g">
+              <feFuncR type="linear" slope="0.35" />
+              <feFuncG type="linear" slope="0.35" />
+              <feFuncB type="linear" slope="0.35" />
+            </feComponentTransfer>
+          </filter>
+          <style>{`
+            @keyframes vTwinkle { 0%,100%{opacity:.15} 50%{opacity:.95} }
+            @keyframes vBob { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-4px)} }
+            @keyframes vFloat { 0%,100%{transform:translateY(0)rotate(0deg)} 50%{transform:translateY(-8px)rotate(180deg)} }
+            @keyframes vPulse { 0%,100%{opacity:.45} 50%{opacity:1} }
+            @keyframes vMoon { 0%,100%{opacity:.85} 50%{opacity:1} }
+            @keyframes vRoad { 0%{stroke-dashoffset:24} 100%{stroke-dashoffset:0} }
+            @keyframes vSway { 0%,100%{transform:rotate(-2deg);transform-origin:50% 100%} 50%{transform:rotate(2deg);transform-origin:50% 100%} }
+            @keyframes vAura { 0%,100%{opacity:.08} 50%{opacity:.18} }
+            .vMove { transition:transform 1.3s cubic-bezier(.4,0,.2,1); }
+            .vBtn { cursor:pointer; }
+            .vBtn:hover .vHover { opacity:1!important; }
+          `}</style>
+        </defs>
+
+        {/* SKY */}
+        <rect width="800" height="500" fill="url(#vSky)" />
+        {STARS.map(([cx, cy], i) => (
+          <circle key={i} cx={cx} cy={cy} r={i % 5 === 0 ? 2 : 1.3} fill="white"
+            style={{ animation: `vTwinkle ${2.4 + (i % 4) * 0.9}s ease-in-out ${(i * 0.38) % 3}s infinite` }} />
+        ))}
+
+        {/* MOON */}
+        <circle cx={715} cy={52} r={52} fill="url(#vMoonHalo)" />
+        <circle cx={715} cy={52} r={30} fill="#fef3c7" style={{ animation: "vMoon 5s ease-in-out infinite" }} />
+        <circle cx={727} cy={44} r={24} fill="#0f1a40" />
+        <circle cx={700} cy={60} r={4} fill="#fde68a" opacity={0.3} />
+        <circle cx={707} cy={48} r={2.5} fill="#fde68a" opacity={0.22} />
+
+        {/* GROUND */}
+        <rect x="0" y="148" width="800" height="352" fill="url(#vGround)" />
+        <ellipse cx={180} cy={360} rx={90} ry={32} fill="#1e3510" opacity={0.55} />
+        <ellipse cx={580} cy={440} rx={110} ry={38} fill="#1e3510" opacity={0.45} />
+        <ellipse cx={680} cy={220} rx={65} ry={24} fill="#1e3510" opacity={0.45} />
+        <ellipse cx={455} cy={182} rx={55} ry={18} fill="#1e3510" opacity={0.4} />
+
+        {/* ROADS */}
+        {([
+          ["M390,272 Q270,248 148,200", "#5c3d0a", "#c8920e"],
+          ["M390,272 Q462,202 548,148", "#5c3d0a", "#c8920e"],
+          ["M390,272 L648,286",         "#5c3d0a", "#c8920e"],
+          ["M390,272 Q368,335 332,408", "#5c3d0a", "#c8920e"],
+        ] as [string, string, string][]).map(([d, shadow, road], i) => (
+          <g key={i}>
+            <path d={d} stroke={shadow} strokeWidth={22} fill="none" strokeLinecap="round" />
+            <path d={d} stroke={road}   strokeWidth={14} fill="none" strokeLinecap="round" />
+            <path d={d} stroke="#fcd34d" strokeWidth={2} fill="none" strokeLinecap="round"
+              strokeDasharray="10 10" style={{ animation: "vRoad 1.2s linear infinite" }} />
+          </g>
+        ))}
+
+        {/* T2 — CASE DU GRIOT */}
+        <g className="vBtn" filter={progress.theme2 === 0 ? "url(#vLock)" : undefined} onClick={() => goTo(1)}>
+          <ellipse cx={148} cy={216} rx={58} ry={28} fill="#2a1854" opacity={0.7} />
+          {progress.theme2 >= 1 && (
+            <ellipse cx={148} cy={200} rx={56} ry={46} fill="#a78bfa"
+              style={{ animation: "vAura 3s ease-in-out infinite" }} filter="url(#vGlow)" />
+          )}
+          {/* Hut walls */}
+          <ellipse cx={148} cy={218} rx={38} ry={14} fill="#7c3d12" />
+          <rect x={110} y={178} width={76} height={44} rx={12} fill="#92400e" />
+          <rect x={118} y={182} width={60} height={38} rx={10} fill="#b45309" />
+          {/* Pattern stripe */}
+          <rect x={110} y={200} width={76} height={5} fill="#a78bfa" opacity={0.5} />
+          <rect x={110} y={207} width={76} height={3} fill="#7c3aed" opacity={0.35} />
+          {/* Door */}
+          <path d="M140,222 Q148,210 156,222 Z" fill="#451a03" />
+          {/* Windows */}
+          <rect x={127} y={187} width={11} height={10} rx={2} fill="#7c3d12" stroke="#fcd34d" strokeWidth={1} />
+          <rect x={158} y={187} width={11} height={10} rx={2} fill="#7c3d12" stroke="#fcd34d" strokeWidth={1} />
+          {progress.theme2 >= 1 && <>
+            <rect x={127} y={187} width={11} height={10} rx={2} fill="#fcd34d" opacity={0.2} />
+            <rect x={158} y={187} width={11} height={10} rx={2} fill="#fcd34d" opacity={0.2} />
+          </>}
+          {/* Conical roof */}
+          <polygon points="148,143 102,196 194,196" fill="#7c3d12" />
+          <polygon points="148,143 108,192 188,192" fill="#92400e" />
+          <polygon points="148,143 114,186 182,186" fill="#b45309" />
+          {[1,2,3,4].map(i => (
+            <line key={i} x1={148} y1={143} x2={108+i*10} y2={175+i*4} stroke="#78350f" strokeWidth={1.2} opacity={0.5} />
+          ))}
+          {/* Roof tip */}
+          <circle cx={148} cy={141} r={5} fill={progress.theme2 >= 1 ? "#a78bfa" : "#4b5563"}
+            style={progress.theme2 >= 1 ? { animation: "vPulse 2s infinite" } : {}} />
+          {/* Drum */}
+          <rect x={182} y={207} width={16} height={12} rx={2} fill="#92400e" stroke="#b45309" strokeWidth={1} />
+          <ellipse cx={190} cy={207} rx={8} ry={3} fill="#b45309" />
+          <ellipse cx={190} cy={219} rx={8} ry={3} fill="#7c3d12" />
+          {/* Hover ring */}
+          <rect className="vHover" x={105} y={141} width={88} height={82} rx={8}
+            fill="none" stroke="#a78bfa" strokeWidth={2.5} opacity={0} style={{ pointerEvents: "none" }} />
+          <text x={148} y={240} textAnchor="middle" fontSize={9} fontFamily="system-ui" fontWeight="800"
+            fill={progress.theme2 >= 1 ? "#c4b5fd" : "#6b7280"}>Case du Griot</text>
         </g>
-      )}
-      {/* Halo de réparation */}
-      {repairLevel >= 4 && (
-        <circle cx={x} cy={y} r="25" fill="none" stroke="#FDB813" strokeWidth="1" opacity="0.4">
-          <animate attributeName="r" values="25;30;25" dur="2s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.4;0.1;0.4" dur="2s" repeatCount="indefinite" />
-        </circle>
-      )}
-    </g>
-  );
-}
 
-export default function VillageMap({ progress, kodiMessage }: Props) {
-  const [showMessage, setShowMessage] = useState(false);
+        {/* T3 — BIBLIOTHÈQUE */}
+        <g className="vBtn" filter={progress.theme3 === 0 ? "url(#vLock)" : undefined} onClick={() => goTo(2)}>
+          <ellipse cx={548} cy={176} rx={66} ry={26} fill="#0c2a4a" opacity={0.7} />
+          {progress.theme3 >= 1 && (
+            <ellipse cx={548} cy={155} rx={63} ry={49} fill="#60a5fa"
+              style={{ animation: "vAura 3s ease-in-out 1s infinite" }} filter="url(#vGlow)" />
+          )}
+          {/* Steps */}
+          <rect x={507} y={186} width={82} height={4} rx={1} fill="#1e40af" />
+          <rect x={512} y={190} width={72} height={3} rx={1} fill="#1e3a5f" />
+          {/* Main body */}
+          <rect x={503} y={148} width={90} height={40} rx={3} fill="#1e3a5f" />
+          <rect x={507} y={151} width={82} height={36} rx={2} fill="#1d4ed8" />
+          {/* Columns */}
+          {[513, 526, 562, 575].map((x, i) => (
+            <g key={i}>
+              <rect x={x} y={149} width={7} height={36} rx={2} fill="#2563eb" />
+              <rect x={x-1} y={147} width={9} height={5} rx={1} fill="#3b82f6" />
+              <rect x={x-1} y={182} width={9} height={4} rx={1} fill="#3b82f6" />
+            </g>
+          ))}
+          {/* Dome */}
+          <ellipse cx={548} cy={147} rx={37} ry={12} fill="#1e3a5f" />
+          <path d="M511,147 Q548,108 585,147 Z" fill="#1d4ed8" />
+          <path d="M517,147 Q548,113 579,147 Z" fill="#2563eb" />
+          {/* Dome window */}
+          <circle cx={548} cy={130} r={8} fill="#0f172a" stroke="#60a5fa" strokeWidth={1.5} />
+          <circle cx={548} cy={130} r={4} fill="#60a5fa" opacity={0.4}
+            style={progress.theme3 >= 1 ? { animation: "vPulse 2.5s infinite" } : {}} />
+          {/* Dome tip */}
+          <line x1={548} y1={108} x2={548} y2={99} stroke="#60a5fa" strokeWidth={2} />
+          <circle cx={548} cy={97} r={4} fill={progress.theme3 >= 1 ? "#60a5fa" : "#334155"}
+            style={progress.theme3 >= 1 ? { animation: "vPulse 2s infinite" } : {}} />
+          {/* Windows */}
+          {([514, 537, 568] as number[]).map((x, i) => (
+            <g key={i}>
+              <rect x={x} y={156} width={i === 1 ? 22 : 13} height={18} rx={3} fill="#0f172a" stroke="#60a5fa" strokeWidth={1} />
+              {progress.theme3 >= 1 && <rect x={x} y={156} width={i === 1 ? 22 : 13} height={18} rx={3} fill="#60a5fa" opacity={0.15} />}
+            </g>
+          ))}
+          <rect className="vHover" x={503} y={97} width={90} height={96} rx={6}
+            fill="none" stroke="#60a5fa" strokeWidth={2.5} opacity={0} style={{ pointerEvents: "none" }} />
+          <text x={548} y={202} textAnchor="middle" fontSize={9} fontFamily="system-ui" fontWeight="800"
+            fill={progress.theme3 >= 1 ? "#93c5fd" : "#6b7280"}>Bibliothèque</text>
+        </g>
 
-  useEffect(() => {
-    if (kodiMessage) {
-      const t = setTimeout(() => setShowMessage(true), 800);
-      return () => clearTimeout(t);
-    }
-  }, [kodiMessage]);
+        {/* T4 — PALAIS */}
+        <g className="vBtn" filter={progress.theme4 === 0 ? "url(#vLock)" : undefined} onClick={() => goTo(3)}>
+          <ellipse cx={648} cy={318} rx={68} ry={26} fill="#0a2418" opacity={0.7} />
+          {progress.theme4 >= 1 && (
+            <ellipse cx={648} cy={290} rx={66} ry={52} fill="#10b981"
+              style={{ animation: "vAura 3s ease-in-out 0.5s infinite" }} filter="url(#vGlow)" />
+          )}
+          {/* Steps */}
+          <rect x={596} y={310} width={108} height={5} rx={1} fill="#064e3b" />
+          <rect x={601} y={306} width={98} height={5} rx={1} fill="#065f46" />
+          {/* Body */}
+          <rect x={604} y={256} width={90} height={52} rx={2} fill="#047857" />
+          <rect x={608} y={260} width={82} height={48} rx={2} fill="#059669" />
+          {/* Grand entrance */}
+          <path d="M635,308 Q648,288 661,308 Z" fill="#064e3b" />
+          {/* Columns */}
+          {[610, 622, 673, 685].map((x, i) => (
+            <g key={i}>
+              <rect x={x} y={258} width={8} height={50} rx={2} fill="#10b981" />
+              <rect x={x-1} y={255} width={10} height={6} rx={1} fill="#34d399" />
+              <rect x={x-1} y={305} width={10} height={5} rx={1} fill="#34d399" />
+            </g>
+          ))}
+          {/* Pediment */}
+          <polygon points="597,258 648,226 699,258" fill="#047857" />
+          <polygon points="603,258 648,230 693,258" fill="#059669" />
+          {/* Pediment window */}
+          <circle cx={648} cy={248} r={9} fill="#064e3b" stroke="#10b981" strokeWidth={1.5} />
+          {progress.theme4 >= 1 && <circle cx={648} cy={248} r={5} fill="#10b981" opacity={0.5}
+            style={{ animation: "vPulse 2s infinite" }} />}
+          {/* Flag */}
+          <line x1={648} y1={226} x2={648} y2={215} stroke="#10b981" strokeWidth={2} />
+          <polygon points="648,215 660,220 648,225" fill={progress.theme4 >= 1 ? "#10b981" : "#374151"} />
+          {/* Windows */}
+          {([612, 676] as number[]).map((x) => (
+            <g key={x}>
+              <rect x={x} y={267} width={12} height={16} rx={2} fill="#064e3b" stroke="#10b981" strokeWidth={1} />
+              {progress.theme4 >= 1 && <rect x={x} y={267} width={12} height={16} rx={2} fill="#10b981" opacity={0.15} />}
+            </g>
+          ))}
+          <rect className="vHover" x={596} y={215} width={108} height={100} rx={4}
+            fill="none" stroke="#10b981" strokeWidth={2.5} opacity={0} style={{ pointerEvents: "none" }} />
+          <text x={648} y={332} textAnchor="middle" fontSize={9} fontFamily="system-ui" fontWeight="800"
+            fill={progress.theme4 >= 1 ? "#6ee7b7" : "#6b7280"}>Palais</text>
+        </g>
 
-  const t1 = progress.theme1; // Routes
-  const t2 = progress.theme2; // Griot
-  const t3 = progress.theme3; // Bibliothèque
-  const t4 = progress.theme4; // Palais
-  const t5 = progress.theme5; // Galerie
+        {/* T5 — GALERIE */}
+        <g className="vBtn" filter={progress.theme5 === 0 ? "url(#vLock)" : undefined} onClick={() => goTo(4)}>
+          <ellipse cx={332} cy={434} rx={74} ry={24} fill="#3d0a1e" opacity={0.7} />
+          {progress.theme5 >= 1 && (
+            <ellipse cx={332} cy={410} rx={72} ry={46} fill="#ec4899"
+              style={{ animation: "vAura 3s ease-in-out 1.5s infinite" }} filter="url(#vGlow)" />
+          )}
+          {/* Sign */}
+          <rect x={304} y={360} width={60} height={14} rx={3} fill="#831843" stroke="#ec4899" strokeWidth={1} />
+          <text x={334} y={371} textAnchor="middle" fill="#f9a8d4" fontSize={6} fontFamily="system-ui" fontWeight="800">GALERIE</text>
+          {/* Roof overhang */}
+          <rect x={255} y={372} width={158} height={7} rx={2} fill="#db2777" />
+          <rect x={259} y={379} width={150} height={5} rx={1} fill="#be185d" />
+          {/* Body */}
+          <rect x={263} y={382} width={140} height={50} rx={4} fill="#831843" />
+          <rect x={267} y={385} width={132} height={46} rx={3} fill="#9d174d" />
+          {/* Windows */}
+          {([271, 316, 361] as number[]).map((x) => (
+            <g key={x}>
+              <rect x={x} y={389} width={36} height={32} rx={3} fill="#0f172a" stroke="#ec4899" strokeWidth={1.5} />
+              {progress.theme5 >= 1 && <rect x={x} y={389} width={36} height={32} rx={3} fill="#ec4899" opacity={0.12} />}
+            </g>
+          ))}
+          {/* Art pieces in windows */}
+          {progress.theme5 >= 1 && <>
+            <rect x={275} y={393} width={11} height={10} rx={1} fill="#fbbf24" opacity={0.65} />
+            <circle cx={299} cy={404} r={5} fill="#ec4899" opacity={0.7} />
+            <rect x={320} y={393} width={24} height={8} rx={1} fill="#60a5fa" opacity={0.55} />
+            <polygon points="371,393 383,393 377,402" fill="#a78bfa" opacity={0.7} />
+            <rect x={274} y={405} width={24} height={12} rx={1} fill="#f472b6" opacity={0.4} />
+            <circle cx={372} cy={406} r={5} fill="#fb7185" opacity={0.5} />
+          </>}
+          {/* Flower boxes */}
+          {([269, 364] as number[]).map((x) => (
+            <g key={x}>
+              <rect x={x} y={430} width={32} height={8} rx={2} fill="#4a1942" />
+              <circle cx={x+6} cy={429} r={4} fill="#f472b6" />
+              <circle cx={x+14} cy={428} r={3.5} fill="#fb7185" />
+              <circle cx={x+22} cy={429} r={4} fill="#ec4899" />
+            </g>
+          ))}
+          <rect className="vHover" x={257} y={358} width={156} height={82} rx={4}
+            fill="none" stroke="#ec4899" strokeWidth={2.5} opacity={0} style={{ pointerEvents: "none" }} />
+          <text x={332} y={450} textAnchor="middle" fontSize={9} fontFamily="system-ui" fontWeight="800"
+            fill={progress.theme5 >= 1 ? "#f9a8d4" : "#6b7280"}>Galerie des Œuvres</text>
+        </g>
 
-  // Kodi se positionne sur le quartier actif
-  const kodiPos = t1 < 2 ? { x: 130, y: 160 }
-    : t2 < 2 ? { x: 68, y: 90 }
-    : t3 < 2 ? { x: 200, y: 85 }
-    : t4 < 2 ? { x: 300, y: 110 }
-    : { x: 235, y: 200 };
+        {/* T1 — ROUTES HUB (center plaza) */}
+        <g className="vBtn" onClick={() => goTo(0)}>
+          {/* Plaza */}
+          <ellipse cx={390} cy={286} rx={56} ry={22} fill="#5c3d0a" opacity={0.85} />
+          <ellipse cx={390} cy={284} rx={48} ry={18} fill="#78350f" />
+          {/* Paving tiles */}
+          {([-22,-10,2,14] as number[]).map((dx) =>
+            ([-8, 4] as number[]).map((dy) => (
+              <rect key={`${dx}${dy}`} x={390+dx-5} y={281+dy-4} width={10} height={7} rx={1} fill="#92400e" opacity={0.6} />
+            ))
+          )}
+          {/* Lamppost */}
+          <rect x={388} y={246} width={4} height={38} rx={2} fill="#b45309" />
+          <ellipse cx={390} cy={245} rx={10} ry={4} fill="#78350f" />
+          <ellipse cx={390} cy={244} rx={9} ry={3} fill="#d97706" />
+          <circle cx={390} cy={242} r={8} fill="#fef3c7" filter="url(#vSoft)"
+            style={{ animation: "vPulse 3s ease-in-out infinite" }} />
+          <circle cx={390} cy={242} r={4} fill="#fcd34d" />
+          <ellipse cx={390} cy={270} rx={30} ry={10} fill="#fcd34d" opacity={0.06}
+            style={{ animation: "vPulse 3s ease-in-out infinite" }} />
+          {/* Small houses */}
+          <rect x={340} y={257} width={23} height={19} rx={2} fill="#b45309" />
+          <polygon points="340,257 351,246 363,257" fill="#92400e" />
+          <rect x={344} y={262} width={6} height={10} rx={1} fill="#78350f" />
+          <rect x={354} y={262} width={7} height={8} rx={1} fill="#78350f" stroke="#fcd34d" strokeWidth={0.8} />
+          <rect x={416} y={257} width={23} height={19} rx={2} fill="#b45309" />
+          <polygon points="416,257 427,246 439,257" fill="#92400e" />
+          <rect x={420} y={262} width={6} height={10} rx={1} fill="#78350f" />
+          <rect x={430} y={262} width={7} height={8} rx={1} fill="#78350f" stroke="#fcd34d" strokeWidth={0.8} />
+          <text x={390} y={304} textAnchor="middle" fontSize={9} fontFamily="system-ui" fontWeight="800" fill="#fcd34d">
+            Routes du Village
+          </text>
+        </g>
 
-  const repairLevel = t1 + t2 + t3 + t4 + t5;
+        {/* TREES */}
+        {TREES.map(([tx, ty, s, d]) => (
+          <g key={d} transform={`translate(${tx},${ty})`}
+            style={{ animation: `vSway ${3.5 + (d % 3) * 0.7}s ease-in-out ${d * 0.45}s infinite` }}>
+            <rect x={-3} y={0} width={6} height={s * 14} rx={2} fill="#713f12" />
+            <circle cx={0} cy={-s * 8} r={s * 14} fill="#166534" />
+            <circle cx={-s * 6} cy={-s * 6} r={s * 10} fill="#15803d" />
+            <circle cx={s * 6} cy={-s * 5} r={s * 11} fill="#16a34a" />
+            <circle cx={0} cy={-s * 14} r={s * 9} fill="#22c55e" opacity={0.7} />
+          </g>
+        ))}
 
-  const roadColor = t1 >= 1 ? "#d97706" : "#374151";
-  const roadOpacity = t1 >= 1 ? 1 : 0.35;
+        {/* COMPLETION STARS */}
+        {SPOTS.map((s) => progress[s.id] === 2 && (
+          <g key={s.id} transform={`translate(${s.x}, ${s.y - 54})`}
+            style={{ animation: "vFloat 3s ease-in-out infinite" }}>
+            <text fontSize={16} textAnchor="middle" y={6}>⭐</text>
+          </g>
+        ))}
 
-  return (
-    <div className="relative w-full select-none" style={{ maxWidth: 420 }}>
-      {/* Titre de la carte */}
-      <div className="text-center mb-2">
-        <span className="text-xs font-mono font-black uppercase tracking-widest" style={{ color: "#FDB813" }}>
-          ◈ Village Numérique d&apos;Amavi
-        </span>
-      </div>
+        {/* LOCK ICONS */}
+        {SPOTS.slice(1).map((s) => progress[s.id] === 0 && (
+          <g key={s.id} transform={`translate(${s.x}, ${s.y - 22})`}>
+            <rect x={-11} y={-13} width={22} height={17} rx={3} fill="#0f172a" stroke="#374151" strokeWidth={1.5} />
+            <path d="M-5,-13 Q-5,-24 0,-24 Q5,-24 5,-13" fill="none" stroke="#374151" strokeWidth={2} strokeLinecap="round" />
+            <circle cx={0} cy={-4} r={3} fill="#4b5563" />
+          </g>
+        ))}
 
-      <svg
-        viewBox="0 0 400 280"
-        xmlns="http://www.w3.org/2000/svg"
-        className="w-full rounded-2xl"
-        style={{ background: "linear-gradient(180deg, #0a0f1e 0%, #0f172a 60%, #1a2a1a 100%)", border: "1px solid #1e3a5f" }}
-        role="img"
-        aria-label="Carte animée du Village Numérique d'Amavi"
-      >
-        {/* Ciel étoilé */}
-        <Star x={30} y={18} delay={0} />
-        <Star x={80} y={12} delay={0.5} />
-        <Star x={150} y={8} delay={1} />
-        <Star x={220} y={15} delay={0.3} />
-        <Star x={310} y={10} delay={0.8} />
-        <Star x={370} y={20} delay={0.2} />
-        <Star x={55} y={30} delay={1.4} />
-        <Star x={340} y={30} delay={0.6} />
+        {/* AVATAR */}
+        <g className="vMove" transform={`translate(${av.x}, ${av.y - 32})`}>
+          <ellipse cx={0} cy={27} rx={12} ry={4} fill="black" opacity={0.35} />
+          <g style={{ animation: moving ? "none" : "vBob 2.2s ease-in-out infinite" }}>
+            <rect x={-6} y={16} width={5} height={10} rx={2.5} fill="#2563eb" />
+            <rect x={1}  y={16} width={5} height={10} rx={2.5} fill="#2563eb" />
+            <rect x={-10} y={2} width={20} height={16} rx={5} fill="#3b82f6" stroke="#60a5fa" strokeWidth={1.5} />
+            <rect x={-6} y={6} width={12} height={6} rx={2} fill="#1e3a8a" />
+            <circle cx={-3} cy={9} r={1.8} fill="#fbbf24" />
+            <circle cx={3}  cy={9} r={1.8} fill="#34d399" />
+            <rect x={-8} y={-13} width={16} height={15} rx={5} fill="#60a5fa" stroke="#93c5fd" strokeWidth={1.5} />
+            <circle cx={-3} cy={-6} r={3} fill="#0f172a" />
+            <circle cx={4}  cy={-6} r={3} fill="#0f172a" />
+            <circle cx={-2} cy={-7} r={1} fill="white" />
+            <circle cx={5}  cy={-7} r={1} fill="white" />
+            <line x1={0} y1={-13} x2={0} y2={-21} stroke="#93c5fd" strokeWidth={2} />
+            <circle cx={0} cy={-23} r={3} fill="#fbbf24"
+              style={{ animation: "vPulse 1.8s ease-in-out infinite" }} />
+          </g>
+        </g>
 
-        {/* Lune */}
-        <circle cx="370" cy="25" r="14" fill="#1e3a5f" />
-        <circle cx="378" cy="20" r="11" fill={t5 >= 2 ? "#fef3c7" : "#0f172a"} opacity={t5 >= 2 ? 1 : 0.4} />
-
-        {/* ── ROUTES (Thème 1) ── */}
-        {/* Route principale horizontale */}
-        <path d="M 20 170 Q 100 160 200 165 Q 280 170 380 155"
-          stroke={roadColor} strokeWidth="10" fill="none" strokeLinecap="round" opacity={roadOpacity} />
-        {/* Route vers nord */}
-        <path d="M 130 165 Q 100 130 80 100"
-          stroke={roadColor} strokeWidth="8" fill="none" strokeLinecap="round" opacity={roadOpacity} />
-        {/* Route vers bibliothèque */}
-        <path d="M 200 165 Q 205 130 200 95"
-          stroke={roadColor} strokeWidth="8" fill="none" strokeLinecap="round" opacity={roadOpacity} />
-        {/* Route vers palais */}
-        <path d="M 290 158 Q 300 130 300 108"
-          stroke={roadColor} strokeWidth="8" fill="none" strokeLinecap="round" opacity={roadOpacity} />
-        {/* Route galerie */}
-        <path d="M 230 165 Q 235 220 235 240"
-          stroke={roadColor} strokeWidth="7" fill="none" strokeLinecap="round" opacity={roadOpacity} />
-
-        {/* Reflets de route allumée */}
-        {t1 >= 1 && (
-          <path d="M 20 170 Q 100 160 200 165 Q 280 170 380 155"
-            stroke="#FDB813" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.3">
-            <animate attributeName="opacity" values="0.3;0.6;0.3" dur="2.5s" repeatCount="indefinite" />
-          </path>
-        )}
-
-        {/* ── CASE DU GRIOT (Thème 2) ── */}
-        <RoundHut x={75} y={88} lit={t2 >= 1} color="#a78bfa" label="Case du Griot" />
-        {/* Notes de musique flottantes */}
-        {t2 >= 1 && (
-          <g>
-            <text x="95" y="70" fontSize="10" fill="#a78bfa" opacity="0.8">
-              ♪
-              <animate attributeName="y" values="70;60;70" dur="2s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2s" repeatCount="indefinite" />
-            </text>
-            <text x="60" y="65" fontSize="8" fill="#c4b5fd" opacity="0.6">
-              ♫
-              <animate attributeName="y" values="65;55;65" dur="2.5s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2.5s" repeatCount="indefinite" />
+        {/* SPEECH BUBBLE */}
+        {bubble && (
+          <g transform={`translate(${av.x}, ${av.y - 74})`}>
+            <rect x={-74} y={-22} width={148} height={38} rx={10} fill="#0f172a" stroke="#f59e0b" strokeWidth={2} />
+            <polygon points="-6,16 6,16 0,27" fill="#0f172a" />
+            <polygon points="-4,16 4,16 0,25" fill="#f59e0b" />
+            <text x={0} y={3} textAnchor="middle" fill="#fef3c7" fontSize={9} fontFamily="system-ui" fontWeight="800">
+              {bubble.length > 22 ? bubble.slice(0, 22) + "…" : bubble}
             </text>
           </g>
         )}
 
-        {/* ── BIBLIOTHÈQUE (Thème 3) ── */}
-        <Building x={200} y={60} w={50} h={40} lit={t3 >= 1} color="#3b82f6" roofColor="#1e40af" label="Bibliothèque" windows={3} />
-
-        {/* ── PALAIS DES DÉCISIONS (Thème 4) ── */}
-        <Building x={300} y={65} w={65} h={50} lit={t4 >= 1} color="#10b981" roofColor="#065f46" label="Palais" windows={4} />
-        {/* Colonnes */}
-        {[-20, -7, 7, 20].map((dx, i) => (
-          <rect key={i} x={300 + dx - 2} y={95} width="4" height="20" rx="1"
-            fill={t4 >= 1 ? "#34d399" : "#1e293b"} opacity={t4 >= 1 ? 0.8 : 0.3} />
-        ))}
-
-        {/* ── GALERIE DES ŒUVRES (Thème 5) ── */}
-        <Building x={235} y={220} w={60} h={35} lit={t5 >= 1} color="#ec4899" roofColor="#9d174d" label="Galerie" windows={3} />
-        {/* Cadres de tableau */}
-        {t5 >= 1 && [0, 1, 2].map((i) => (
-          <rect key={i} x={208 + i * 18} y={226} width="12" height="10" rx="1"
-            stroke="#f9a8d4" strokeWidth="1.5" fill="none" opacity="0.8" />
-        ))}
-
-        {/* ── VÉGÉTATION ── */}
-        <Palm x={35} y={135} scale={0.8} />
-        <Palm x={355} y={130} scale={0.9} />
-        <Palm x={160} y={120} scale={0.7} />
-        <Baobab x={340} y={175} />
-        <Bush x={110} y={145} color={t1 >= 1 ? "#16a34a" : "#1e3a2a"} />
-        <Bush x={250} y={145} color={t1 >= 1 ? "#15803d" : "#1e3a2a"} />
-        <Bush x={170} y={185} color={t1 >= 1 ? "#16a34a" : "#1e3a2a"} />
-
-        {/* ── TORCHES ── */}
-        <Torch x={45} y={160} lit={t1 >= 1} />
-        <Torch x={185} y={155} lit={t1 >= 1} />
-        <Torch x={270} y={150} lit={t1 >= 1} />
-        <Torch x={360} y={148} lit={t1 >= 1} />
-        <Torch x={58} y={110} lit={t2 >= 1} />
-        <Torch x={182} y={108} lit={t3 >= 1} />
-        <Torch x={265} y={112} lit={t4 >= 1} />
-
-        {/* Puits au centre */}
-        <circle cx="155" cy="170" r="10" fill="#1e293b" stroke={t1 >= 1 ? "#d97706" : "#374151"} strokeWidth="2" />
-        <rect x="148" y="162" width="14" height="3" rx="1.5" fill={t1 >= 1 ? "#d97706" : "#374151"} />
-        <text x="155" y="173" textAnchor="middle" fontSize="7" fill={t1 >= 1 ? "#fbbf24" : "#475569"}>≋</text>
-
-        {/* ── KODI ── */}
-        <KodiWithState x={kodiPos.x} y={kodiPos.y} repairLevel={repairLevel} />
-
-        {/* Légende en bas */}
-        <rect x="5" y="262" width="390" height="16" rx="4" fill="#0f172a" opacity="0.7" />
-        {[
-          { label: "Routes", color: t1 >= 1 ? "#d97706" : "#374151", done: t1 >= 2 },
-          { label: "Griot", color: t2 >= 1 ? "#a78bfa" : "#374151", done: t2 >= 2 },
-          { label: "Biblio", color: t3 >= 1 ? "#3b82f6" : "#374151", done: t3 >= 2 },
-          { label: "Palais", color: t4 >= 1 ? "#10b981" : "#374151", done: t4 >= 2 },
-          { label: "Galerie", color: t5 >= 1 ? "#ec4899" : "#374151", done: t5 >= 2 },
-        ].map((item, i) => (
-          <g key={i} transform={`translate(${16 + i * 76}, 268)`}>
-            <circle cx="0" cy="3" r="4" fill={item.color} />
-            {item.done && <text x="0" y="5" textAnchor="middle" fontSize="5" fill="white">✓</text>}
-            <text x="8" y="6" fontSize="7" fill={item.color} fontWeight="bold">{item.label}</text>
-          </g>
-        ))}
+        {/* LEGEND */}
+        <rect x="0" y="474" width="800" height="26" fill="#060b24" opacity="0.92" />
+        {SPOTS.map((s, i) => {
+          const lvl = progress[s.id];
+          return (
+            <g key={s.id} transform={`translate(${10 + i * 156}, 487)`}>
+              <circle cx={5} cy={0} r={5} fill={lvl > 0 ? s.color : "#1e293b"} />
+              <text x={14} y={4} fill={lvl > 0 ? s.color : "#374151"} fontSize={9} fontFamily="system-ui" fontWeight="700">
+                {s.short} {lvl === 2 ? "✓" : lvl === 1 ? "···" : "🔒"}
+              </text>
+            </g>
+          );
+        })}
       </svg>
-
-      {/* Bulle de message Kodi */}
-      {kodiMessage && showMessage && (
-        <div
-          className="mt-3 rounded-2xl px-5 py-4 text-sm font-bold flex items-start gap-3"
-          style={{
-            background: "linear-gradient(135deg, #1e3a5f, #1e293b)",
-            border: "1px solid #3b82f640",
-            color: "#e2e8f0",
-          }}
-        >
-          <span className="text-xl shrink-0">🤖</span>
-          <span className="leading-snug italic">&ldquo;{kodiMessage}&rdquo;</span>
-        </div>
-      )}
     </div>
   );
 }
