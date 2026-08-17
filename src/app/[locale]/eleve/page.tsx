@@ -117,11 +117,11 @@ export default async function EleveDashboard() {
   }
 
   const villageProgress: ThemeProgress = {
-    theme1: themeProgressLevel(EXPLORER_THEME_IDS[0]),
-    theme2: themeProgressLevel(EXPLORER_THEME_IDS[1]),
-    theme3: themeProgressLevel(EXPLORER_THEME_IDS[2]),
-    theme4: themeProgressLevel(EXPLORER_THEME_IDS[3]),
-    theme5: themeProgressLevel(EXPLORER_THEME_IDS[4]),
+    theme1: themeProgressLevel(EXPLORER_THEME_IDS[0]) as 0|1|2,
+    theme2: themeProgressLevel(EXPLORER_THEME_IDS[1]) as 0|1|2,
+    theme3: themeProgressLevel(EXPLORER_THEME_IDS[2]) as 0|1|2,
+    theme4: themeProgressLevel(EXPLORER_THEME_IDS[3]) as 0|1|2,
+    theme5: themeProgressLevel(EXPLORER_THEME_IDS[4]) as 0|1|2,
   };
 
   // Message Kodi pour la leçon suivante (thème 1)
