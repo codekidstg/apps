@@ -181,10 +181,13 @@ export default function VillageMap({
   progress: ThemeProgress;
   kodiMessage?: string;
 }) {
-  // Avatar free movement
-  const keysRef  = useRef<Set<string>>(new Set());
-  const posRef   = useRef({ x: SPOTS[0].x, y: SPOTS[0].y - 32 });
-  const rafRef   = useRef<number>(0);
+  // Avatar free movement — tous les refs pour éviter stale closure dans le RAF loop
+  const keysRef    = useRef<Set<string>>(new Set());
+  const posRef     = useRef({ x: SPOTS[0].x, y: SPOTS[0].y - 32 });
+  const rafRef     = useRef<number>(0);
+  const facingRef  = useRef<"left"|"right">("right");
+  const nearRef    = useRef<number | null>(null);
+
   const [avatarPos, setAvatarPos] = useState({ x: SPOTS[0].x, y: SPOTS[0].y - 32 });
   const [facing,    setFacing]    = useState<"left"|"right">("right");
 
@@ -223,7 +226,7 @@ export default function VillageMap({
       const k = keysRef.current;
       let { x, y } = posRef.current;
       let moved = false;
-      let newFacing = facing;
+      let newFacing: "left"|"right" = facingRef.current;
 
       if (k.has("ArrowUp")    || k.has("w") || k.has("W")) { y -= SPEED; moved = true; }
       if (k.has("ArrowDown")  || k.has("s") || k.has("S")) { y += SPEED; moved = true; }
@@ -242,11 +245,17 @@ export default function VillageMap({
         if (Math.sqrt(dx*dx + dy*dy) < 55) { near = i; break; }
       }
 
-      if (moved || near !== nearSpot) {
+      if (moved) {
         posRef.current = { x, y };
         setAvatarPos({ x, y });
+      }
+      if (near !== nearRef.current) {
+        nearRef.current = near;
         setNearSpot(near);
-        if (newFacing !== facing) setFacing(newFacing);
+      }
+      if (newFacing !== facingRef.current) {
+        facingRef.current = newFacing;
+        setFacing(newFacing);
       }
 
       // E / Space to enter nearby spot
