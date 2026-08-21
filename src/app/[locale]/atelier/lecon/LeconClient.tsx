@@ -204,6 +204,13 @@ export default function LeconClient({ homeHref }: { homeHref: string }) {
   const [xp, setXp]                 = useState(0);
   const [vaisseau, setVaisseau]     = useState(VAISSEAUX[0]);
   const [manche1Score, setManche1Score] = useState<number | null>(null);
+  /** Seuil du jeu, en points — distinct du prix du cadeau, qui est en FCFA. */
+  const [seuilJeu, setSeuilJeu]     = useState("");
+
+  const nomEstUnNombre = /^\d+$/.test(cadeauNom.trim());
+  const cadeauOk = cadeauNom.trim().length >= 2 && !nomEstUnNombre && parseInt(cadeauPrix) > 0;
+  const seuilNum = parseInt(seuilJeu);
+  const seuilOk  = seuilNum >= 10 && seuilNum <= 5000;
 
   const block    = BLOCKS[idx];
   const total    = BLOCKS.length;
@@ -219,9 +226,10 @@ export default function LeconClient({ homeHref }: { homeHref: string }) {
 
   function startAtelier() {
     const params = new URLSearchParams();
-    if (cadeauPrix) params.set("seuil", cadeauPrix);
-    if (cadeauNom)  params.set("cadeau", cadeauNom);
-    if (vaisseau)   params.set("vaisseau", vaisseau);
+    // Le seuil transmis au jeu est celui en points, jamais le prix en FCFA.
+    if (seuilOk)   params.set("seuil", String(seuilNum));
+    if (cadeauNom) params.set("cadeau", cadeauNom.trim());
+    if (vaisseau)  params.set("vaisseau", vaisseau);
     router.push(`/fr/atelier?${params.toString()}`);
   }
 
@@ -345,7 +353,11 @@ export default function LeconClient({ homeHref }: { homeHref: string }) {
                       avatar: vaisseau, name: "", speed: 2, obstacles: 2,
                       obstacleSize: 2, theme: "space", rules: MANCHE1_RULES,
                     }}
-                    onGameOver={(s) => setManche1Score(s)}
+                    onGameOver={(s) => {
+                      setManche1Score(s);
+                      // Suggestion ancrée sur sa propre performance : atteignable à coup sûr.
+                      setSeuilJeu(String(Math.max(30, Math.min(500, Math.round(s / 20) * 10))));
+                    }}
                   />
                 </>
               ) : (
@@ -530,44 +542,86 @@ export default function LeconClient({ homeHref }: { homeHref: string }) {
                 </div>
               </div>
 
-              {/* Saisie cadeau */}
+              {/* 1. Le cadeau : une comparaison écrite dans SES propres termes (argent / FCFA) */}
               <div className="bg-black/30 rounded-xl p-4 border-l-4 border-yellow-500/40 space-y-3">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">🎁 Maintenant ton exemple à toi</div>
                 <p className="text-slate-300 text-xs leading-relaxed">
-                  Ton cadeau et son prix vont devenir une règle dans ton jeu. Le seuil que tu fixes ici sera le moment où les astéroïdes accélèrent.
+                  Choisis quelque chose que tu voudrais acheter. On va en faire une comparaison.
                 </p>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-bold text-slate-400 mb-1 block">C'est quoi ton cadeau ?</label>
-                    <input type="text" placeholder="Ex : un téléphone, des baskets…"
+                    <label className="text-xs font-bold text-slate-400 mb-1 block">C&apos;est quoi ton cadeau ?</label>
+                    <input type="text" placeholder="Ex : un téléphone, des baskets…" maxLength={40}
                       value={cadeauNom} onChange={e => setCadeauNom(e.target.value)}
                       className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-yellow-500" />
+                    {cadeauNom.trim() !== "" && nomEstUnNombre && (
+                      <p className="text-[11px] text-amber-400 mt-1 font-bold">
+                        Écris le nom de l&apos;objet, pas son prix — le prix, c&apos;est juste en dessous.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-400 mb-1 block">Ça coûte combien ? (en FCFA)</label>
-                    <input type="number" placeholder="Ex : 15000"
+                    <input type="number" placeholder="Ex : 15000" min={1} max={1000000}
                       value={cadeauPrix} onChange={e => setCadeauPrix(e.target.value)}
                       className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-yellow-500" />
                   </div>
                 </div>
               </div>
 
-              {cadeauNom && cadeauPrix && (
+              {cadeauOk && (
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-200 leading-relaxed">
-                  <strong>Ta règle :</strong><br />
+                  <strong>Ta comparaison :</strong><br />
                   <code className="text-yellow-400 font-mono text-xs">
-                    SI score &gt;= {parseInt(cadeauPrix).toLocaleString()} pts<br />
-                    ALORS les astéroïdes vont plus vite
+                    SI mon argent &gt;= {parseInt(cadeauPrix).toLocaleString()} FCFA<br />
+                    ALORS j&apos;achète {cadeauNom.trim()}
                   </code>
                   <p className="mt-2 text-slate-300 text-xs">
-                    Tu viens de fixer ton seuil — comme quand le téléphone se met à sonner à 20% de batterie. C'est toi le développeur.
+                    Un chiffre comparé à un seuil — exactement comme le téléphone qui alerte à 20 % de batterie.
                   </p>
                 </div>
               )}
 
-              <button onClick={next} disabled={!cadeauNom || !cadeauPrix}
+              {/* 2. Le seuil du jeu, demandé dans l'unité du jeu — des points, pas des FCFA.
+                     Réutiliser le prix ici donnerait une règle qui ne se déclenche jamais. */}
+              {cadeauOk && (
+                <div className="bg-black/30 rounded-xl p-4 border-l-4 border-orange-500/50 space-y-3">
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">🎮 Et dans ton jeu ?</div>
+                  <p className="text-slate-300 text-xs leading-relaxed">
+                    Là, ce ne sont plus des FCFA mais des <strong className="text-white">points</strong>.
+                    {manche1Score !== null && <> Tu as fait <strong className="text-orange-400">{manche1Score} points</strong> à la manche 1.</>}
+                    {" "}À partir de combien de points veux-tu que les astéroïdes accélèrent ?
+                  </p>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 mb-1 block">Mon seuil (en points)</label>
+                    <input type="number" min={10} max={5000} placeholder="Ex : 90"
+                      value={seuilJeu} onChange={e => setSeuilJeu(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-orange-500" />
+                    {seuilJeu !== "" && !seuilOk && (
+                      <p className="text-[11px] text-amber-400 mt-1 font-bold">
+                        Choisis entre 10 et 5000 points — au-delà, tu n&apos;atteindrais jamais ton seuil.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {cadeauOk && seuilOk && (
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 text-sm text-orange-200 leading-relaxed">
+                  <strong>Ta règle de jeu :</strong><br />
+                  <code className="text-orange-400 font-mono text-xs">
+                    SI score &gt;= {parseInt(seuilJeu).toLocaleString()} pts<br />
+                    ALORS les astéroïdes vont plus vite
+                  </code>
+                  <p className="mt-2 text-slate-300 text-xs">
+                    Même forme que ta comparaison du cadeau — seule l&apos;unité change. C&apos;est toi le développeur.
+                  </p>
+                </div>
+              )}
+
+              <button onClick={next} disabled={!cadeauOk || !seuilOk}
                 className="w-full py-3 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-black rounded-xl transition-all">
-                J'ai compris →
+                J&apos;ai compris →
               </button>
             </div>
           )}
