@@ -53,7 +53,7 @@ export const NAV_PAGES: NavPageDef[] = [
   { role: "manager", key: "manager.compta.mentors",           label: "↳ Mentors",        href: "/manager/compta/mentors",            parentKey: "manager.compta" },
   { role: "manager", key: "manager.compta.parents",           label: "↳ Parents",        href: "/manager/compta/parents",            parentKey: "manager.compta" },
   { role: "manager", key: "manager.compta.tresorerie",        label: "↳ Trésorerie",     href: "/manager/compta/tresorerie",         parentKey: "manager.compta" },
-  { role: "manager", key: "manager.atelier",                  label: "Atelier",          href: "/atelier/animateur",                 icon: "🎓" },
+  { role: "manager", key: "manager.atelier",                  label: "Atelier",          href: "/atelier",                           icon: "🎓" },
 
   // ── Teacher ──────────────────────────────────────────────────────────────────
   { role: "teacher", key: "teacher.dashboard",    label: "Tableau de bord",  href: "/prof",             icon: "◈" },
@@ -62,7 +62,7 @@ export const NAV_PAGES: NavPageDef[] = [
   { role: "teacher", key: "teacher.cours",        label: "Mes cours",        href: "/prof/cours",       icon: "📚" },
   { role: "teacher", key: "teacher.classes",      label: "Mes classes",      href: "/prof/classes",     icon: "👨‍🏫" },
   { role: "teacher", key: "teacher.certificats",  label: "Certificats",      href: "/prof/certificats", icon: "🎓" },
-  { role: "teacher", key: "teacher.atelier",      label: "Atelier",          href: "/atelier/animateur", icon: "🎓" },
+  { role: "teacher", key: "teacher.atelier",      label: "Atelier",          href: "/atelier",           icon: "🎓" },
 ];
 
 export const PAGES_BY_ROLE: Record<string, NavPageDef[]> = {
