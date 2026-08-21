@@ -288,7 +288,8 @@ export default function AtelierGame({ config, onScore, onGameOver }: Props) {
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-2xl gap-4">
           <div className="text-5xl">{config.avatar}</div>
           <div className="text-xl font-black text-white">{config.name || "Mon Jeu"}</div>
-          <div className="text-slate-400 text-sm">Créé par {config.name ? "toi" : "—"}</div>
+          {/* Sans prénom (manche 1 de la leçon), pas de ligne d'auteur vide. */}
+          {config.name && <div className="text-slate-400 text-sm">Créé par toi</div>}
           <button
             onClick={startGame}
             className="mt-2 px-8 py-3 bg-orange-500 hover:bg-orange-400 text-white font-black rounded-full text-lg transition-all hover:scale-105 active:scale-95 shadow-lg shadow-orange-500/30"

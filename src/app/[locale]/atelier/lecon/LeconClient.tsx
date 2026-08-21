@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AtelierGame from "../AtelierGame";
 
 type QuizQuestion = {
   question: string;
@@ -13,15 +14,30 @@ type Example = { icon: string; title: string; desc: string };
 
 type Block =
   | { type: "intro" }
+  | { type: "vaisseau" }
+  | { type: "manche1" }
   | { type: "concept"; concept: string; color: string; icon: string; title: string; body: string; examples: Example[] }
   | { type: "quiz"; quiz: QuizQuestion }
   | { type: "cadeau" }
   | { type: "fin" };
 
+/** Manche 1 : mêmes règles de base que l'atelier, mais SANS score_boost —
+ *  la vitesse reste donc constante. C'est ce manque que la leçon vient combler. */
+const MANCHE1_RULES = [
+  { id: "collision", condition: "collision", action: "lose_life" },
+  { id: "no_lives",  condition: "no_lives",  action: "game_over" },
+  { id: "loop",      condition: "loop",      action: "continue"  },
+];
+
+const VAISSEAUX = ["🚀", "🛸", "☄️"];
+
 // ─── Contenu ─────────────────────────────────────────────────────────────────
 
 const BLOCKS: Block[] = [
   { type: "intro" },
+
+  { type: "vaisseau" },
+  { type: "manche1" },
 
   // ── VARIABLE ──
   {
@@ -31,9 +47,9 @@ const BLOCKS: Block[] = [
     body: "Une variable, c'est une case mémoire dans l'ordinateur. Elle retient un chiffre ou un mot — et cette valeur peut changer à tout moment.",
     examples: [
       {
-        icon: "👟",
-        title: "Les chaussures du matin",
-        desc: "Tu as plusieurs paires, tu en choisis une. Ton cerveau retient ce choix toute la journée — pas celui de ton voisin. L'ordinateur fait pareil.",
+        icon: "❤️",
+        title: "Tes vies, à l'instant",
+        desc: "Tu as commencé avec 3 vies. Tu as touché un astéroïde, il t'en restait 2. Ce nombre changeait pendant que tu jouais — c'est une variable.",
       },
       {
         icon: "🔊",
@@ -55,14 +71,14 @@ const BLOCKS: Block[] = [
   {
     type: "quiz",
     quiz: {
-      question: "Parmi ces exemples, lequel est une variable ?",
+      question: "Dans la manche que tu viens de jouer, qu'est-ce qui était une variable ?",
       options: [
-        "Ton prénom",
-        "Ton solde de crédit téléphonique",
-        "La couleur du ciel en journée",
+        "La forme des astéroïdes",
+        "Ton score",
+        "La couleur du fond",
       ],
       correct: 1,
-      explanation: "Ton solde change chaque fois que tu appelles ou que tu recharges — c'est exactement ça une variable : un chiffre qui évolue dans le temps.",
+      explanation: "Ton score montait pendant que tu survivais. Une variable, c'est exactement ça : une valeur qui évolue pendant que le programme tourne. Ton prénom en est une aussi — tu vas le donner tout à l'heure, et le jeu s'en souviendra.",
     },
   },
 
@@ -81,12 +97,12 @@ const BLOCKS: Block[] = [
       {
         icon: "💡",
         title: "Le groupe électrogène",
-        desc: "SI le courant s'arrête ALORS le générateur démarre. Ça se fait tout seul — c'est une condition programmée dans la machine.",
+        desc: "SI le courant s'arrête ALORS le générateur démarre. Sur les grosses installations, la machine surveille le courant en permanence et bascule toute seule.",
       },
       {
-        icon: "🏫",
-        title: "La note à l'école",
-        desc: "SI ta note est >= 10 ALORS tu passes. Le système vérifie ça automatiquement pour chaque élève. Même logique qu'un programme.",
+        icon: "🔒",
+        title: "Le code du téléphone",
+        desc: "SI le code est bon ALORS le téléphone s'ouvre. SINON il reste bloqué. Une question, deux réponses possibles — jamais autre chose.",
       },
       {
         icon: "🌧️",
@@ -98,14 +114,14 @@ const BLOCKS: Block[] = [
   {
     type: "quiz",
     quiz: {
-      question: "Complète la condition : SI il pleut ALORS…",
+      question: "Dans ta manche : SI ton vaisseau touche un astéroïde, ALORS…",
       options: [
-        "Je reste dehors quand même",
-        "Je prends un parapluie",
-        "Je mange du riz",
+        "Le jeu accélère",
+        "Tu perds une vie",
+        "Ton score monte",
       ],
       correct: 1,
-      explanation: "Exact ! SI (condition) il pleut ALORS (action) prendre un parapluie. Les programmes fonctionnent tous comme ça.",
+      explanation: "SI (la question) tu touches un astéroïde, ALORS (l'action) tu perds une vie. Cette condition tournait déjà dans ton jeu sans que tu l'écrives. Tout à l'heure, c'est toi qui en ajouteras une.",
     },
   },
 
@@ -114,14 +130,14 @@ const BLOCKS: Block[] = [
   {
     type: "quiz",
     quiz: {
-      question: "C'est quoi une comparaison ?",
+      question: "Le prix que tu viens de fixer va servir à quoi dans ton jeu ?",
       options: [
-        "Une variable qui change",
-        "Vérifier si un chiffre a dépassé un seuil",
-        "Une action qui se répète",
+        "Changer la couleur du vaisseau",
+        "Savoir quand les astéroïdes accélèrent",
+        "Compter tes vies",
       ],
       correct: 1,
-      explanation: "L'ordinateur compare en permanence des chiffres avec des seuils. C'est toi qui fixes le seuil — comme tu viens de fixer le prix de ton cadeau.",
+      explanation: "Le jeu compare ton score à ton seuil, 60 fois par seconde. Et c'est là le lien : une comparaison, c'est ce qui répond à la question posée par une condition. SI score >= seuil — la comparaison dit OUI ou NON, la condition agit.",
     },
   },
 
@@ -133,9 +149,9 @@ const BLOCKS: Block[] = [
     body: "Une boucle, c'est une action qui se répète encore et encore — jusqu'à ce qu'une condition l'arrête. Sans boucle, un programme s'exécute une seule fois puis s'arrête.",
     examples: [
       {
-        icon: "🫁",
-        title: "La respiration",
-        desc: "Inspire, expire, inspire, expire — sans fin, sans y penser. Ton jeu fait pareil : 60 fois par seconde il vérifie tes règles et bouge les astéroïdes.",
+        icon: "🥣",
+        title: "Le pilon dans le mortier",
+        desc: "Pam, pam, pam — encore et encore, jusqu'à ce que la pâte soit prête. Le geste se répète ; c'est la pâte prête qui arrête la boucle.",
       },
       {
         icon: "🌀",
@@ -157,7 +173,7 @@ const BLOCKS: Block[] = [
   {
     type: "quiz",
     quiz: {
-      question: "Le jeu vérifie tes règles 60 fois par seconde. C'est…",
+      question: "Pendant ta manche, le jeu vérifiait ses règles 60 fois par seconde. C'est…",
       options: [
         "Une condition",
         "Une variable",
@@ -185,6 +201,8 @@ export default function LeconClient() {
   const [cadeauNom, setCadeauNom]   = useState("");
   const [cadeauPrix, setCadeauPrix] = useState("");
   const [xp, setXp]                 = useState(0);
+  const [vaisseau, setVaisseau]     = useState(VAISSEAUX[0]);
+  const [manche1Score, setManche1Score] = useState<number | null>(null);
 
   const block    = BLOCKS[idx];
   const total    = BLOCKS.length;
@@ -202,6 +220,7 @@ export default function LeconClient() {
     const params = new URLSearchParams();
     if (cadeauPrix) params.set("seuil", cadeauPrix);
     if (cadeauNom)  params.set("cadeau", cadeauNom);
+    if (vaisseau)   params.set("vaisseau", vaisseau);
     router.push(`/fr/atelier?${params.toString()}`);
   }
 
@@ -239,27 +258,99 @@ export default function LeconClient() {
                 <span className="text-orange-400">un vrai jeu vidéo.</span>
               </h1>
               <p className="text-slate-300 text-base leading-relaxed">
-                Pour ça, tu vas apprendre <strong className="text-white">4 mots</strong> que
-                les développeurs utilisent tous les jours.<br />
-                Ça prend 10 minutes. Allons-y.
+                Mais on ne commence pas par un cours.<br />
+                <strong className="text-white">D&apos;abord tu joues.</strong> Une minute.<br />
+                Ensuite tu verras ce qui manque à ce jeu — et tu le répareras.
               </p>
-              <div className="grid grid-cols-4 gap-3 pt-2">
-                {[
-                  { icon: "📦", label: "Variable",    color: "text-orange-400" },
-                  { icon: "❓", label: "Condition",   color: "text-red-400" },
-                  { icon: "⚖️", label: "Comparaison", color: "text-yellow-400" },
-                  { icon: "🔄", label: "Boucle",      color: "text-blue-400" },
-                ].map(c => (
-                  <div key={c.label} className="bg-slate-900 border border-slate-700 rounded-2xl p-3 text-center">
-                    <div className="text-2xl mb-1">{c.icon}</div>
-                    <div className={`text-xs font-black ${c.color}`}>{c.label}</div>
-                  </div>
+              <button onClick={next}
+                className="mt-2 px-8 py-3 bg-orange-500 hover:bg-orange-400 text-white font-black rounded-full text-lg transition-all hover:scale-105 shadow-lg shadow-orange-500/30">
+                Choisir mon vaisseau →
+              </button>
+            </div>
+          )}
+
+          {/* ── CHOIX DU VAISSEAU (rapide) ── */}
+          {block.type === "vaisseau" && (
+            <div className="text-center space-y-6">
+              <div className="text-5xl">🚀</div>
+              <h2 className="text-2xl font-black text-white">Choisis ton vaisseau</h2>
+              <p className="text-slate-400 text-sm">Tu pourras en changer plus tard.</p>
+              <div className="flex justify-center gap-4">
+                {VAISSEAUX.map(v => (
+                  <button key={v} onClick={() => setVaisseau(v)}
+                    className={`w-20 h-20 rounded-2xl text-4xl flex items-center justify-center transition-all border-2 ${
+                      vaisseau === v
+                        ? "border-orange-500 bg-orange-500/20 scale-110 shadow-lg shadow-orange-500/30"
+                        : "border-slate-700 bg-slate-800 hover:border-slate-500 hover:scale-105"
+                    }`}>
+                    {v}
+                  </button>
                 ))}
               </div>
               <button onClick={next}
-                className="mt-2 px-8 py-3 bg-orange-500 hover:bg-orange-400 text-white font-black rounded-full text-lg transition-all hover:scale-105 shadow-lg shadow-orange-500/30">
-                C'est parti →
+                className="px-8 py-3 bg-orange-500 hover:bg-orange-400 text-white font-black rounded-full text-lg transition-all hover:scale-105">
+                Jouer →
               </button>
+            </div>
+          )}
+
+          {/* ── MANCHE 1 : vitesse constante, aucune règle de l'enfant ── */}
+          {block.type === "manche1" && (
+            <div className="space-y-5">
+              {manche1Score === null ? (
+                <>
+                  <div className="text-center">
+                    <div className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Manche 1</div>
+                    <h2 className="text-xl font-black text-white mt-1">Survis le plus longtemps possible</h2>
+                    <p className="text-slate-400 text-xs mt-1">Flèches ou doigt pour bouger. 3 vies.</p>
+                  </div>
+                  <AtelierGame
+                    config={{
+                      avatar: vaisseau, name: "", speed: 2, obstacles: 2,
+                      obstacleSize: 2, theme: "space", rules: MANCHE1_RULES,
+                    }}
+                    onGameOver={(s) => setManche1Score(s)}
+                  />
+                </>
+              ) : (
+                <div className="text-center space-y-5">
+                  <div className="text-5xl">🎯</div>
+                  <div>
+                    <div className="text-slate-400 text-sm">Ton score</div>
+                    <div className="text-4xl font-black text-orange-400">{manche1Score}</div>
+                  </div>
+                  <div className="bg-slate-900 border-l-4 border-orange-500 rounded-xl p-4 text-left space-y-2">
+                    <p className="text-slate-200 text-sm leading-relaxed">
+                      Tu as remarqué ? Les astéroïdes allaient <strong className="text-white">toujours à la même vitesse</strong>.
+                      Du début à la fin. Jamais plus dur, jamais plus excitant.
+                    </p>
+                    <p className="text-slate-300 text-sm leading-relaxed">
+                      C&apos;est parce qu&apos;il manque une règle à ce jeu. Une règle que
+                      <strong className="text-orange-400"> tu vas écrire toi-même</strong> dans quelques minutes.
+                    </p>
+                  </div>
+                  <p className="text-slate-400 text-xs">
+                    Pour l&apos;écrire, il te faut 4 mots. Les voici.
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { icon: "📦", label: "Variable",    color: "text-orange-400" },
+                      { icon: "❓", label: "Condition",   color: "text-red-400" },
+                      { icon: "⚖️", label: "Comparaison", color: "text-yellow-400" },
+                      { icon: "🔄", label: "Boucle",      color: "text-blue-400" },
+                    ].map(c => (
+                      <div key={c.label} className="bg-slate-900 border border-slate-700 rounded-2xl p-2 text-center">
+                        <div className="text-xl mb-0.5">{c.icon}</div>
+                        <div className={`text-[10px] font-black ${c.color}`}>{c.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={next}
+                    className="px-8 py-3 bg-orange-500 hover:bg-orange-400 text-white font-black rounded-full text-lg transition-all hover:scale-105">
+                    Comprendre pourquoi →
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -389,7 +480,7 @@ export default function LeconClient() {
                 <div className="grid grid-cols-1 gap-2">
                   {[
                     { icon: "🔋", title: "La batterie du téléphone", desc: "SI batterie <= 20% ALORS afficher alerte rouge. Le téléphone compare ton niveau avec le seuil 20, des milliers de fois par seconde." },
-                    { icon: "🚰", title: "L'eau du robinet", desc: "SI le château d'eau est trop bas ALORS la pompe redémarre. Un chiffre comparé à un seuil — automatiquement." },
+                    { icon: "🚰", title: "L'eau du château", desc: "SI le niveau descend sous 30 % ALORS la pompe redémarre. Un chiffre comparé à un seuil précis — automatiquement." },
                     { icon: "📝", title: "La note de passage", desc: "SI moyenne >= 10 ALORS passage en classe supérieure. Le système fait cette comparaison pour chaque élève, automatiquement." },
                   ].map((ex, i) => (
                     <div key={i} className="flex items-start gap-3 p-3 rounded-xl border bg-yellow-900/20 border-yellow-800/40">

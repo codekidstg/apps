@@ -322,10 +322,13 @@ type Props = {
   obstacleSize: number; setObstacleSize: (v: number) => void;
   rules: Rule[]; setRules: (r: Rule[]) => void;
   onLaunch: () => void;
+  /** Seuil fixé pendant la leçon (prix du cadeau) — pré-remplit le Turbo. */
+  defaultThreshold?: number;
+  cadeau?: string;
 };
 
 // ── Composant principal ───────────────────────────────────────────────────────
-export default function CockpitPanel({ playerName, speed, setSpeed, obstacles, setObstacles, obstacleSize, setObstacleSize, rules, setRules, onLaunch }: Props) {
+export default function CockpitPanel({ playerName, speed, setSpeed, obstacles, setObstacles, obstacleSize, setObstacleSize, rules, setRules, onLaunch, defaultThreshold, cadeau }: Props) {
   const [phase, setPhase]             = useState<"briefing" | "steps" | "complete">("briefing");
   const [briefLines, setBriefLines]   = useState<string[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
@@ -335,7 +338,7 @@ export default function CockpitPanel({ playerName, speed, setSpeed, obstacles, s
   const [localDensity, setLocalDensity] = useState(obstacles);
   const [localSize,    setLocalSize]    = useState(obstacleSize);
   const [toggles, setToggles]           = useState({ collision: true, gameover: true, loop: true, turbo: false });
-  const [turboThreshold, setTurboThreshold] = useState(50);
+  const [turboThreshold, setTurboThreshold] = useState(defaultThreshold ?? 50);
 
   // Briefing
   const BRIEF = [
@@ -591,7 +594,7 @@ export default function CockpitPanel({ playerName, speed, setSpeed, obstacles, s
                 { id: "collision", icon: "💥", label: "Collision" },
                 { id: "gameover",  icon: "☠️", label: "Game Over" },
                 { id: "loop",      icon: "🔄", label: "Boucle" },
-                { id: "turbo",     icon: "⚡", label: `Turbo (≥${turboThreshold})` },
+                { id: "turbo",     icon: "⚡", label: cadeau ? `Turbo (≥${turboThreshold} · ${cadeau})` : `Turbo (≥${turboThreshold})` },
               ].map(r => {
                 const on = toggles[r.id as keyof typeof toggles];
                 return (

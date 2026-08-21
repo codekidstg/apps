@@ -74,14 +74,19 @@ type Props = {
   shareBase: string;
   homeHref: string;
   onSave?: (config: GameConfig, score: number) => Promise<string | null>;
+  /** Repris de la leçon : seuil et cadeau choisis par l'enfant, vaisseau de la manche 1. */
+  seuil?: number;
+  cadeau?: string;
+  vaisseau?: string;
 };
 
-export default function AtelierClient({ sessionStep, shareBase, homeHref, onSave }: Props) {
+export default function AtelierClient({ sessionStep, shareBase, homeHref, onSave, seuil, cadeau, vaisseau }: Props) {
   const pathname = usePathname();
   const locale = pathname.split("/")[1] || "fr";
   const [step, setStep]               = useState(0);
   const [name, setName]               = useState("");
-  const [avatar, setAvatar]           = useState("🚀");
+  // Le vaisseau choisi en manche 1 est repris ; l'enfant reste libre d'en changer.
+  const [avatar, setAvatar]           = useState(vaisseau || "🚀");
   const [theme, setTheme]             = useState("space");
   const [speed, setSpeed]             = useState(3);
   const [obstacles, setObstacles]     = useState(3);
@@ -282,6 +287,8 @@ export default function AtelierClient({ sessionStep, shareBase, homeHref, onSave
               obstacleSize={obstacleSize} setObstacleSize={setObstacleSize}
               rules={rules} setRules={setRules}
               onLaunch={next}
+              defaultThreshold={seuil}
+              cadeau={cadeau}
             />
           </div>
         );

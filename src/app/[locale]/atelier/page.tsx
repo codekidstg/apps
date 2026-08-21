@@ -15,10 +15,10 @@ export default async function AtelierPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ session?: string }>;
+  searchParams: Promise<{ session?: string; seuil?: string; cadeau?: string; vaisseau?: string }>;
 }) {
   const { locale }  = await params;
-  const { session } = await searchParams;
+  const { session, seuil, cadeau, vaisseau } = await searchParams;
   const supabase    = await createClient();
 
   // Détermine le lien d'accueil selon le rôle de l'utilisateur connecté
@@ -76,6 +76,9 @@ export default async function AtelierPage({
       shareBase={shareBase}
       homeHref={homeHref}
       onSave={savePlayer}
+      seuil={seuil ? parseInt(seuil, 10) : undefined}
+      cadeau={cadeau}
+      vaisseau={vaisseau}
     />
   );
 }
