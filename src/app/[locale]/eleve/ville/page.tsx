@@ -115,7 +115,7 @@ export default async function VillePage() {
 
       {/* Carte plein écran */}
       <Suspense fallback={<div className="w-full h-64 rounded-2xl animate-pulse" style={{ background: "#1e293b" }} />}>
-        <VillageMapClient progress={villageProgress} kodiMessage={kodiMessage} />
+        <VillageMapClient progress={villageProgress} kodiMessage={kodiMessage} themeIds={EXPLORER_THEME_IDS} />
       </Suspense>
 
       {/* Statuts des quartiers */}

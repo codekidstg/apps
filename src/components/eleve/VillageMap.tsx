@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 export type ThemeProgress = {
   theme1: 0 | 1 | 2;
@@ -56,6 +57,14 @@ const FIREFLIES: [number, number, number, number][] = [
 
 // Couleurs des voitures
 const CAR_COLORS = ["#ef4444","#3b82f6","#f59e0b","#10b981","#a78bfa","#ec4899"];
+
+// Ce que Kodi dit quand le quartier est encore verrouillé — narratif + actionnable
+const UNLOCK_HINT: Record<string, string> = {
+  theme2: "Finis les Routes du Village et le Griot se réveillera.",
+  theme3: "Le Griot doit chanter avant que la Bibliothèque n'ouvre.",
+  theme4: "Lis à la Bibliothèque avant de frapper au Palais.",
+  theme5: "Le Palais doit te reconnaître avant la Galerie.",
+};
 
 // ─── Sous-composants ────────────────────────────────────────────────────────
 
@@ -177,16 +186,27 @@ function Firework({ x, y, color }: { x:number; y:number; color:string }) {
 export default function VillageMap({
   progress,
   kodiMessage,
+  themeIds,
+  locale = "fr",
 }: {
   progress: ThemeProgress;
   kodiMessage?: string;
+  /** UUID des 5 thèmes Explorer, dans l'ordre theme1…theme5. Sans eux, l'entrée reste décorative. */
+  themeIds?: string[];
+  locale?: string;
 }) {
+  const router = useRouter();
+
   // Avatar free movement — tous les refs pour éviter stale closure dans le RAF loop
   const keysRef    = useRef<Set<string>>(new Set());
   const posRef     = useRef({ x: SPOTS[0].x, y: SPOTS[0].y - 32 });
   const rafRef     = useRef<number>(0);
   const facingRef  = useRef<"left"|"right">("right");
   const nearRef    = useRef<number | null>(null);
+  /** Bloque le déplacement + double déclenchement pendant le portail */
+  const busyRef    = useRef(false);
+  /** Pont entre le RAF loop et enterSpot(), qui a besoin des state courants */
+  const enterRef   = useRef<(i: number) => void>(() => {});
 
   const [avatarPos, setAvatarPos] = useState({ x: SPOTS[0].x, y: SPOTS[0].y - 32 });
   const [facing,    setFacing]    = useState<"left"|"right">("right");
@@ -194,6 +214,13 @@ export default function VillageMap({
   // Bubble + nearby spot
   const [bubble,    setBubble]    = useState<string | null>(kodiMessage ?? null);
   const [nearSpot,  setNearSpot]  = useState<number | null>(null);
+
+  // Entrée dans un quartier : portail ouvert, ou refus
+  const [portal,  setPortal]  = useState<number | null>(null);
+  /** Bâtiment refusé — pilote la secousse + le cadenas, retombe après 0,7 s */
+  const [refused, setRefused] = useState<number | null>(null);
+  /** Le message affiché est un refus — vit aussi longtemps que la bulle */
+  const [denyMsg, setDenyMsg] = useState(false);
 
   // Traffic light phase (0=green,1=yellow,2=red)
   const [tlPhase, setTlPhase] = useState(0);
@@ -212,35 +239,52 @@ export default function VillageMap({
 
   // Arrow key movement loop
   useEffect(() => {
+    // Les lettres sont normalisées en minuscule : sinon un « a » enfoncé puis
+    // Shift relâche un « A » qui ne supprime jamais le « a » — l'avatar part tout seul.
+    const norm = (k: string) => (k.length === 1 ? k.toLowerCase() : k);
+    const WATCHED = ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","w","a","s","d","e"," ","Enter"];
+
     const onDown = (e: KeyboardEvent) => {
-      keysRef.current.add(e.key);
-      if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","e","E"].includes(e.key))
-        e.preventDefault();
+      const k = norm(e.key);
+      keysRef.current.add(k);
+      if (WATCHED.includes(k)) e.preventDefault();
     };
-    const onUp = (e: KeyboardEvent) => keysRef.current.delete(e.key);
+    const onUp = (e: KeyboardEvent) => keysRef.current.delete(norm(e.key));
+    // Perdre le focus (Cmd-Tab, changement d'onglet) n'envoie aucun keyup :
+    // sans ça l'avatar continuerait de courir indéfiniment.
+    const release = () => keysRef.current.clear();
+
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup",   onUp);
+    window.addEventListener("blur",    release);
+    document.addEventListener("visibilitychange", release);
 
     const SPEED = 2.5;
     const loop = () => {
       const k = keysRef.current;
+
+      // Pendant le portail, l'avatar est figé — plus aucune entrée n'est lue
+      if (busyRef.current) {
+        rafRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
       let { x, y } = posRef.current;
       let moved = false;
       let newFacing: "left"|"right" = facingRef.current;
 
-      if (k.has("ArrowUp")    || k.has("w") || k.has("W")) { y -= SPEED; moved = true; }
-      if (k.has("ArrowDown")  || k.has("s") || k.has("S")) { y += SPEED; moved = true; }
-      if (k.has("ArrowLeft")  || k.has("a") || k.has("A")) { x -= SPEED; moved = true; newFacing = "left"; }
-      if (k.has("ArrowRight") || k.has("d") || k.has("D")) { x += SPEED; moved = true; newFacing = "right"; }
+      if (k.has("ArrowUp")    || k.has("w")) { y -= SPEED; moved = true; }
+      if (k.has("ArrowDown")  || k.has("s")) { y += SPEED; moved = true; }
+      if (k.has("ArrowLeft")  || k.has("a")) { x -= SPEED; moved = true; newFacing = "left"; }
+      if (k.has("ArrowRight") || k.has("d")) { x += SPEED; moved = true; newFacing = "right"; }
 
       x = Math.max(28, Math.min(772, x));
       y = Math.max(162, Math.min(465, y));
 
-      // Find nearby spot
+      // Quartier à portée — verrouillé compris, pour pouvoir expliquer le refus
       let near: number | null = null;
       for (let i = 0; i < SPOTS.length; i++) {
         const s = SPOTS[i];
-        if (progress[s.id] === 0 && i !== 0) continue;
         const dx = x - s.x, dy = y - (s.y - 32);
         if (Math.sqrt(dx*dx + dy*dy) < 55) { near = i; break; }
       }
@@ -258,12 +302,10 @@ export default function VillageMap({
         setFacing(newFacing);
       }
 
-      // E / Space to enter nearby spot
-      if ((k.has("e") || k.has("E") || k.has(" ")) && near !== null) {
-        k.delete("e"); k.delete("E"); k.delete(" ");
-        const s = SPOTS[near];
-        setBubble(s.label);
-        setTimeout(() => setBubble(null), 3000);
+      // Entrée / E / Espace pour franchir le seuil
+      if ((k.has("Enter") || k.has("e") || k.has(" ")) && near !== null) {
+        k.delete("Enter"); k.delete("e"); k.delete(" ");
+        enterRef.current(near);
       }
 
       rafRef.current = requestAnimationFrame(loop);
@@ -293,6 +335,11 @@ export default function VillageMap({
 
   const skyTx = `translate(${mouse.x * -10}, ${mouse.y * -7})`;
   const treeTx = `translate(${mouse.x * -5}, ${mouse.y * -4})`;
+
+  // Le RAF loop appelle enterSpot via ce ref, réassigné à chaque rendu pour rester frais
+  enterRef.current = enterSpot;
+
+  const nearLocked = nearSpot !== null && progress[SPOTS[nearSpot].id] === 0 && nearSpot !== 0;
 
   return (
     <div
@@ -386,6 +433,10 @@ export default function VillageMap({
             @keyframes vBlink   { 0%,96%,100%{opacity:1} 97%{opacity:.2} }
             @keyframes vCloud   { 0%{opacity:0} 5%,90%{opacity:.85} 100%{opacity:0} }
             @keyframes vNudge   { 0%,100%{transform:translateX(0)} 50%{transform:translateX(2px)} }
+            @keyframes vShake   { 0%,100%{transform:translateX(0)} 15%{transform:translateX(-5px)} 30%{transform:translateX(5px)} 45%{transform:translateX(-4px)} 60%{transform:translateX(4px)} 80%{transform:translateX(-2px)} }
+            @keyframes vDeny    { 0%{transform:scale(.6);opacity:0} 25%{transform:scale(1.25);opacity:1} 60%{transform:scale(1);opacity:1} 100%{transform:scale(1);opacity:0} }
+            @keyframes vReady   { 0%,100%{transform:translateY(0);opacity:.9} 50%{transform:translateY(-3px);opacity:1} }
+            @keyframes vPortalT { 0%{opacity:0;transform:scale(.85)} 45%{opacity:1;transform:scale(1)} 100%{opacity:1;transform:scale(1)} }
             .vMove { transition:transform 0.05s linear; }
             .vBtn  { cursor:pointer; }
             .vBtn:hover .vHover { opacity:1!important; }
@@ -684,7 +735,8 @@ export default function VillageMap({
 
         {/* ══════════ LAYER 12 — AVATAR ══════════ */}
         <g transform={`translate(${avatarPos.x},${avatarPos.y})`}
-          style={{ transition:"transform 0.04s linear" }}>
+          style={{ transition:"transform 0.04s linear",
+                   ...(refused !== null ? { animation:"vShake 0.5s ease-in-out" } : {}) }}>
           <ellipse cx={0} cy={27} rx={12} ry={4} fill="black" opacity={0.35} />
           <g style={{ animation:"vBob 2.2s ease-in-out infinite",
                       transform: facing==="left" ? "scaleX(-1)" : "scaleX(1)",
@@ -706,26 +758,55 @@ export default function VillageMap({
         </g>
 
         {/* ══════════ LAYER 13 — INTERACTION PROMPT ══════════ */}
-        {nearSpot !== null && !bubble && (
-          <g transform={`translate(${avatarPos.x},${avatarPos.y - 52})`}>
-            <rect x={-38} y={-14} width={76} height={22} rx={6} fill="#0f172a" stroke="#fbbf24" strokeWidth={1.5} />
-            <text x={0} y={3} textAnchor="middle" fill="#fef3c7" fontSize={8} fontFamily="system-ui" fontWeight="700">
-              [E] Entrer
+        {nearSpot !== null && !bubble && !portal && (
+          <g transform={`translate(${avatarPos.x},${avatarPos.y - 52})`}
+             style={{ animation:"vReady 1.6s ease-in-out infinite" }}>
+            <rect x={-46} y={-14} width={92} height={22} rx={6}
+              fill="#0f172a"
+              stroke={nearLocked ? "#64748b" : SPOTS[nearSpot].color}
+              strokeWidth={1.5} />
+            <text x={0} y={3} textAnchor="middle"
+              fill={nearLocked ? "#94a3b8" : "#fef3c7"}
+              fontSize={8} fontFamily="system-ui" fontWeight="700">
+              {nearLocked ? "🔒 Verrouillé" : "[Entrée] Entrer"}
             </text>
           </g>
         )}
 
-        {/* ══════════ LAYER 14 — SPEECH BUBBLE ══════════ */}
-        {bubble && (
-          <g transform={`translate(${avatarPos.x},${avatarPos.y - 72})`}>
-            <rect x={-74} y={-22} width={148} height={38} rx={10} fill="#0f172a" stroke="#f59e0b" strokeWidth={2} />
-            <polygon points="-6,16 6,16 0,27" fill="#0f172a" />
-            <polygon points="-4,16 4,16 0,25" fill="#f59e0b" />
-            <text x={0} y={3} textAnchor="middle" fill="#fef3c7" fontSize={9} fontFamily="system-ui" fontWeight="800">
-              {bubble.length>22 ? bubble.slice(0,22)+"…" : bubble}
-            </text>
+        {/* Refus : cadenas rouge qui claque sur le bâtiment */}
+        {refused !== null && (
+          <g transform={`translate(${SPOTS[refused].x},${SPOTS[refused].y - 46})`}
+             style={{ animation:"vDeny 0.7s ease-out forwards" }}>
+            <circle r={17} fill="#450a0a" stroke="#ef4444" strokeWidth={2.5} />
+            <rect x={-7} y={-4} width={14} height={11} rx={2} fill="#ef4444" />
+            <path d="M-4,-4 Q-4,-12 0,-12 Q4,-12 4,-4" fill="none" stroke="#ef4444" strokeWidth={2.2} strokeLinecap="round" />
           </g>
         )}
+
+        {/* ══════════ LAYER 14 — SPEECH BUBBLE ══════════ */}
+        {bubble && !portal && (() => {
+          const lines  = wrapText(bubble, 30);
+          const w      = 200;
+          const h      = 16 + lines.length * 13;
+          // La bulle reste dans le cadre même quand l'avatar longe un bord
+          const bx     = Math.max(w/2 + 6, Math.min(800 - w/2 - 6, avatarPos.x));
+          const tail   = Math.max(-w/2 + 14, Math.min(w/2 - 14, avatarPos.x - bx));
+          const accent = denyMsg ? "#ef4444" : "#f59e0b";
+          return (
+            <g transform={`translate(${bx},${avatarPos.y - 78 - lines.length*6})`}>
+              <rect x={-w/2} y={-h/2} width={w} height={h} rx={10}
+                fill="#0f172a" stroke={accent} strokeWidth={2} />
+              <polygon points={`${tail-6},${h/2} ${tail+6},${h/2} ${tail},${h/2+11}`} fill="#0f172a" />
+              <polygon points={`${tail-4},${h/2} ${tail+4},${h/2} ${tail},${h/2+9}`}  fill={accent} />
+              <text textAnchor="middle" fill="#fef3c7" fontSize={9}
+                fontFamily="system-ui" fontWeight="800">
+                {lines.map((ln,i) => (
+                  <tspan key={i} x={0} y={-h/2 + 17 + i*13}>{ln}</tspan>
+                ))}
+              </text>
+            </g>
+          );
+        })()}
 
         {/* ══════════ LEGEND + HINT ══════════ */}
         <rect x="0" y="474" width="800" height="26" fill="#060b24" opacity="0.92" />
@@ -741,21 +822,99 @@ export default function VillageMap({
           );
         })}
         <text x={790} y={487} textAnchor="end" fill="#475569" fontSize={8} fontFamily="system-ui">
-          ↑↓←→ déplacer · E entrer
+          ↑↓←→ déplacer · Entrée pour entrer
         </text>
+
+        {/* ══════════ LAYER 15 — PORTAIL D'ENTRÉE (au-dessus de tout) ══════════ */}
+        {portal !== null && (() => {
+          const s = SPOTS[portal];
+          const cy = s.y - 32;
+          return (
+            <g>
+              {/* Onde qui part du bâtiment */}
+              <circle cx={s.x} cy={cy} r={0} fill="none" stroke={s.color} strokeWidth={6} opacity={0.9}>
+                <animate attributeName="r" from="10" to="420" dur="0.55s" fill="freeze" />
+                <animate attributeName="opacity" from="0.9" to="0" dur="0.55s" fill="freeze" />
+              </circle>
+              {/* Le disque de couleur avale l'écran */}
+              <circle cx={s.x} cy={cy} r={0} fill={s.color}>
+                <animate attributeName="r" from="0" to="1000" dur="0.62s" begin="0.06s"
+                  fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.4 0 0.2 1" />
+              </circle>
+              {/* Voile sombre pour que le texte reste lisible */}
+              <circle cx={s.x} cy={cy} r={0} fill="#060b24" opacity={0.72}>
+                <animate attributeName="r" from="0" to="1000" dur="0.62s" begin="0.16s"
+                  fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.4 0 0.2 1" />
+              </circle>
+              {/* Nom du quartier franchi */}
+              <g style={{ animation:"vPortalT 0.5s ease-out 0.3s both" }}>
+                <text x={400} y={244} textAnchor="middle" fill={s.color}
+                  fontSize={13} fontFamily="system-ui" fontWeight="700" letterSpacing="3">
+                  TU ENTRES DANS
+                </text>
+                <text x={400} y={276} textAnchor="middle" fill="#f8fafc"
+                  fontSize={26} fontFamily="system-ui" fontWeight="900">
+                  {s.label}
+                </text>
+              </g>
+            </g>
+          );
+        })()}
       </svg>
     </div>
   );
 
   function enterSpot(idx: number) {
+    if (busyRef.current) return;
     const s = SPOTS[idx];
-    if (progress[s.id]===0 && idx!==0) return;
-    setBubble(s.label);
-    setTimeout(() => setBubble(null), 3000);
+    const locked = progress[s.id] === 0 && idx !== 0;
+
+    if (locked) {
+      // Refus : l'avatar recule et tremble, Kodi explique quoi faire pour ouvrir
+      busyRef.current = true;
+      setRefused(idx);
+      setDenyMsg(true);
+      setBubble(UNLOCK_HINT[s.id] ?? "Ce quartier dort encore.");
+      const p = posRef.current;
+      posRef.current = { x: p.x, y: Math.min(465, p.y + 16) };
+      setAvatarPos(posRef.current);
+      window.setTimeout(() => { busyRef.current = false; setRefused(null); }, 700);
+      window.setTimeout(() => { setBubble(null); setDenyMsg(false); }, 4500);
+      return;
+    }
+
+    // Ouvert : le portail avale l'écran, puis on entre dans le thème
+    const dest = themeIds?.[idx];
+    busyRef.current = true;
+    setBubble(null);
+    setDenyMsg(false);
+    setPortal(idx);
+    window.setTimeout(() => {
+      if (dest) {
+        router.push(`/${locale}/eleve/theme/${dest}`);
+      } else {
+        // Pas d'ID fourni : on rouvre la carte plutôt que de laisser l'écran plein
+        busyRef.current = false;
+        setPortal(null);
+      }
+    }, 780);
   }
 }
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────
+
+/** Découpe un message en lignes de `max` caractères, sans couper les mots. */
+function wrapText(t: string, max: number): string[] {
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of t.split(" ")) {
+    if (!cur) { cur = w; continue; }
+    if ((cur + " " + w).length <= max) cur += " " + w;
+    else { lines.push(cur); cur = w; }
+  }
+  if (cur) lines.push(cur);
+  return lines.slice(0, 3);
+}
 
 function lerpColor(a: string, b: string, t: number): string {
   const pa = parseInt(a.slice(1),16), pb = parseInt(b.slice(1),16);

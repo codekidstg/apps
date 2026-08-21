@@ -159,7 +159,7 @@ export default async function EleveDashboard() {
       {studentLevel === "explorer" && (
         <div className="flex justify-center">
           <Suspense fallback={<div className="w-full h-48 rounded-2xl animate-pulse" style={{ background: "#1e293b" }} />}>
-            <VillageMapClient progress={villageProgress} kodiMessage={kodiMessage} />
+            <VillageMapClient progress={villageProgress} kodiMessage={kodiMessage} themeIds={EXPLORER_THEME_IDS} />
           </Suspense>
         </div>
       )}
