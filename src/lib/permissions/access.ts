@@ -20,15 +20,21 @@ const getRoleConfig = unstable_cache(
       .select("page_key, allowed")
       .eq("role", role);
 
-    if (!data || data.length === 0) {
-      await seedRoleDefaults(role);
-      return Object.fromEntries(
-        (PAGES_BY_ROLE[role] ?? []).map(p => [p.key, true])
-      );
-    }
-    return Object.fromEntries(
-      (data as { page_key: string; allowed: boolean }[]).map(r => [r.page_key, r.allowed])
-    );
+    const rows  = (data ?? []) as { page_key: string; allowed: boolean }[];
+    const pages = PAGES_BY_ROLE[role] ?? [];
+    const known = new Set(rows.map(r => r.page_key));
+
+    // Une page ajoutée au registre après coup n'a pas encore de ligne en base.
+    // On la sème (ignoreDuplicates préserve les choix existants) pour qu'elle
+    // apparaisse dans /admin/droits avec un vrai toggle.
+    if (pages.some(p => !known.has(p.key))) await seedRoleDefaults(role);
+
+    // Défaut « activé », puis la base a le dernier mot. Sans ce défaut, toute
+    // nouvelle page resterait invisible partout jusqu'à activation manuelle —
+    // et l'UI de /admin/droits, elle, l'affiche déjà comme activée (`?? true`).
+    const config: Record<string, boolean> = Object.fromEntries(pages.map(p => [p.key, true]));
+    for (const r of rows) config[r.page_key] = r.allowed;
+    return config;
   },
   ["role-nav-config"],
   { revalidate: 300, tags: ["nav-permissions"] }

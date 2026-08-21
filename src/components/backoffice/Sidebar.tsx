@@ -30,7 +30,7 @@ const adminNav: NavItem[] = [
       { label: "Trésorerie",   href: "/admin/compta/tresorerie", pageKey: "admin.compta.tresorerie" },
     ],
   },
-  { label: "Démo parent",      href: "/admin/demo-parent",  icon: "🎟️", pageKey: "admin.demo_parent" },
+  { label: "Atelier",          href: "/admin/atelier",      icon: "🎓", pageKey: "admin.atelier" },
   { label: "Gestion des droits", href: "/admin/droits",     icon: "🔐", pageKey: "admin.droits" },
 ];
 
@@ -55,6 +55,7 @@ const managerNav: NavItem[] = [
       { label: "Trésorerie",   href: "/manager/compta/tresorerie", pageKey: "manager.compta.tresorerie" },
     ],
   },
+  { label: "Atelier",         href: "/atelier/animateur",    icon: "🎓", pageKey: "manager.atelier" },
 ];
 
 const teacherNav: NavItem[] = [
@@ -64,6 +65,7 @@ const teacherNav: NavItem[] = [
   { label: "Mes cours",       href: "/prof/cours",        icon: "📚", pageKey: "teacher.cours" },
   { label: "Mes classes",     href: "/prof/classes",      icon: "👨‍🏫", pageKey: "teacher.classes" },
   { label: "Certificats",     href: "/prof/certificats",  icon: "🎓", pageKey: "teacher.certificats" },
+  { label: "Atelier",         href: "/atelier/animateur", icon: "🎓", pageKey: "teacher.atelier" },
 ];
 
 const roleLabel: Record<string, string> = {

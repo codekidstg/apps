@@ -3,6 +3,14 @@
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { revalidateTag } from "next/cache";
 
+/**
+ * Écritures partagées sur les droits de navigation.
+ *
+ * Deux écrans les utilisent — /admin/droits (matrice complète) et /admin/atelier
+ * (bloc animateurs). Ils doivent écrire dans les mêmes tables et invalider le
+ * même cache, sinon les deux vues divergent.
+ */
+
 async function requireAdmin() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -12,6 +20,7 @@ async function requireAdmin() {
   return user;
 }
 
+/** Active/désactive une page pour tout un rôle. */
 export async function toggleRolePage(role: string, pageKey: string, allowed: boolean) {
   const user = await requireAdmin();
   if (!user) return { error: "Non autorisé" };
@@ -27,6 +36,7 @@ export async function toggleRolePage(role: string, pageKey: string, allowed: boo
   return { success: true };
 }
 
+/** Surcharge individuelle. `allowed: null` supprime la surcharge → retour à l'héritage du rôle. */
 export async function setUserPageOverride(
   userId: string,
   pageKey: string,
@@ -38,7 +48,6 @@ export async function setUserPageOverride(
   const admin = createAdminClient();
 
   if (allowed === null) {
-    // Remove override → inherit from role
     const { error } = await (admin.from("user_nav_overrides") as any)
       .delete()
       .eq("user_id", userId)
@@ -60,7 +69,7 @@ export async function seedAllRoleDefaults() {
   const user = await requireAdmin();
   if (!user) return { error: "Non autorisé" };
 
-  const { PAGES_BY_ROLE } = await import("@/lib/permissions/registry");
+  const { PAGES_BY_ROLE } = await import("./registry");
   const admin = createAdminClient();
 
   for (const [role, pages] of Object.entries(PAGES_BY_ROLE)) {

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { PAGES_BY_ROLE } from "@/lib/permissions/registry";
-import { toggleRolePage, setUserPageOverride, seedAllRoleDefaults } from "./actions";
+import { toggleRolePage, setUserPageOverride, seedAllRoleDefaults } from "@/lib/permissions/actions";
 
 type RoleConfigs   = Record<string, Record<string, boolean>>;
 type UserOverrides = Record<string, Record<string, boolean>>;

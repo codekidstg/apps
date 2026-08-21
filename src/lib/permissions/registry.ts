@@ -37,7 +37,7 @@ export const NAV_PAGES: NavPageDef[] = [
   { role: "admin", key: "admin.compta.mentors",           label: "↳ Mentors",        href: "/admin/compta/mentors",            parentKey: "admin.compta" },
   { role: "admin", key: "admin.compta.parents",           label: "↳ Parents",        href: "/admin/compta/parents",            parentKey: "admin.compta" },
   { role: "admin", key: "admin.compta.tresorerie",        label: "↳ Trésorerie",     href: "/admin/compta/tresorerie",         parentKey: "admin.compta" },
-  { role: "admin", key: "admin.demo_parent",              label: "Démo parent",      href: "/admin/demo-parent",               icon: "🎟️" },
+  { role: "admin", key: "admin.atelier",                  label: "Atelier",          href: "/admin/atelier",                   icon: "🎓" },
   { role: "admin", key: "admin.droits",                   label: "Gestion des droits", href: "/admin/droits",                  icon: "🔐" },
 
   // ── Manager ──────────────────────────────────────────────────────────────────
@@ -53,6 +53,7 @@ export const NAV_PAGES: NavPageDef[] = [
   { role: "manager", key: "manager.compta.mentors",           label: "↳ Mentors",        href: "/manager/compta/mentors",            parentKey: "manager.compta" },
   { role: "manager", key: "manager.compta.parents",           label: "↳ Parents",        href: "/manager/compta/parents",            parentKey: "manager.compta" },
   { role: "manager", key: "manager.compta.tresorerie",        label: "↳ Trésorerie",     href: "/manager/compta/tresorerie",         parentKey: "manager.compta" },
+  { role: "manager", key: "manager.atelier",                  label: "Atelier",          href: "/atelier/animateur",                 icon: "🎓" },
 
   // ── Teacher ──────────────────────────────────────────────────────────────────
   { role: "teacher", key: "teacher.dashboard",    label: "Tableau de bord",  href: "/prof",             icon: "◈" },
@@ -61,6 +62,7 @@ export const NAV_PAGES: NavPageDef[] = [
   { role: "teacher", key: "teacher.cours",        label: "Mes cours",        href: "/prof/cours",       icon: "📚" },
   { role: "teacher", key: "teacher.classes",      label: "Mes classes",      href: "/prof/classes",     icon: "👨‍🏫" },
   { role: "teacher", key: "teacher.certificats",  label: "Certificats",      href: "/prof/certificats", icon: "🎓" },
+  { role: "teacher", key: "teacher.atelier",      label: "Atelier",          href: "/atelier/animateur", icon: "🎓" },
 ];
 
 export const PAGES_BY_ROLE: Record<string, NavPageDef[]> = {
