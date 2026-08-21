@@ -136,12 +136,23 @@ export async function syncBlockProgress(lessonId: string, blockProgress: Record<
   if (!studentId) return { error: "Élève introuvable" };
 
   try {
-    await (supabase.from("lesson_progress") as any).upsert({
+    const { data: existing } = await (supabase.from("lesson_progress") as any)
+      .select("status")
+      .eq("student_id", studentId)
+      .eq("lesson_id", lessonId)
+      .maybeSingle();
+
+    const payload: Record<string, unknown> = {
       student_id:     studentId,
       lesson_id:      lessonId,
-      status:         "in_progress",
       block_progress: blockProgress,
-    }, { onConflict: "student_id,lesson_id" });
+    };
+    // Relire une leçon déjà terminée ne doit pas la rétrograder : le déverrouillage
+    // des leçons suivantes dépend du statut "completed" de la précédente.
+    if (existing?.status !== "completed") payload.status = "in_progress";
+
+    await (supabase.from("lesson_progress") as any)
+      .upsert(payload, { onConflict: "student_id,lesson_id" });
   } catch (_) { /* La colonne block_progress n'existe peut-être pas encore */ }
 
   return { success: true };
