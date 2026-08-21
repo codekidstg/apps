@@ -1,14 +1,7 @@
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import AtelierClient from "./AtelierClient";
-
-const ROLE_HOME: Record<string, string> = {
-  student: "/eleve",
-  teacher: "/prof",
-  admin:   "/admin",
-  parent:  "/suivi",
-  manager: "/manager",
-};
+import { homeHrefFor } from "./roleHome";
 
 export default async function AtelierPage({
   params,
@@ -30,8 +23,7 @@ export default async function AtelierPage({
       .select("role")
       .eq("id", user.id)
       .single<{ role: string }>();
-    const dest = ROLE_HOME[profile?.role ?? ""];
-    if (dest) homeHref = `/${locale}${dest}`;
+    homeHref = homeHrefFor(profile?.role, locale);
   }
 
   // Récupère l'étape courante de la session mentor (si code fourni)

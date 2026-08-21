@@ -194,8 +194,9 @@ const COLORS: Record<string, { bg: string; border: string; badge: string; text: 
   blue:   { bg: "bg-blue-950/40",   border: "border-blue-500",   badge: "bg-blue-500/20 text-blue-300",     text: "text-blue-400",   card: "bg-blue-900/20 border-blue-800/40" },
 };
 
-export default function LeconClient() {
+export default function LeconClient({ homeHref }: { homeHref: string }) {
   const router = useRouter();
+  const [confirmSortie, setConfirmSortie] = useState(false);
   const [idx, setIdx]               = useState(0);
   const [answered, setAnswered]     = useState<number | null>(null);
   const [cadeauNom, setCadeauNom]   = useState("");
@@ -227,11 +228,46 @@ export default function LeconClient() {
   return (
     <div className="min-h-screen bg-[#030712] text-white flex flex-col">
 
+      {/* Confirmation de sortie — rien n'est sauvegardé, on prévient avant de perdre */}
+      {confirmSortie && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center px-4"
+             onClick={() => setConfirmSortie(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full space-y-4 text-center"
+               onClick={e => e.stopPropagation()}>
+            <div className="text-4xl">👋</div>
+            <h2 className="text-lg font-black text-white">Quitter la leçon ?</h2>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Ta progression n&apos;est pas enregistrée. Si tu sors maintenant,
+              tu devras tout recommencer depuis le début.
+            </p>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setConfirmSortie(false)}
+                className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-400 text-white font-black rounded-xl text-sm transition-colors">
+                Rester
+              </button>
+              <button onClick={() => router.push(homeHref)}
+                className="flex-1 py-2.5 border border-slate-600 hover:bg-slate-800 text-slate-300 font-black rounded-xl text-sm transition-colors">
+                Sortir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="border-b border-slate-800 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🚀</span>
-          <span className="font-black text-white text-sm">Avant l'atelier</span>
+        <div className="flex items-center gap-3">
+          {/* Sortie : sur l'intro il n'y a rien à perdre, ensuite on confirme */}
+          <button
+            onClick={() => (idx === 0 ? router.push(homeHref) : setConfirmSortie(true))}
+            className="text-slate-500 hover:text-white text-xs font-bold px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-all"
+            title="Quitter la leçon">
+            🏠 <span className="hidden sm:inline">Quitter</span>
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🚀</span>
+            <span className="font-black text-white text-sm">Avant l&apos;atelier</span>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-xs font-bold text-yellow-400">⭐ {xp} XP</span>
