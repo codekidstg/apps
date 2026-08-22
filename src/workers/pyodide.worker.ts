@@ -63,7 +63,16 @@ def _codekids_input(prompt=""):
 builtins.input = _codekids_input
 `;
 
-type RunCtx = { code: string; tests?: string; inputs: string[]; seed: number };
+type RunCtx = {
+  code: string;
+  tests?: string;
+  inputs: string[];
+  seed: number;
+  /** Code exécuté avant celui de l'enfant — définit l'API d'un jeu, par exemple. */
+  prelude?: string;
+  /** Variables Python à renvoyer après exécution (sérialisées en JSON). */
+  collect?: string[];
+};
 const runs = new Map<string, RunCtx>();
 
 /** Traduction courte des erreurs que rencontre un débutant, ajoutée sous le message réel. */
@@ -118,6 +127,10 @@ async function execute(id: string, ctx: RunCtx) {
     `_rnd.seed(${ctx.seed})\n`
   );
 
+  // Le prélude tourne avant le code de l'enfant, à chaque rejeu, pour repartir d'un
+  // état de jeu propre.
+  if (ctx.prelude) await pyodide!.runPythonAsync(ctx.prelude);
+
   try {
     await pyodide!.runPythonAsync(ctx.code);
   } catch (err: unknown) {
@@ -155,17 +168,34 @@ async function execute(id: string, ctx: RunCtx) {
     }
   }
 
+  // Variables demandées par l'appelant — c'est ainsi qu'un jeu récupère,
+  // par exemple, la liste des déplacements produits par le code de l'enfant.
+  let collected: Record<string, unknown> | undefined;
+  if (ctx.collect?.length) {
+    collected = {};
+    for (const nom of ctx.collect) {
+      try {
+        const brut = await pyodide!.runPythonAsync(
+          `import json as _json\n_json.dumps(${nom})`
+        );
+        collected[nom] = JSON.parse(String(brut));
+      } catch { collected[nom] = null; }
+    }
+  }
+
   runs.delete(id);
-  postMessage({ id, type: "success", stdout: capturedOutput, stderr: stderr.join("\n") });
+  postMessage({ id, type: "success", stdout: capturedOutput, stderr: stderr.join("\n"), collected });
 }
 
 self.addEventListener("message", async (e: MessageEvent) => {
-  const { id, type, code, tests, value } = e.data as {
+  const { id, type, code, tests, value, prelude, collect } = e.data as {
     id: string;
     type?: "run" | "input" | "cancel";
     code?: string;
     tests?: string;
     value?: string;
+    prelude?: string;
+    collect?: string[];
   };
 
   try {
@@ -189,6 +219,8 @@ self.addEventListener("message", async (e: MessageEvent) => {
       tests,
       inputs: [],
       seed: Math.floor(Math.random() * 1_000_000),
+      prelude,
+      collect,
     };
     runs.set(id, ctx);
     await execute(id, ctx);
