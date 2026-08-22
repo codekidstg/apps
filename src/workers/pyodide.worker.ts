@@ -66,8 +66,43 @@ builtins.input = _codekids_input
 type RunCtx = { code: string; tests?: string; inputs: string[]; seed: number };
 const runs = new Map<string, RunCtx>();
 
+/** Traduction courte des erreurs que rencontre un débutant, ajoutée sous le message réel. */
+const INDICES: [RegExp, string][] = [
+  [/unterminated string literal/,                 "Il manque un guillemet pour fermer le texte."],
+  [/was never closed|unexpected EOF/,             "Il manque une parenthèse fermante."],
+  [/NameError: name '([^']+)' is not defined/,    "Python ne connaît pas ce mot. Vérifie l'orthographe."],
+  [/expected an indented block|unexpected indent|IndentationError/, "Le décalage au début de la ligne ne va pas."],
+  [/can only concatenate str/,                    "Tu colles un texte et un nombre. Transforme le nombre en texte avec str(...)."],
+  [/invalid literal for int/,                     "Ce texte ne peut pas devenir un nombre."],
+  [/ZeroDivisionError/,                           "Tu divises par zéro — c'est impossible."],
+  [/IndexError/,                                  "Tu demandes un élément qui n'existe pas dans la liste."],
+  [/KeyError/,                                    "Cette clé n'existe pas dans le dictionnaire."],
+  [/invalid syntax/,                              "Python n'a pas compris cette ligne. Regarde les guillemets, les parenthèses et les deux-points."],
+];
+
+/** Frames internes de Pyodide — sans intérêt pour l'élève, et effrayantes. */
+const INTERNE = /_pyodide|\/lib\/python\d/;
+
 function cleanError(msg: string): string {
-  return msg.replace(/File "<exec>", /g, "").replace(/\s+\^+\s*/g, "\n");
+  const lignes = msg.split("\n");
+  const gardees: string[] = [];
+
+  for (let i = 0; i < lignes.length; i++) {
+    const l = lignes[i];
+    if (/^\s*Traceback \(most recent call last\)/.test(l)) continue;
+    // Ligne de chevrons seule : elle pointait une frame interne qu'on vient d'ôter
+    if (/^\s*\^+\s*$/.test(l)) continue;
+    if (INTERNE.test(l)) {
+      // La ligne suivante est le code source de cette frame interne : on la saute aussi.
+      if (i + 1 < lignes.length && /^\s{2,}\S/.test(lignes[i + 1]) && !INTERNE.test(lignes[i + 1])) i++;
+      continue;
+    }
+    gardees.push(l.replace(/File "<exec>", /g, ""));
+  }
+
+  const propre = gardees.join("\n").replace(/\s+\^+\s*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  const indice = INDICES.find(([re]) => re.test(propre))?.[1];
+  return indice ? `${propre}\n\n💡 ${indice}` : propre;
 }
 
 async function execute(id: string, ctx: RunCtx) {
