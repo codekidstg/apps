@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 
 const CodeEditor = dynamic(() => import("./CodeEditor"), { ssr: false });
 
-type RunStatus = "idle" | "loading_pyodide" | "running" | "success" | "test_failed" | "error";
+type RunStatus = "idle" | "loading_pyodide" | "running" | "waiting_input" | "success" | "test_failed" | "error";
 
 type Props = {
   starterCode: string;
@@ -52,6 +52,11 @@ export default function PythonRunner({
   const [swReady, setSwReady]   = useState(false);
   const [dataWarning, setDataWarning] = useState(true); // show on first run
   const pendingRun = useRef(false);
+  // Saisie interactive : le programme est suspendu tant que l'enfant n'a pas répondu
+  const [inputPrompt, setInputPrompt] = useState<string | null>(null);
+  const [inputValue, setInputValue]   = useState("");
+  const runIdRef  = useRef<string | null>(null);
+  const inputRef  = useRef<HTMLInputElement | null>(null);
 
   // Register Service Worker for Pyodide cache
   useEffect(() => {
@@ -72,15 +77,27 @@ export default function PythonRunner({
     setErrMsg("");
     setHintMsg("");
     setPassed(false);
+    setInputPrompt(null);
+    setInputValue("");
 
     const worker = getWorker();
     const id = Math.random().toString(36).slice(2);
+    runIdRef.current = id;
 
     function handleMessage(e: MessageEvent) {
       if (e.data.id !== id) return;
 
       if (e.data.type === "loading") {
         setStatus("running");
+        return;
+      }
+
+      // Le programme réclame une saisie : on garde l'écoute, il n'est pas terminé
+      if (e.data.type === "input_request") {
+        setStdout(e.data.stdout as string);
+        setInputPrompt((e.data.prompt as string) || "…");
+        setStatus("waiting_input");
+        setTimeout(() => inputRef.current?.focus(), 50);
         return;
       }
 
@@ -109,8 +126,18 @@ export default function PythonRunner({
     }
 
     worker.addEventListener("message", handleMessage);
-    worker.postMessage({ id, code, tests: hiddenTests });
+    worker.postMessage({ id, type: "run", code, tests: hiddenTests });
   }, [code, hiddenTests, expectedOutput, onSuccess, status]);
+
+  function submitInput() {
+    const id = runIdRef.current;
+    if (!id || inputPrompt === null) return;
+    setStdout(prev => `${prev}${prev ? "\n" : ""}${inputPrompt}${inputValue}`);
+    setInputPrompt(null);
+    setStatus("running");
+    getWorker().postMessage({ id, type: "input", value: inputValue });
+    setInputValue("");
+  }
 
   function handleRunClick() {
     if (dataWarning) {
@@ -129,7 +156,7 @@ export default function PythonRunner({
     }
   }, [dataWarning, runCode]);
 
-  const isLoading = status === "loading_pyodide" || status === "running";
+  const isLoading = status === "loading_pyodide" || status === "running" || status === "waiting_input";
 
   return (
     <div className="space-y-3">
@@ -217,6 +244,32 @@ export default function PythonRunner({
               {hintMsg}
             </>
           ) : stdout}
+        </div>
+      )}
+
+      {/* Saisie interactive — le programme attend la réponse de l'enfant */}
+      {inputPrompt !== null && (
+        <div className="rounded-xl border border-emerald-700 bg-slate-900 p-3 space-y-2">
+          <div className="text-xs font-black text-emerald-400">⌨️ Ton programme te demande quelque chose</div>
+          <div className="flex items-center gap-2">
+            {inputPrompt !== "…" && (
+              <span className="font-mono text-sm text-slate-300 shrink-0">{inputPrompt}</span>
+            )}
+            <input
+              ref={inputRef}
+              value={inputValue}
+              onChange={e => setInputValue(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submitInput(); } }}
+              placeholder="Tape ta réponse puis Entrée"
+              className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 font-mono text-sm text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+            />
+            <button
+              onClick={submitInput}
+              className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-black px-4 py-2 rounded-lg transition-colors shrink-0"
+            >
+              Envoyer
+            </button>
+          </div>
         </div>
       )}
     </div>

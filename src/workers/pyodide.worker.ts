@@ -6,6 +6,7 @@ interface PyodideInterface {
   runPythonAsync(code: string): Promise<unknown>;
   setStdout(opts: { batched: (s: string) => void }): void;
   setStderr(opts: { batched: (s: string) => void }): void;
+  globals: { set: (k: string, v: unknown) => void; get: (k: string) => unknown };
 }
 
 const PYODIDE_URL = "https://cdn.jsdelivr.net/pyodide/v0.27.5/full/";
@@ -26,56 +27,139 @@ async function initPyodide() {
   await loadPromise;
 }
 
+/**
+ * `input()` interactif sans SharedArrayBuffer.
+ *
+ * Pyodide tourne dans un worker et `input()` est synchrone : impossible d'attendre
+ * la frappe de l'enfant depuis l'intérieur. On procède donc par rejeu — le code
+ * est relancé depuis le début à chaque réponse, avec la liste des réponses déjà
+ * données. Les programmes de ce niveau sont courts et Pyodide est déjà chargé,
+ * donc le rejeu est imperceptible.
+ *
+ * La graine de `random` est figée pour la durée d'une exécution : sans elle,
+ * « Devine le nombre » tirerait un nombre différent à chaque rejeu.
+ */
+const BOOTSTRAP = `
+import builtins, json, random as _rnd
+
+class _NeedInput(Exception):
+    pass
+
+_inputs = []
+_cursor = 0
+_last_prompt = ""
+
+def _codekids_input(prompt=""):
+    global _cursor, _last_prompt
+    if _cursor < len(_inputs):
+        v = _inputs[_cursor]
+        _cursor += 1
+        # Une seule ligne : le prompt et la réponse, comme dans un vrai terminal
+        print(f"{prompt}{v}")
+        return v
+    _last_prompt = prompt
+    raise _NeedInput()
+
+builtins.input = _codekids_input
+`;
+
+type RunCtx = { code: string; tests?: string; inputs: string[]; seed: number };
+const runs = new Map<string, RunCtx>();
+
+function cleanError(msg: string): string {
+  return msg.replace(/File "<exec>", /g, "").replace(/\s+\^+\s*/g, "\n");
+}
+
+async function execute(id: string, ctx: RunCtx) {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  pyodide!.setStdout({ batched: (s) => stdout.push(s) });
+  pyodide!.setStderr({ batched: (s) => stderr.push(s) });
+
+  // Réinjecte les réponses déjà données et refige la graine avant chaque rejeu
+  await pyodide!.runPythonAsync(
+    `_inputs = json.loads(${JSON.stringify(JSON.stringify(ctx.inputs))})\n` +
+    `_cursor = 0\n` +
+    `_rnd.seed(${ctx.seed})\n`
+  );
+
+  try {
+    await pyodide!.runPythonAsync(ctx.code);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("_NeedInput")) {
+      // Le programme réclame une saisie : on rend la main à l'interface
+      const prompt = String(pyodide!.globals.get("_last_prompt") ?? "");
+      postMessage({ id, type: "input_request", prompt, stdout: stdout.join("\n") });
+      return;
+    }
+    runs.delete(id);
+    postMessage({ id, type: "error", error: cleanError(msg) });
+    return;
+  }
+
+  const capturedOutput = stdout.join("\n");
+
+  // Tests cachés — `output` et `code` disponibles comme globales
+  if (ctx.tests) {
+    pyodide!.globals.set("output", capturedOutput);
+    pyodide!.globals.set("code", ctx.code);
+    try {
+      await pyodide!.runPythonAsync(ctx.tests);
+    } catch (testErr: unknown) {
+      const msg = testErr instanceof Error ? testErr.message : String(testErr);
+      if (msg.includes("AssertionError")) {
+        const hint = msg.split("AssertionError:").pop()?.trim() ?? "Pas encore correct, réessaie !";
+        runs.delete(id);
+        postMessage({ id, type: "test_failed", stdout: capturedOutput, hint });
+        return;
+      }
+      runs.delete(id);
+      postMessage({ id, type: "error", error: cleanError(msg) });
+      return;
+    }
+  }
+
+  runs.delete(id);
+  postMessage({ id, type: "success", stdout: capturedOutput, stderr: stderr.join("\n") });
+}
+
 self.addEventListener("message", async (e: MessageEvent) => {
-  const { id, code, tests } = e.data as {
+  const { id, type, code, tests, value } = e.data as {
     id: string;
-    code: string;
-    tests?: string; // hidden assert block appended after user code
+    type?: "run" | "input" | "cancel";
+    code?: string;
+    tests?: string;
+    value?: string;
   };
 
   try {
-    postMessage({ id, type: "loading" });
-    await initPyodide();
+    if (type === "cancel") { runs.delete(id); return; }
 
-    const stdout: string[] = [];
-    const stderr: string[] = [];
-    pyodide!.setStdout({ batched: (s) => stdout.push(s) });
-    pyodide!.setStderr({ batched: (s) => stderr.push(s) });
-
-    // Phase 1 — run user code
-    await pyodide!.runPythonAsync(code);
-    const capturedOutput = stdout.join("\n");
-
-    // Phase 2 — run hidden tests with `output` and `code` available as globals
-    if (tests) {
-      (pyodide as unknown as { globals: { set: (k: string, v: unknown) => void } })
-        .globals.set("output", capturedOutput);
-      (pyodide as unknown as { globals: { set: (k: string, v: unknown) => void } })
-        .globals.set("code", code);
-      try {
-        await pyodide!.runPythonAsync(tests);
-      } catch (testErr: unknown) {
-        const msg = testErr instanceof Error ? testErr.message : String(testErr);
-        // AssertionError = test échoué → message d'indice, pas d'erreur fatale
-        if (msg.includes("AssertionError")) {
-          const hint = msg.split("AssertionError:").pop()?.trim() ?? "Pas encore correct, réessaie !";
-          postMessage({ id, type: "test_failed", stdout: capturedOutput, hint });
-          return;
-        }
-        throw testErr; // autre erreur dans les tests → remonter normalement
-      }
+    if (type === "input") {
+      const ctx = runs.get(id);
+      if (!ctx) return;
+      ctx.inputs.push(value ?? "");
+      await execute(id, ctx);
+      return;
     }
 
-    postMessage({
-      id,
-      type: "success",
-      stdout: capturedOutput,
-      stderr: stderr.join("\n"),
-    });
+    // "run" (ou message sans type, pour compatibilité)
+    postMessage({ id, type: "loading" });
+    await initPyodide();
+    await pyodide!.runPythonAsync(BOOTSTRAP);
+
+    const ctx: RunCtx = {
+      code: code ?? "",
+      tests,
+      inputs: [],
+      seed: Math.floor(Math.random() * 1_000_000),
+    };
+    runs.set(id, ctx);
+    await execute(id, ctx);
   } catch (err: unknown) {
+    runs.delete(id);
     const msg = err instanceof Error ? err.message : String(err);
-    // Clean up Pyodide stack traces for kids
-    const clean = msg.replace(/File "<exec>", /g, "").replace(/\s+\^+\s*/g, "\n");
-    postMessage({ id, type: "error", error: clean });
+    postMessage({ id, type: "error", error: cleanError(msg) });
   }
 });
