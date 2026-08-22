@@ -10,6 +10,7 @@ import BlocklyMusic from "@/components/eleve/BlocklyMusicLoader";
 import dynamic from "next/dynamic";
 const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), { ssr: false });
 const PythonMaze   = dynamic(() => import("@/components/eleve/PythonMaze"), { ssr: false });
+const PythonArcade = dynamic(() => import("@/components/eleve/PythonArcade"), { ssr: false });
 
 type Block = {
   id: string;
@@ -405,6 +406,20 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
                     onXmlChange={(xml) => saveGameState(block.id, xml)}
                   />
                 </div>
+              );
+            }
+
+            // Bâtisseur : le jeu de l'atelier, mais c'est son code qui le règle
+            if (gameType === "python_arcade") {
+              return (
+                <PythonArcade
+                  key={block.id}
+                  config={cfg as any}
+                  done={done}
+                  onSolved={done ? () => {} : markDone}
+                  savedCode={gameStates[block.id] as string | undefined}
+                  onCodeChange={(c) => saveGameState(block.id, c)}
+                />
               );
             }
 
