@@ -22,8 +22,9 @@ export default async function AdminThemesPage({
   let query = supabase
     .from("themes")
     .select("*, profiles(display_name)")
-    .order("order_index", { ascending: true })
-    .order("title", { ascending: true });
+    // Grouper par niveau d'abord : sans ça les « T0 » des trois niveaux se mélangent
+    .order("level", { ascending: true })
+    .order("order_index", { ascending: true });
 
   if (status) query = query.eq("status", status);
 

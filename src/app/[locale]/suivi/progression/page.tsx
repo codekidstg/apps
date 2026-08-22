@@ -40,10 +40,11 @@ export default async function ProgressionPage({
       .eq("student_id", child.id),
     admin
       .from("themes")
-      .select("id, title, chapters(id, title, order_index, lessons(id, title, order_index))")
+      .select("id, title, order_index, chapters(id, title, order_index, lessons(id, title, order_index))")
       .eq("status", "published")
       .eq("level", childLevel)
-      .order("title"),
+      // Le parent suit une progression : l'ordre doit être celui du programme
+      .order("order_index"),
   ]);
 
   const progMap = new Map<string, { status: string; score?: number; attempts?: number }>(

@@ -24,7 +24,7 @@ export default async function AffectationsPage() {
       .select("id, scheduled_at, created_at, themes(title, level), classes(name), profiles!teacher_id(display_name)")
       .order("created_at", { ascending: false })
       .returns<Assignment[]>(),
-    supabase.from("themes").select("id, title, level").eq("status", "published").order("title"),
+    supabase.from("themes").select("id, title, level, order_index").eq("status", "published").order("level").order("order_index"),
     supabase.from("classes").select("id, name").order("name"),
     supabase.from("profiles").select("id, display_name").eq("role", "teacher").order("display_name"),
   ]);

@@ -56,7 +56,7 @@ export default async function ProfCoursPage() {
   // Thèmes publiés correspondant aux niveaux des élèves
   let themesQuery = (admin.from("themes") as any)
     .select(`
-      id, title, level,
+      id, title, level, order_index,
       chapters (
         id, title, order_index,
         lessons ( id, title, order_index, xp_reward )
@@ -64,7 +64,8 @@ export default async function ProfCoursPage() {
     `)
     .eq("status", "published")
     .in("level", levelStrings)
-    .order("title");
+    // L'ordre du programme est pédagogique, jamais alphabétique
+    .order("order_index");
   if (activatedThemeIds.length === 0) {
     // Aucun thème activé pour les élèves de ce prof → on force un résultat vide
     return (
@@ -111,22 +112,26 @@ export default async function ProfCoursPage() {
         const levelStr = LEVEL_MAP[levelNum];
         const colors   = LEVEL_COLORS[levelNum];
         const prog     = progressIndex.get(student.id) ?? new Map<string, ProgEntry>();
-        const studentThemes = themesByLevel.get(levelStr) ?? [];
+        const byIndex = (a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0);
+        const studentThemes = [...(themesByLevel.get(levelStr) ?? [])].sort(byIndex);
 
-        // Toutes les leçons de ce niveau
+        // Toutes les leçons de ce niveau, dans l'ordre du programme —
+        // c'est cet ordre qui détermine « où l'élève en est ».
         const allLessons = studentThemes.flatMap((t: any) =>
-          (t.chapters ?? []).flatMap((c: any) => c.lessons ?? [])
+          [...(t.chapters ?? [])].sort(byIndex).flatMap((c: any) =>
+            [...(c.lessons ?? [])].sort(byIndex)
+          )
         );
         const totalLessons = allLessons.length;
         const doneLessons  = allLessons.filter((l: any) => prog.get(l.id)?.status === "completed").length;
         const pct          = totalLessons > 0 ? Math.round((doneLessons / totalLessons) * 100) : 0;
 
-        // Dernière leçon active (la plus récente non terminée, ou la première non commencée)
+        // Où l'élève en est : la première leçon non terminée, dans l'ordre du programme.
+        // L'ancien tri se faisait sur completed_at, qui est nul tant qu'une leçon est en
+        // cours — il renvoyait donc une leçon au hasard.
         const lastActive = allLessons
           .map((l: any) => ({ ...l, entry: prog.get(l.id) }))
-          .filter((l: any) => l.entry && l.entry.status !== "completed")
-          .sort((a: any, b: any) => new Date(b.entry.completed_at).getTime() - new Date(a.entry.completed_at).getTime())[0]
-          ?? allLessons.find((l: any) => !prog.get(l.id)); // première pas commencée
+          .find((l: any) => l.entry?.status !== "completed");
 
         return (
           <div key={student.id} className="bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden">
