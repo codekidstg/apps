@@ -61,22 +61,48 @@ Recommencez avec `primt` au lieu de `print` → autre message, autre nom.
 **Deux erreurs, pas plus :** `SyntaxError` et `NameError`. Pas l'indentation, il n'y a pas
 encore de bloc indenté.
 
-### 35–55 min · Le cabinet de réparation
-Trois programmes cassés, il travaille **seul**. Vous observez.
+### 35–45 min · Repérer la ligne fautive
+Deux programmes cassés : il **clique** sur la ligne coupable. Rapide.
+Puis le jeu de mémoire sur les quatre mots de la séance, en respiration.
 
-**N'intervenez que s'il le demande.** S'il bloque plus d'une minute, une seule question :
-*« Qu'est-ce que le message te dit ? »* — jamais la réponse.
+### 45–58 min · Le cabinet de réparation — il répare pour de vrai
+Un programme à **deux bugs**, dans l'éditeur. Il corrige et relance jusqu'à ce que
+les trois lignes s'affichent.
 
-### 55–62 min · `print` et les virgules
-Court. Montrez `print("J'ai", 14, "ans")`. Faites-lui remarquer que Python ajoute
-les espaces tout seul.
+**C'est le moment décisif de la séance.** Vous observez, vous n'intervenez que s'il le
+demande. S'il bloque plus d'une minute, une seule question : *« Qu'est-ce que le message
+te dit ? »* — jamais la réponse.
 
-### 62–65 min · Récap et défi
+Les messages d'erreur affichent un indice en français sous le texte de Python. Laissez-le
+le lire seul avant de commenter.
+
+### 58–62 min · Sa carte de visite
+Trois lignes à lui : prénom, âge, métier rêvé. S'il va vite, le **défi bonus** l'attend
+juste en dessous — ne l'entamez pas s'il reste moins de cinq minutes.
+
+### 62–65 min · Récap et semaine
 Demandez-lui **oralement** : *« Qu'est-ce que tu sais faire maintenant que tu ne savais pas
 en arrivant ? »* Laissez-le répondre avec ses mots.
 
-Montrez-lui son entraînement dans **Mon Entraînement** : « Ta carte de visite parlante ».
-Dites-lui de la montrer à ses parents.
+Puis ouvrez **Mon Entraînement** avec lui et montrez-lui les cinq exercices de la semaine.
+
+---
+
+## Les entraînements de la semaine
+
+Cinq exercices, ~35 min au total. Donnez-lui le rythme, ne le laissez pas tout faire
+le premier soir.
+
+| Quand | Exercice | Durée |
+|---|---|---|
+| Lendemain | **Ça affiche quoi ?** — il prédit la sortie, sans machine si besoin | 5 min |
+| Milieu de semaine | **Ça marche ou ça plante ?** — six lignes à juger une par une | 7 min |
+| Fin de semaine | **Le message et le remède** — relier l'erreur au geste qui la répare | 6 min |
+| Veille de la séance 2 | **Le grand chantier** — cinq lignes, trois bugs | 12 min |
+| Quand il veut | **Ta carte de visite parlante** — le créatif, à montrer aux parents | 5 min |
+
+En début de séance 2, reprenez **Le grand chantier** : c'est le meilleur indicateur de
+ce qu'il a gardé.
 
 ---
 
