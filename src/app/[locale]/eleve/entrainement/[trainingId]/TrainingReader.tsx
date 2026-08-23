@@ -17,6 +17,7 @@ import { completeTraining } from "../../actions";
 
 const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), { ssr: false });
 const BlocklyKodi  = dynamic(() => import("@/components/eleve/BlocklyKodi"), { ssr: false });
+const PythonMaze   = dynamic(() => import("@/components/eleve/PythonMaze"), { ssr: false });
 
 type Block = { id: string; type: string; content: Record<string, unknown>; order_index: number };
 
@@ -67,6 +68,8 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
   // drag_to_bin : blockId-itemId → chosen binId
   const [dragResults,  setDragResults]  = useState<Record<string, { chosen: string; correct: boolean } | null>>({});
   const [dragSelected, setDragSelected] = useState<Record<string, string | null>>({});  // blockId → selected itemId
+  // python_maze : blockId → résolu
+  const [gameDone,     setGameDone]     = useState<Record<string, boolean>>({});
 
   const [completed, setCompleted]    = useState(false);
   const [xpGained, setXpGained]     = useState<number | null>(null);
@@ -75,11 +78,12 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
 
   const quizBlocks    = blocks.filter(b => b.type === "quiz");
   const codeBlocks    = blocks.filter(b => b.type === "code_challenge");
-  const blocklyBlocks = blocks.filter(b => b.type === "blockly_challenge");
+  const blocklyBlocks = blocks.filter(b => b.type === "blockly_challenge" && (b.content as any)?.game_type !== "python_maze");
   const fillBlocks    = blocks.filter(b => b.type === "fill_blank");
   const matchBlocks   = blocks.filter(b => b.type === "match");
   const swipeBlocks   = blocks.filter(b => b.type === "swipe_sort");
   const dragBlocks    = blocks.filter(b => b.type === "drag_to_bin");
+  const mazeBlocks    = blocks.filter(b => b.type === "blockly_challenge" && (b.content as any)?.game_type === "python_maze");
 
   // — Progression —
   const allQuizKeys = quizBlocks.flatMap(b => {
@@ -110,6 +114,8 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
   const totalDrag   = allDragKeys.length;
   const doneMatch   = matchBlocks.filter(b => matchDone[b.id]).length;
   const totalMatch  = matchBlocks.length;
+  const doneMaze    = mazeBlocks.filter(b => gameDone[b.id]).length;
+  const totalMaze   = mazeBlocks.length;
   const doneCode    = codeBlocks.filter(b => codeResults[b.id]).length;
   const doneBlockly = blocklyBlocks.filter(b => codeResults[b.id]).length;
 
@@ -120,13 +126,14 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
   const allSwipeDone  = totalSwipe === 0 || doneSwipe === totalSwipe;
   const allDragDone   = totalDrag === 0  || doneDrag  === totalDrag;
   const allMatchDone  = totalMatch === 0 || doneMatch === totalMatch;
+  const allMazeDone   = totalMaze === 0  || doneMaze  === totalMaze;
   const allCodeDone   = requiredCode.every(b => codeResults[b.id]);
   const allBlocklyDone = requiredBlockly.every(b => codeResults[b.id]);
-  const canFinish = allQuizDone && allFillDone && allSwipeDone && allDragDone && allMatchDone && allCodeDone && allBlocklyDone;
+  const canFinish = allQuizDone && allFillDone && allSwipeDone && allDragDone && allMatchDone && allMazeDone && allCodeDone && allBlocklyDone;
 
   // Progression globale pour la barre
-  const totalSteps = totalQuiz + totalFill + totalSwipe + totalDrag + totalMatch + requiredCode.length + requiredBlockly.length;
-  const doneSteps  = doneQuiz + doneFill + doneSwipe + doneDrag + doneMatch + doneCode + doneBlockly;
+  const totalSteps = totalQuiz + totalFill + totalSwipe + totalDrag + totalMatch + totalMaze + requiredCode.length + requiredBlockly.length;
+  const doneSteps  = doneQuiz + doneFill + doneSwipe + doneDrag + doneMatch + doneMaze + doneCode + doneBlockly;
   const progressPct = totalSteps > 0 ? Math.round((doneSteps / totalSteps) * 100) : 100;
 
   function computeScore() {
@@ -376,6 +383,20 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                   })}
                 </div>
               </div>
+            );
+          }
+
+          /* Labyrinthe piloté en Python. La contrainte de training_blocks n'autorise
+             pas de nouveau type : on le porte par blockly_challenge + game_type,
+             comme les leçons le font avec leurs jeux. */
+          if (block.type === "blockly_challenge" && (block.content as any)?.game_type === "python_maze") {
+            return (
+              <PythonMaze
+                key={block.id}
+                config={block.content as any}
+                done={!!gameDone[block.id]}
+                onSolved={() => setGameDone(g => ({ ...g, [block.id]: true }))}
+              />
             );
           }
 
