@@ -6,6 +6,7 @@ import { SuiviSidebarNav, SuiviBottomNav, type NavItem } from "./SuiviNav";
 import PushPermission from "@/components/PushPermission";
 import { getEffectiveNavPermissions } from "@/lib/permissions/access";
 import { PAGES_BY_ROLE } from "@/lib/permissions/registry";
+import { logout } from "@/app/[locale]/auth/actions";
 
 export default async function SuiviLayout({
   children,
@@ -63,7 +64,10 @@ export default async function SuiviLayout({
         <SuiviSidebarNav items={items} />
 
         <div className="p-4 border-t border-slate-800">
-          <form action={`/${locale}/auth/deconnexion`} method="POST">
+          {/* Server action partagée avec le back-office. Le formulaire postait
+              vers /auth/deconnexion, une route qui n'a jamais existé : le
+              parent tombait sur un 404 sans être déconnecté. */}
+          <form action={logout}>
             <button className="w-full text-xs font-bold text-slate-600 hover:text-slate-400 transition-colors">
               Déconnexion
             </button>
@@ -76,9 +80,22 @@ export default async function SuiviLayout({
         <Link href={`/${locale}/suivi`}>
           <Logo size={64} variant="white" />
         </Link>
-        <div className="text-right">
-          <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">Espace Parent</div>
-          <div className="text-xs font-bold text-slate-400 truncate max-w-[140px]">{profile?.display_name ?? "Parent"}</div>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">Espace Parent</div>
+            <div className="text-xs font-bold text-slate-400 truncate max-w-[110px]">{profile?.display_name ?? "Parent"}</div>
+          </div>
+          {/* La barre latérale est masquée sur téléphone : sans ce bouton, un
+              parent sur mobile n'avait aucun moyen de se déconnecter. */}
+          <form action={logout}>
+            <button
+              type="submit"
+              aria-label="Déconnexion"
+              className="w-9 h-9 shrink-0 rounded-xl border border-slate-700 text-slate-400 flex items-center justify-center text-base active:bg-slate-800 transition-colors"
+            >
+              ⏻
+            </button>
+          </form>
         </div>
       </div>
 
