@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   addTreasuryExpense, updateTreasuryExpense, deleteTreasuryExpense,
   addTreasuryIncome,  updateTreasuryIncome,  deleteTreasuryIncome,
+  deleteMentorPayment, deleteParentSessionPayment,
 } from "@/lib/compta/treasury";
 import type { TreasuryData, ManualLine } from "@/lib/compta/treasury";
 import { useRouter } from "next/navigation";
@@ -17,22 +18,69 @@ function fmtDate(iso: string) {
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-// ── Ligne auto (lecture seule) ─────────────────────────────────────────────
-function AutoLine({ name, label, date, amount, sign }: {
-  name: string; label: string; date: string; amount: number; sign: "+" | "−";
+// ── Ligne auto ─────────────────────────────────────────────────────────────
+// Lecture seule, sauf pour l'admin qui peut la supprimer. C'est un paiement
+// réel : la suppression change les totaux et ne se rattrape pas, d'où la
+// confirmation en deux temps plutôt que la croix immédiate des lignes saisies.
+function AutoLine({ id, name, label, date, amount, sign, kind, isAdmin, onDeleted }: {
+  id: string; name: string; label: string; date: string; amount: number;
+  sign: "+" | "−"; kind: "mentor" | "parent"; isAdmin?: boolean; onDeleted: () => void;
 }) {
+  const [confirming, setConfirming] = useState(false);
+  const [erreur, setErreur]         = useState<string | null>(null);
+  const [pending, start]            = useTransition();
   const color = sign === "+" ? "text-emerald-600" : "text-red-500";
+
+  function handleDelete() {
+    start(async () => {
+      const fn  = kind === "mentor" ? deleteMentorPayment : deleteParentSessionPayment;
+      const res = await fn(id);
+      if (res.error) { setErreur(res.error); setConfirming(false); return; }
+      onDeleted();
+    });
+  }
+
   return (
-    <div className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-50 last:border-0">
-      <div className="text-xs text-gray-400 font-semibold shrink-0 w-24 tabular-nums">{fmtDate(date)}</div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-gray-800 truncate">{name}</div>
-        <div className="text-[11px] text-gray-400 truncate">{label}</div>
+    <div className="border-b border-gray-50 last:border-0">
+      <div className="flex items-center gap-3 px-5 py-2.5">
+        <div className="text-xs text-gray-400 font-semibold shrink-0 w-24 tabular-nums">{fmtDate(date)}</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-gray-800 truncate">{name}</div>
+          <div className="text-[11px] text-gray-400 truncate">{label}</div>
+        </div>
+        <span className={`font-black text-sm shrink-0 tabular-nums ${color}`}>
+          {sign}{fmt(amount)}
+        </span>
+        <span className="text-[9px] font-black bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded shrink-0">AUTO</span>
+        {isAdmin && !confirming && (
+          <button
+            type="button"
+            onClick={() => { setErreur(null); setConfirming(true); }}
+            className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+            title="Supprimer cette ligne"
+          >
+            ×
+          </button>
+        )}
       </div>
-      <span className={`font-black text-sm shrink-0 tabular-nums ${color}`}>
-        {sign}{fmt(amount)}
-      </span>
-      <span className="text-[9px] font-black bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded shrink-0">AUTO</span>
+
+      {confirming && (
+        <div className="flex items-center justify-end gap-2 px-5 pb-2.5 -mt-1">
+          <span className="text-[11px] font-bold text-gray-500">Supprimer définitivement&nbsp;?</span>
+          <button type="button" onClick={() => setConfirming(false)}
+            className="px-2.5 py-1 rounded-lg border border-gray-200 text-[11px] font-bold text-gray-500 hover:bg-gray-100 transition-colors">
+            Annuler
+          </button>
+          <button type="button" onClick={handleDelete} disabled={pending}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-black text-white bg-red-500 transition-opacity ${pending ? "opacity-50" : "hover:opacity-90"}`}>
+            {pending ? "…" : "Supprimer"}
+          </button>
+        </div>
+      )}
+
+      {erreur && (
+        <div className="px-5 pb-2.5 -mt-1 text-[11px] font-bold text-red-500">{erreur}</div>
+      )}
     </div>
   );
 }
@@ -195,10 +243,12 @@ const PRESETS = [
 ] as const;
 
 // ── Section card ───────────────────────────────────────────────────────────
-function SectionCard({ title, total, autoLines, manualLines, type, sign, isAdmin }: {
+function SectionCard({ title, total, autoLines, autoKind, manualLines, type, sign, isAdmin }: {
   title: string;
   total: number;
   autoLines: { id: string; name: string; label: string; date: string; amount_fcfa: number }[];
+  /** Table d'origine des lignes auto — dit laquelle supprimer. */
+  autoKind: "mentor" | "parent";
   manualLines: ManualLine[];
   type: "expense" | "income";
   sign: "+" | "−";
@@ -228,7 +278,18 @@ function SectionCard({ title, total, autoLines, manualLines, type, sign, isAdmin
           </div>
         ) : (
           autoLines.map(l => (
-            <AutoLine key={l.id} name={l.name} label={l.label} date={l.date} amount={l.amount_fcfa} sign={sign} />
+            <AutoLine
+              key={l.id}
+              id={l.id}
+              name={l.name}
+              label={l.label}
+              date={l.date}
+              amount={l.amount_fcfa}
+              sign={sign}
+              kind={autoKind}
+              isAdmin={isAdmin}
+              onDeleted={() => router.refresh()}
+            />
           ))
         )}
       </div>
@@ -362,6 +423,7 @@ export default function TresorerieClient({ data, from, to, isAdmin }: Props) {
           title="🔴 Décaissements"
           total={data.totalOut}
           autoLines={data.mentorLines}
+          autoKind="mentor"
           manualLines={data.expenses}
           type="expense"
           sign="−"
@@ -371,6 +433,7 @@ export default function TresorerieClient({ data, from, to, isAdmin }: Props) {
           title="🟢 Encaissements"
           total={data.totalIn}
           autoLines={data.parentLines}
+          autoKind="parent"
           manualLines={data.incomes}
           type="income"
           sign="+"

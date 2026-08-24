@@ -145,6 +145,42 @@ export async function getTreasuryData(from: string, to: string): Promise<Treasur
   };
 }
 
+// ── Suppression des lignes auto (admin uniquement) ────────────────────────────
+
+/**
+ * Les lignes « AUTO » sont des paiements réels, pas des écritures de saisie :
+ * les effacer change les totaux de la période et n'est pas réversible. Seul un
+ * admin peut le faire — un manager voit la trésorerie mais n'y touche pas.
+ */
+async function requireAdminUser() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: profile } = await supabase
+    .from("profiles").select("role").eq("id", user.id).single<{ role: string }>();
+  return profile?.role === "admin" ? user : null;
+}
+
+export async function deleteMentorPayment(id: string) {
+  if (!await requireAdminUser()) return { error: "Réservé à l'administrateur" };
+  const admin = createAdminClient();
+  const { error } = await (admin.from("mentor_payments") as any).delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/compta/tresorerie");
+  revalidatePath("/manager/compta/tresorerie");
+  return { success: true };
+}
+
+export async function deleteParentSessionPayment(id: string) {
+  if (!await requireAdminUser()) return { error: "Réservé à l'administrateur" };
+  const admin = createAdminClient();
+  const { error } = await (admin.from("parent_session_payments") as any).delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/compta/tresorerie");
+  revalidatePath("/manager/compta/tresorerie");
+  return { success: true };
+}
+
 // ── CRUD dépenses manuelles ───────────────────────────────────────────────────
 
 export async function addTreasuryExpense(formData: FormData) {
