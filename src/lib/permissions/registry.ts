@@ -5,16 +5,23 @@ export interface NavPageDef {
   icon?: string;
   parentKey?: string;
   role: string;
+  /** Libellé court : la barre du bas, sur mobile, n'a pas la place du libellé complet. */
+  shortLabel?: string;
+  /** Éligible à la barre du bas (mobile), qui n'affiche que les destinations fréquentes. */
+  bottomNav?: boolean;
 }
 
 export const NAV_PAGES: NavPageDef[] = [
   // ── Parent ───────────────────────────────────────────────────────────────────
-  { role: "parent", key: "parent.dashboard",     label: "Tableau de bord",    href: "/suivi",                 icon: "🏠" },
-  { role: "parent", key: "parent.progression",   label: "Suivi progression",  href: "/suivi/progression",     icon: "📊" },
-  { role: "parent", key: "parent.entrainements", label: "Entraînements",      href: "/suivi/entrainements",   icon: "🏋️" },
-  { role: "parent", key: "parent.certificats",   label: "Certificats",        href: "/suivi/certificats",     icon: "🎓" },
-  { role: "parent", key: "parent.abonnement",    label: "Abonnement",         href: "/suivi/abonnement",      icon: "💳" },
-  { role: "parent", key: "parent.contact",       label: "Contact",            href: "/suivi/contact",         icon: "✉️" },
+  // L'espace parent est mobile first : chaque entrée porte son libellé court et
+  // dit si elle mérite une place dans la barre du bas.
+  { role: "parent", key: "parent.dashboard",     label: "Tableau de bord",    href: "/suivi",                 icon: "🏠", shortLabel: "Accueil",      bottomNav: true },
+  { role: "parent", key: "parent.progression",   label: "Suivi progression",  href: "/suivi/progression",     icon: "📊", shortLabel: "Progression",  bottomNav: true },
+  { role: "parent", key: "parent.entrainements", label: "Entraînements",      href: "/suivi/entrainements",   icon: "💪", shortLabel: "Entraînem.",   bottomNav: true },
+  { role: "parent", key: "parent.certificats",   label: "Certificats",        href: "/suivi/certificats",     icon: "🎓", shortLabel: "Certificats",  bottomNav: true },
+  { role: "parent", key: "parent.abonnement",    label: "Abonnement",         href: "/suivi/abonnement",      icon: "💳", shortLabel: "Abonnement" },
+  { role: "parent", key: "parent.consentement",  label: "Consentement",       href: "/suivi/consentement",    icon: "✅", shortLabel: "Consent." },
+  { role: "parent", key: "parent.contact",       label: "Contact",            href: "/suivi/contact",         icon: "✉️", shortLabel: "Contact",      bottomNav: true },
 
   // ── Élève ────────────────────────────────────────────────────────────────────
   { role: "student", key: "student.suivi",        label: "Suivi / Progression",    href: "/suivi/progression",     icon: "📊" },

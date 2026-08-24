@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import Logo from "@/components/Logo";
-import { SuiviSidebarNav, SuiviBottomNav } from "./SuiviNav";
+import { SuiviSidebarNav, SuiviBottomNav, type NavItem } from "./SuiviNav";
 import PushPermission from "@/components/PushPermission";
+import { getEffectiveNavPermissions } from "@/lib/permissions/access";
+import { PAGES_BY_ROLE } from "@/lib/permissions/registry";
 
 export default async function SuiviLayout({
   children,
@@ -26,6 +28,26 @@ export default async function SuiviLayout({
     .eq("id", user.id)
     .single<{ display_name: string }>();
 
+  // Le menu se construit à partir du registre filtré par les droits, comme
+  // celui du prof et du manager. Les pages elles-mêmes appliquent déjà
+  // requireParentPermission : un admin ou un manager qui visite /suivi voit
+  // donc exactement les entrées auxquelles le parent a droit.
+  const allowedKeys = await getEffectiveNavPermissions(user.id, "parent");
+  const items: NavItem[] = (PAGES_BY_ROLE["parent"] ?? [])
+    .filter(p => allowedKeys.has(p.key))
+    .map(p => ({
+      key:        p.key,
+      label:      p.label,
+      shortLabel: p.shortLabel ?? p.label,
+      icon:       p.icon ?? "•",
+      href:       `/${locale}${p.href}`,
+    }));
+
+  const bottomKeys = new Set(
+    (PAGES_BY_ROLE["parent"] ?? []).filter(p => p.bottomNav).map(p => p.key)
+  );
+  const bottomItems = items.filter(i => bottomKeys.has(i.key)).slice(0, 5);
+
   return (
     <div className="min-h-screen bg-[#0f172a] flex">
       {/* Sidebar — desktop only */}
@@ -38,7 +60,7 @@ export default async function SuiviLayout({
           <div className="text-xs font-bold text-slate-400 truncate">{profile?.display_name ?? "Parent"}</div>
         </div>
 
-        <SuiviSidebarNav locale={locale} />
+        <SuiviSidebarNav items={items} />
 
         <div className="p-4 border-t border-slate-800">
           <form action={`/${locale}/auth/deconnexion`} method="POST">
@@ -66,7 +88,7 @@ export default async function SuiviLayout({
       </main>
 
       {/* Bottom nav — mobile only */}
-      <SuiviBottomNav locale={locale} />
+      <SuiviBottomNav items={bottomItems} />
 
       {/* Push notifications — demande permission au parent */}
       <PushPermission />

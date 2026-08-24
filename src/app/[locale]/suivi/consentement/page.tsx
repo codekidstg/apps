@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireParentPermission } from "@/lib/permissions/parent";
 import ConsentForm from "./ConsentForm";
 
 export default async function ConsentementPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
+
+  await requireParentPermission(user.id, "parent.consentement");
 
   // Enfants liés
   const { data: links } = await (supabase.from("parent_children") as any)
