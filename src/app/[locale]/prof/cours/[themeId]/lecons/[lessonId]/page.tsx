@@ -39,12 +39,17 @@ export default async function ProfLessonPage({
     .order("order_index");
   const blocks = (blocksRaw ?? []) as Block[];
 
-  // Entraînements publiés liés à cette leçon
-  const { data: trainings } = await (admin.from("trainings") as any)
+  // Entraînements liés à cette leçon.
+  //
+  // Cette requête filtrait sur trainings.status, une colonne qui n'existe pas :
+  // Postgres rejetait tout, l'erreur n'était pas lue, et la liste est restée
+  // vide pour toutes les leçons depuis qu'elle a été écrite. L'ordre venait de
+  // created_at, c'est-à-dire de l'ordre de saisie — il suit le programme.
+  const { data: trainings, error: errTrainings } = await (admin.from("trainings") as any)
     .select("id, title, description, xp_reward")
     .eq("lesson_id", lessonId)
-    .eq("status", "published")
-    .order("created_at");
+    .order("order_index");
+  if (errTrainings) console.error("prof/cours — entraînements :", errTrainings.message);
 
   return (
     <div className="p-6 lg:p-10 bg-slate-950 min-h-screen">

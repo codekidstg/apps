@@ -408,7 +408,7 @@ const ENTRAINEMENTS = [
   {
     title: "Le total qui ment",
     description: "Trois pièces, trois places. Une seule combinaison donne le bon total.",
-    xp_reward: 30,
+    xp_reward: 35,
     blocks: [
       {
         type: "text",
