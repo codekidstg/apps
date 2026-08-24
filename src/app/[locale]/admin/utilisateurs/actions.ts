@@ -5,6 +5,30 @@ import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/supabase/types";
 import { sendWelcomeEmail } from "@/lib/email";
 
+/**
+ * Crée la ligne `students` d'un profil élève si elle manque.
+ *
+ * Le trigger d'inscription ne crée que le profil. Or `students` porte le niveau,
+ * l'XP, le prof assigné, et c'est son id — pas celui du profil — que référencent
+ * `parent_children` et `lesson_progress`. Sans cette ligne, l'élève n'apparaît
+ * ni dans la liste des élèves, ni dans les listes d'association.
+ */
+async function ensureStudentRow(
+  admin: ReturnType<typeof createAdminClient>,
+  profileId: string,
+  role: Role,
+) {
+  if (role !== "student") return;
+  const { data: existant } = await (admin.from("students") as any)
+    .select("id").eq("profile_id", profileId).maybeSingle();
+  if (existant) return;
+  await (admin.from("students") as any).insert({
+    profile_id: profileId,
+    level: "explorer",
+    level_num: 1,
+  });
+}
+
 export async function createUser(formData: FormData) {
   const email       = formData.get("email") as string;
   const password    = formData.get("password") as string;
@@ -34,6 +58,11 @@ export async function createUser(formData: FormData) {
     temp_password: password,
   }).eq("id", data.user.id);
 
+  // Un profil role=student ne suffit pas : tout le reste de l'application
+  // (progression, affectation d'un prof, lien parent, niveau) s'appuie sur la
+  // ligne `students`. Sans elle, l'élève est invisible partout.
+  await ensureStudentRow(admin, data.user.id, role || "student");
+
   // Envoyer email de bienvenue avec les identifiants
   try {
     await sendWelcomeEmail({ email, displayName, password, role: role || "student" });
@@ -52,6 +81,8 @@ export async function updateUserRole(userId: string, role: Role) {
   });
   if (error) return { error: error.message };
   await (admin.from("profiles") as any).update({ role }).eq("id", userId);
+  // Basculer quelqu'un en élève doit aussi lui créer sa ligne students
+  await ensureStudentRow(admin, userId, role);
   revalidatePath("/admin/utilisateurs");
   return { success: true };
 }
