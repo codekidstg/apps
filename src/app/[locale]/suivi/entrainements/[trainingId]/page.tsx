@@ -8,8 +8,20 @@ function BlockViewer({ block }: { block: Block }) {
   const raw = block.content as any;
 
   if (block.type === "text") {
+    // Les blocs de cours stockent du HTML dans content.html. Lire content.text
+    // renvoyait une chaîne vide : le parent voyait un encadré vide.
+    if (raw.html) {
+      return (
+        <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 sm:p-5">
+          {/* Même feuille de style que l'élève : le parent voit exactement
+              la mise en page que son enfant a sous les yeux. */}
+          <div className="lesson-prose text-sm"
+               dangerouslySetInnerHTML={{ __html: raw.html }} />
+        </div>
+      );
+    }
     return (
-      <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5">
+      <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 sm:p-5">
         {raw.title && <div className="font-black text-white mb-2">{raw.title}</div>}
         <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{raw.text ?? raw.body ?? ""}</p>
       </div>
@@ -17,30 +29,47 @@ function BlockViewer({ block }: { block: Block }) {
   }
 
   if (block.type === "quiz") {
-    const options: string[] = raw.options ?? [];
-    const correct: number   = raw.correct ?? 0;
+    // Le schéma réel est { questions: [{ question, choices, answer, explanation }] },
+    // avec une forme abrégée à une seule question. Lire options/correct ne
+    // renvoyait rien : le parent voyait un quiz sans réponses.
+    const questions: any[] = raw.questions ?? [{
+      question: raw.question, choices: raw.choices ?? raw.options,
+      answer: raw.answer ?? raw.correct, explanation: raw.explanation,
+    }];
     return (
-      <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 space-y-3">
-        <div className="text-xs font-black text-slate-400 uppercase tracking-widest">QCM</div>
-        <div className="font-bold text-white">{raw.question}</div>
-        <div className="space-y-2">
-          {options.map((opt, i) => (
-            <div
-              key={i}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold border ${
-                i === correct
-                  ? "bg-emerald-900/40 border-emerald-700 text-emerald-300"
-                  : "bg-slate-900/40 border-slate-700/50 text-slate-400"
-              }`}
-            >
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 ${i === correct ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-500"}`}>
-                {i === correct ? "✓" : String.fromCharCode(65 + i)}
-              </span>
-              {opt}
-            </div>
-          ))}
+      <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 sm:p-5 space-y-5">
+        <div className="text-xs font-black text-slate-400 uppercase tracking-widest">
+          QCM · {questions.length} question{questions.length > 1 ? "s" : ""}
         </div>
-        {raw.explanation && <div className="text-xs text-slate-400 italic border-l-2 border-slate-600 pl-3">💡 {raw.explanation}</div>}
+        {questions.map((q, qi) => {
+          const options: string[] = q.choices ?? [];
+          const correct: number   = q.answer ?? 0;
+          return (
+            <div key={qi} className="space-y-3">
+              <div className="font-bold text-white text-sm">{q.question}</div>
+              <div className="space-y-2">
+                {options.map((opt: string, i: number) => (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-3 px-4 py-2.5 rounded-xl text-sm font-bold border ${
+                      i === correct
+                        ? "bg-emerald-900/40 border-emerald-700 text-emerald-300"
+                        : "bg-slate-900/40 border-slate-700/50 text-slate-400"
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 ${i === correct ? "bg-emerald-700 text-white" : "bg-slate-700 text-slate-500"}`}>
+                      {i === correct ? "✓" : String.fromCharCode(65 + i)}
+                    </span>
+                    <span className="min-w-0 break-words">{opt}</span>
+                  </div>
+                ))}
+              </div>
+              {q.explanation && (
+                <div className="text-xs text-slate-400 italic border-l-2 border-slate-600 pl-3">💡 {q.explanation}</div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -136,6 +165,45 @@ function BlockViewer({ block }: { block: Block }) {
               {s.after}
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Exercice de code : le parent ne code pas, mais il doit voir ce qu'on demande
+  // à son enfant et sur quoi il bute. C'était le bloc le plus important et le
+  // seul qui n'était pas rendu.
+  if (block.type === "code_challenge") {
+    return (
+      <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 sm:p-5 space-y-3">
+        <div className="text-xs font-black text-slate-400 uppercase tracking-widest">💻 Exercice de code</div>
+        {raw.instructions && (
+          <p className="text-slate-200 text-sm leading-relaxed">{raw.instructions}</p>
+        )}
+        {raw.starter_code && (
+          <div>
+            <div className="text-[11px] font-bold text-slate-500 mb-1">Le programme de départ</div>
+            <pre className="bg-slate-950 border border-slate-800 rounded-xl p-3 overflow-x-auto text-xs font-mono text-amber-300 whitespace-pre">
+{raw.starter_code}
+            </pre>
+          </div>
+        )}
+        <div className="text-xs text-slate-500 italic border-l-2 border-slate-600 pl-3">
+          Votre enfant corrige ce programme dans l&apos;éditeur, puis le relance jusqu&apos;à ce qu&apos;il fonctionne.
+        </div>
+      </div>
+    );
+  }
+
+  // Labyrinthe piloté en Python (porté par blockly_challenge + game_type)
+  if (block.type === "blockly_challenge" || block.type === "python_maze") {
+    return (
+      <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 sm:p-5 space-y-2">
+        <div className="text-xs font-black text-slate-400 uppercase tracking-widest">🤖 Jeu de programmation</div>
+        <div className="font-bold text-white text-sm">{raw.title ?? "Guider le robot"}</div>
+        {raw.instructions && <p className="text-slate-300 text-sm leading-relaxed">{raw.instructions}</p>}
+        <div className="text-xs text-slate-500 italic border-l-2 border-slate-600 pl-3">
+          Votre enfant écrit un programme et regarde le robot traverser le labyrinthe.
         </div>
       </div>
     );

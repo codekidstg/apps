@@ -37,19 +37,38 @@ export default async function SuiviEntrainenementsPage({
   const accessibleThemeIds = new Set((accessRows ?? []).map((r: { theme_id: string }) => r.theme_id));
 
   const { data: trainingsRaw } = await (admin.from("trainings") as any)
-    .select("id, title, description, xp_reward, lesson_id, lessons(id, title, theme_id, themes(id, title))")
-    .order("lesson_id");
+    .select("id, title, description, xp_reward, order_index, lesson_id, lessons(id, title, order_index, theme_id, chapters(order_index), themes(id, title, order_index))")
+    // Trier par lesson_id revenait à trier par UUID : l'ordre du programme se
+    // reconstitue plus bas.
+    .order("order_index");
 
   const { data: trainingProgressRaw } = await (admin.from("training_progress") as any)
     .select("training_id, score, attempts, completed_at")
     .eq("student_id", child.id);
+
+  // Un entraînement ne se débloque que lorsque sa leçon est commencée : sans
+  // cette information, le parent voyait « à faire » sur des exercices que son
+  // enfant ne peut pas encore ouvrir.
+  const { data: lessonProgressRaw } = await (admin.from("lesson_progress") as any)
+    .select("lesson_id")
+    .eq("student_id", child.id);
+  const startedLessonIds = new Set((lessonProgressRaw ?? []).map((lp: any) => lp.lesson_id));
 
   const progressMap = new Map((trainingProgressRaw ?? []).map((tp: any) => [tp.training_id, tp]));
 
   type Group = { themeTitle: string; lessons: { lessonTitle: string; trainings: any[] }[] };
   const grouped = new Map<string, Group>();
 
-  for (const t of (trainingsRaw ?? []).filter((t: any) => accessibleThemeIds.has(t.lessons?.themes?.id))) {
+  const rang = (t: any) =>
+    (t.lessons?.themes?.order_index ?? 0) * 1_000_000 +
+    (t.lessons?.chapters?.order_index ?? 0) * 10_000 +
+    (t.lessons?.order_index ?? 0) * 100 + (t.order_index ?? 0);
+
+  const visibles = (trainingsRaw ?? [])
+    .filter((t: any) => accessibleThemeIds.has(t.lessons?.themes?.id))
+    .sort((x: any, y: any) => rang(x) - rang(y));
+
+  for (const t of visibles) {
     const lesson = t.lessons;
     const theme  = lesson?.themes;
     const themeId = theme?.id ?? "other";
@@ -63,7 +82,11 @@ export default async function SuiviEntrainenementsPage({
       lessonGroup = { lessonTitle: lesson?.title ?? "Leçon", trainings: [] };
       group.lessons.push(lessonGroup);
     }
-    lessonGroup.trainings.push({ ...t, progress: progressMap.get(t.id) ?? null });
+    lessonGroup.trainings.push({
+      ...t,
+      progress: progressMap.get(t.id) ?? null,
+      unlocked: startedLessonIds.has(t.lesson_id),
+    });
   }
 
   return (
@@ -118,15 +141,16 @@ export default async function SuiviEntrainenementsPage({
                   {lg.trainings.map((t: any) => {
                     const p = t.progress;
                     const done = !!p?.completed_at;
+                    const verrouille = !t.unlocked && !done;
                     return (
                       <Link
                         key={t.id}
                         href={`/${locale}/suivi/entrainements/${t.id}?child=${child.id}`}
-                        className="flex items-center justify-between px-4 py-3 hover:bg-slate-700/30 transition-colors"
+                        className={`flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-700/30 transition-colors ${verrouille ? "opacity-50" : ""}`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 ${done ? "bg-emerald-900 text-emerald-300" : "bg-slate-700 text-slate-400"}`}>
-                            {done ? "✓" : "✦"}
+                            {done ? "✓" : verrouille ? "🔒" : "✦"}
                           </div>
                           <div className="min-w-0">
                             <div className={`text-sm font-bold truncate ${done ? "text-white" : "text-slate-300"}`}>{t.title}</div>
@@ -140,8 +164,11 @@ export default async function SuiviEntrainenementsPage({
                               {p.attempts > 0 && <div className="text-[11px] text-slate-500">{p.attempts} essai{p.attempts > 1 ? "s" : ""}</div>}
                             </div>
                           )}
-                          <span className={`text-xs font-black px-2 py-0.5 rounded-full whitespace-nowrap ${done ? "bg-emerald-900 text-emerald-300" : "bg-slate-700 text-slate-500"}`}>
-                            {done ? "✓ Fait" : "À faire"}
+                          <span className={`text-xs font-black px-2 py-0.5 rounded-full whitespace-nowrap ${
+                            done ? "bg-emerald-900 text-emerald-300"
+                                 : verrouille ? "bg-slate-800 text-slate-600"
+                                 : "bg-amber-900/50 text-amber-300"}`}>
+                            {done ? "✓ Fait" : verrouille ? "🔒 Verrouillé" : "À faire"}
                           </span>
                           <span className="text-slate-600 text-xs">›</span>
                         </div>
