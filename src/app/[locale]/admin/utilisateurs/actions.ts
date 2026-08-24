@@ -4,6 +4,7 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/supabase/types";
 import { sendWelcomeEmail } from "@/lib/email";
+import { slugFromNum } from "@/lib/levels";
 
 /**
  * Crée la ligne `students` d'un profil élève si elle manque.
@@ -24,7 +25,7 @@ async function ensureStudentRow(
   if (existant) return;
   await (admin.from("students") as any).insert({
     profile_id: profileId,
-    level: "explorer",
+    level: slugFromNum(1),
     level_num: 1,
   });
 }
@@ -130,11 +131,15 @@ export async function unlinkParentFromStudent(parentId: string, studentId: strin
 
 export async function setStudentLevel(studentId: string, levelNum: number) {
   const admin = createAdminClient();
+  // Les deux colonnes doivent bouger ensemble : l'admin lit level_num,
+  // l'espace élève lit level. N'écrire que l'une laissait l'élève affiché
+  // Bâtisseur côté prof et Explorateur dans son propre espace.
   const { error } = await (admin.from("students") as any)
-    .update({ level_num: levelNum })
+    .update({ level_num: levelNum, level: slugFromNum(levelNum) })
     .eq("id", studentId);
   if (error) return { error: error.message };
   revalidatePath("/admin/utilisateurs/eleves");
+  revalidatePath("/eleve");
   return { success: true };
 }
 

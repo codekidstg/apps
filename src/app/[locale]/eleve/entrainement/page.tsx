@@ -30,8 +30,10 @@ export default async function EntrainementPage() {
   const accessibleThemeIds = new Set((accessRows ?? []).map((r: { theme_id: string }) => r.theme_id));
 
   const { data: trainingsRaw } = await (admin.from("trainings") as any)
-    .select("id, title, description, xp_reward, lesson_id, lessons(id, title, theme_id, themes(id, title, level))")
-    .order("lesson_id");
+    .select("id, title, description, xp_reward, order_index, lesson_id, lessons(id, title, order_index, theme_id, chapters(order_index), themes(id, title, level, order_index))")
+    // L'ordre du programme se reconstitue plus bas : trier ici par lesson_id
+    // revenait à trier par UUID, donc au hasard.
+    .order("order_index");
 
   const { data: lessonProgress } = await (supabase.from("lesson_progress") as any)
     .select("lesson_id, status, completed_at")
@@ -56,6 +58,7 @@ export default async function EntrainementPage() {
     theme_id: string; theme_title: string; theme_level: string;
     attempts: number; last_completed_at: string | null; best_score: number | null;
     lesson_started: boolean;
+    order_index: number; lesson_order: number; chapter_order: number; theme_order: number;
   };
 
   const allTrainings: Training[] = (trainingsRaw ?? []).map((t: any) => {
@@ -70,11 +73,25 @@ export default async function EntrainementPage() {
       theme_id: theme?.id ?? "", theme_title: theme?.title ?? "Thème", theme_level: theme?.level ?? "explorer",
       attempts: tp?.attempts ?? 0, last_completed_at: tp?.completed_at ?? null,
       best_score: tp?.score ?? null, lesson_started: !!lp,
+      order_index:   t.order_index ?? 0,
+      lesson_order:  lesson?.order_index ?? 0,
+      chapter_order: lesson?.chapters?.order_index ?? 0,
+      theme_order:   theme?.order_index ?? 0,
     };
   });
 
-  const available = allTrainings.filter(t => t.lesson_started && accessibleThemeIds.has(t.theme_id));
-  const locked    = allTrainings.filter(t => !t.lesson_started && accessibleThemeIds.has(t.theme_id));
+  // Ordre du programme : thème, puis chapitre, puis leçon, puis position de
+  // l'entraînement dans sa leçon.
+  const rang = (t: any) =>
+    (t.theme_order ?? 0) * 1_000_000 + (t.chapter_order ?? 0) * 10_000 +
+    (t.lesson_order ?? 0) * 100 + (t.order_index ?? 0);
+
+  const available = allTrainings
+    .filter(t => t.lesson_started && accessibleThemeIds.has(t.theme_id))
+    .sort((a, b) => rang(a) - rang(b));
+  const locked = allTrainings
+    .filter(t => !t.lesson_started && accessibleThemeIds.has(t.theme_id))
+    .sort((a, b) => rang(a) - rang(b));
 
   // Grouper thème → leçon
   type LessonGroup = { lessonId: string; lessonTitle: string; lessonCompletedAt: string | null; trainings: Training[] };

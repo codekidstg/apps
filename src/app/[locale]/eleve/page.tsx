@@ -8,10 +8,10 @@ import { Suspense } from "react";
 import type { ThemeProgress } from "@/components/eleve/VillageMap";
 import VillageMapClient from "@/components/eleve/VillageMapClient";
 
-type LessonRow    = { id: string; title: string; xp_reward: number; chapter_id: string };
+type LessonRow    = { id: string; title: string; xp_reward: number; chapter_id: string; order_index: number };
 type ProgressRow  = { lesson_id: string; status: string };
-type Chapter      = { id: string; title: string; theme_id: string };
-type Theme        = { id: string; title: string; level: string };
+type Chapter      = { id: string; title: string; theme_id: string; order_index: number };
+type Theme        = { id: string; title: string; level: string; order_index: number };
 type Achievement  = { badge_id: string; earned_at: string };
 
 const LEVEL_META: Record<string, { label: string; icon: string; color: string }> = {
@@ -47,9 +47,9 @@ export default async function EleveDashboard() {
 
   const [{ data: themesRaw }, { data: chaptersRaw }, { data: lessonsRaw }, { data: progressRaw }, { data: achievementsRaw }, { data: trainingsRaw }, { data: trainingProgressRaw }] =
     await Promise.all([
-      (admin.from("themes") as any).select("id, title, level").eq("status", "published").order("level").order("order_index"),
+      (admin.from("themes") as any).select("id, title, level, order_index").eq("status", "published").order("level").order("order_index"),
       (admin.from("chapters") as any).select("id, title, theme_id, order_index").order("order_index"),
-      (admin.from("lessons") as any).select("id, title, xp_reward, chapter_id").order("order_index"),
+      (admin.from("lessons") as any).select("id, title, xp_reward, chapter_id, order_index").order("order_index"),
       (supabase.from("lesson_progress") as any).select("lesson_id, status").eq("student_id", student.id),
       (supabase.from("student_achievements") as any).select("badge_id, earned_at").eq("student_id", student.id).order("earned_at", { ascending: false }),
       (admin.from("trainings") as any).select("id, lesson_id"),
@@ -81,7 +81,21 @@ export default async function EleveDashboard() {
   }
 
   const completedCount = progress.filter((p) => p.status === "completed").length;
-  const nextLesson     = lessons.find((l) => progressMap.get(l.id) !== "completed");
+
+  // La prochaine quête doit être la première leçon non terminée DANS L'ORDRE DU
+  // PROGRAMME, parmi les thèmes auxquels l'élève a accès. Auparavant on cherchait
+  // dans les 99 leçons de la plateforme, triées par un order_index qui vaut 0 pour
+  // la première leçon de chaque chapitre : la quête proposée était donc tirée au
+  // hasard, parfois dans un autre niveau.
+  const byIndex = (a: { order_index?: number }, b: { order_index?: number }) =>
+    (a.order_index ?? 0) - (b.order_index ?? 0);
+
+  const lessonsDuProgramme: LessonRow[] = [...themes].sort(byIndex).flatMap((t) =>
+    [...(chaptersByTheme.get(t.id) ?? [])].sort(byIndex).flatMap((ch) =>
+      [...(lessonsByChapter.get(ch.id) ?? [])].sort(byIndex)
+    )
+  );
+  const nextLesson = lessonsDuProgramme.find((l) => progressMap.get(l.id) !== "completed");
 
   // Entraînements disponibles (leçon commencée) et non encore faits
   const startedLessonIds = new Set(progress.map((p: any) => p.lesson_id));
@@ -155,12 +169,24 @@ export default async function EleveDashboard() {
         </div>
       </div>
 
-      {/* Carte du Village Numérique */}
-      {studentLevel === "explorer" && (
+      {/* Carte du Village Numérique — propre au niveau Explorateur.
+          Sans aucun thème accessible, elle n'afficherait que des cadenas :
+          on dit alors ce qui se passe plutôt que d'exposer une carte morte. */}
+      {studentLevel === "explorer" && themes.length > 0 && (
         <div className="flex justify-center">
           <Suspense fallback={<div className="w-full h-48 rounded-2xl animate-pulse" style={{ background: "#1e293b" }} />}>
             <VillageMapClient progress={villageProgress} kodiMessage={kodiMessage} themeIds={EXPLORER_THEME_IDS} />
           </Suspense>
+        </div>
+      )}
+
+      {themes.length === 0 && (
+        <div className="rounded-2xl p-6 text-center" style={{ background: "#1e293b", border: "1px solid #334155" }}>
+          <div className="text-3xl mb-2">🔒</div>
+          <div className="font-black text-white text-sm">Ton parcours n&apos;est pas encore ouvert</div>
+          <div className="text-xs mt-1" style={{ color: "#475569" }}>
+            Ton professeur va activer tes premiers cours. Reviens juste après ta première séance.
+          </div>
         </div>
       )}
 
