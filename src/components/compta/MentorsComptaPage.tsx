@@ -43,11 +43,10 @@ export default async function MentorsComptaPage({ month, year, exportHref }: Pro
       </div>
 
       {/* Résumé global */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         {[
-          { label: "Total dû ce mois",  value: totalDue,  color: "text-amber-600" },
-          { label: "Déjà payé",         value: totalPaid, color: "text-green-600" },
-          { label: "Reste à payer",     value: totalDue - totalPaid, color: "text-brand-navy" },
+          { label: "Déjà payé",              value: totalPaid, color: "text-green-600" },
+          { label: "Montant dû aux mentors", value: totalDue - totalPaid, color: "text-brand-navy" },
         ].map(k => (
           <div key={k.label} className="bg-white rounded-2xl border border-gray-200 p-5">
             <div className={`text-2xl font-black ${k.color}`}>{k.value.toLocaleString("fr-FR")} F</div>
