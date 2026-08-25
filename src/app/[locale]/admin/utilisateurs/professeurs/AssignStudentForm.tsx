@@ -22,7 +22,7 @@ export default function AssignStudentForm({
     if (!studentId) return;
     startTransition(async () => {
       const res = await assignTeacherToStudent(studentId, teacherId);
-      if ("error" in res) { setStatus("error"); setErrorMsg(res.error); return; }
+      if (res.error) { setStatus("error"); setErrorMsg(res.error); return; }
       setStatus("ok");
       setStudentId("");
       setTimeout(() => setStatus("idle"), 2000);

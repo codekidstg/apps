@@ -7,6 +7,56 @@ import { sendWelcomeEmail } from "@/lib/email";
 import { slugFromNum } from "@/lib/levels";
 
 /**
+ * Garde d'accès à la gestion des utilisateurs.
+ *
+ * Ces actions écrivent avec le client service-role. Une server action est un
+ * point d'entrée réseau appelable directement : masquer un bouton ne protège
+ * rien, la règle doit être ici. Elles n'avaient aucun contrôle — n'importe
+ * quelle session authentifiée pouvait fixer un mot de passe sur le compte
+ * admin, puis s'y connecter.
+ *
+ * Règle : admin et manager gèrent les utilisateurs ; un manager ne touche
+ * jamais à un compte admin et ne peut pas attribuer le rôle admin — sans quoi
+ * il lui suffirait de se créer un compte admin pour contourner la première
+ * moitié de la règle.
+ */
+type Appelant = { id: string; role: Role };
+
+async function appelant(): Promise<Appelant | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: profile } = await supabase
+    .from("profiles").select("role").eq("id", user.id).single<{ role: Role }>();
+  if (profile?.role !== "admin" && profile?.role !== "manager") return null;
+  return { id: user.id, role: profile.role };
+}
+
+/**
+ * Retour commun à toutes ces actions. Sans type explicite, TypeScript infère
+ * une union dont certaines branches n'ont pas de `error`, et les appelants qui
+ * testent `res.error` ne compilent plus.
+ */
+type Resultat = { error?: string; success?: boolean };
+
+const REFUS_ADMIN: Resultat = { error: "Un manager ne peut pas agir sur un compte administrateur." };
+const REFUS_ROLE:  Resultat = { error: "Un manager ne peut pas attribuer le rôle administrateur." };
+
+/** Rôle actuel d'un compte cible, lu avec le service-role. */
+async function roleDe(userId: string): Promise<Role | null> {
+  const admin = createAdminClient();
+  const { data } = await (admin.from("profiles") as any)
+    .select("role").eq("id", userId).maybeSingle();
+  return (data?.role as Role) ?? null;
+}
+
+/** Le compte cible est-il hors de portée de cet appelant ? */
+async function cibleInterdite(qui: Appelant, userId: string): Promise<boolean> {
+  if (qui.role === "admin") return false;
+  return (await roleDe(userId)) === "admin";
+}
+
+/**
  * Crée la ligne `students` d'un profil élève si elle manque.
  *
  * Le trigger d'inscription ne crée que le profil. Or `students` porte le niveau,
@@ -30,12 +80,17 @@ async function ensureStudentRow(
   });
 }
 
-export async function createUser(formData: FormData) {
+export async function createUser(formData: FormData): Promise<Resultat> {
+  const qui = await appelant();
+  if (!qui) return { error: "Non autorisé" };
+
   const email       = formData.get("email") as string;
   const password    = formData.get("password") as string;
   const displayName = formData.get("display_name") as string;
   const role        = formData.get("role") as Role;
   const schoolId    = formData.get("school_id") as string | null;
+
+  if (qui.role === "manager" && role === "admin") return REFUS_ROLE;
 
   const admin = createAdminClient();
 
@@ -75,7 +130,12 @@ export async function createUser(formData: FormData) {
   return { success: true };
 }
 
-export async function updateUserRole(userId: string, role: Role) {
+export async function updateUserRole(userId: string, role: Role): Promise<Resultat> {
+  const qui = await appelant();
+  if (!qui) return { error: "Non autorisé" };
+  if (await cibleInterdite(qui, userId)) return REFUS_ADMIN;
+  if (qui.role === "manager" && role === "admin") return REFUS_ROLE;
+
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(userId, {
     app_metadata: { role },
@@ -88,7 +148,11 @@ export async function updateUserRole(userId: string, role: Role) {
   return { success: true };
 }
 
-export async function linkParentToStudent(parentProfileId: string, studentProfileId: string) {
+export async function linkParentToStudent(parentProfileId: string, studentProfileId: string): Promise<Resultat> {
+  // Ces quatre actions ne visent jamais un admin, mais elles écrivent en
+  // service-role : la vérification de l'appelant reste nécessaire.
+  if (!await appelant()) return { error: "Non autorisé" };
+
   const admin = createAdminClient();
 
   // Récupérer le student.id depuis profile_id
@@ -111,14 +175,22 @@ export async function linkParentToStudent(parentProfileId: string, studentProfil
   return { success: true };
 }
 
-export async function resetUserPassword(userId: string, password: string) {
+export async function resetUserPassword(userId: string, password: string): Promise<Resultat> {
+  const qui = await appelant();
+  if (!qui) return { error: "Non autorisé" };
+  // Le chemin de prise de contrôle : fixer un mot de passe sur le compte admin,
+  // puis s'y connecter avec le lien affiché juste à côté.
+  if (await cibleInterdite(qui, userId)) return REFUS_ADMIN;
+
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(userId, { password });
   if (error) return { error: error.message };
   return { success: true };
 }
 
-export async function unlinkParentFromStudent(parentId: string, studentId: string) {
+export async function unlinkParentFromStudent(parentId: string, studentId: string): Promise<Resultat> {
+  if (!await appelant()) return { error: "Non autorisé" };
+
   const admin = createAdminClient();
   const { error } = await (admin.from("parent_children") as any)
     .delete()
@@ -129,7 +201,9 @@ export async function unlinkParentFromStudent(parentId: string, studentId: strin
   return { success: true };
 }
 
-export async function setStudentLevel(studentId: string, levelNum: number) {
+export async function setStudentLevel(studentId: string, levelNum: number): Promise<Resultat> {
+  if (!await appelant()) return { error: "Non autorisé" };
+
   const admin = createAdminClient();
   // Les deux colonnes doivent bouger ensemble : l'admin lit level_num,
   // l'espace élève lit level. N'écrire que l'une laissait l'élève affiché
@@ -143,7 +217,9 @@ export async function setStudentLevel(studentId: string, levelNum: number) {
   return { success: true };
 }
 
-export async function assignTeacherToStudent(studentId: string, teacherProfileId: string | null) {
+export async function assignTeacherToStudent(studentId: string, teacherProfileId: string | null): Promise<Resultat> {
+  if (!await appelant()) return { error: "Non autorisé" };
+
   const admin = createAdminClient();
   const { error } = await (admin.from("students") as any)
     .update({ teacher_id: teacherProfileId })
@@ -153,7 +229,12 @@ export async function assignTeacherToStudent(studentId: string, teacherProfileId
   return { success: true };
 }
 
-export async function updateUser(userId: string, data: { display_name?: string; email?: string; role?: Role }) {
+export async function updateUser(userId: string, data: { display_name?: string; email?: string; role?: Role }): Promise<Resultat> {
+  const qui = await appelant();
+  if (!qui) return { error: "Non autorisé" };
+  if (await cibleInterdite(qui, userId)) return REFUS_ADMIN;
+  if (qui.role === "manager" && data.role === "admin") return REFUS_ROLE;
+
   const admin = createAdminClient();
 
   const authUpdate: Record<string, unknown> = {};
@@ -175,7 +256,12 @@ export async function updateUser(userId: string, data: { display_name?: string; 
   return { success: true };
 }
 
-export async function resendWelcomeEmail(userId: string) {
+export async function resendWelcomeEmail(userId: string): Promise<Resultat> {
+  const qui = await appelant();
+  if (!qui) return { error: "Non autorisé" };
+  // Le renvoi expédie les identifiants en clair : à protéger comme le reste.
+  if (await cibleInterdite(qui, userId)) return REFUS_ADMIN;
+
   const admin = createAdminClient();
   const { data: profile } = await (admin.from("profiles") as any)
     .select("display_name, role, temp_password")
@@ -201,7 +287,11 @@ export async function resendWelcomeEmail(userId: string) {
   }
 }
 
-export async function deleteUser(userId: string) {
+export async function deleteUser(userId: string): Promise<Resultat> {
+  const qui = await appelant();
+  if (!qui) return { error: "Non autorisé" };
+  if (await cibleInterdite(qui, userId)) return REFUS_ADMIN;
+
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) return { error: error.message };
@@ -209,7 +299,11 @@ export async function deleteUser(userId: string) {
   return { success: true };
 }
 
-export async function toggleUserActive(userId: string, active: boolean) {
+export async function toggleUserActive(userId: string, active: boolean): Promise<Resultat> {
+  const qui = await appelant();
+  if (!qui) return { error: "Non autorisé" };
+  if (await cibleInterdite(qui, userId)) return REFUS_ADMIN;
+
   const admin = createAdminClient();
   await (admin.from("profiles") as any).update({ active }).eq("id", userId);
   // Disable/enable via Supabase auth

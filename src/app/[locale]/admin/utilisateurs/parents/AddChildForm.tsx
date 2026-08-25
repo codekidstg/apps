@@ -24,7 +24,7 @@ export default function AddChildForm({
     if (!studentId) return;
     startTransition(async () => {
       const res = await linkParentToStudent(parentId, studentId);
-      if ("error" in res) { setStatus("error"); setErrorMsg(res.error); return; }
+      if (res.error) { setStatus("error"); setErrorMsg(res.error); return; }
       setStatus("ok");
       setStudentId("");
       setTimeout(() => window.location.reload(), 800);

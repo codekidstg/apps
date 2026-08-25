@@ -18,7 +18,7 @@ export default function LinkParentForm({ users }: { users: User[] }) {
     const fd = new FormData(e.currentTarget);
     start(async () => {
       const res = await linkParentToStudent(fd.get("parent_id") as string, fd.get("student_id") as string);
-      if ("error" in res) { setError(res.error); return; }
+      if (res.error) { setError(res.error); return; }
       setOk(true);
       setTimeout(() => { setOpen(false); setOk(false); }, 1500);
     });

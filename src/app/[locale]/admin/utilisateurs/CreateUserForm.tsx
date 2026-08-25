@@ -19,7 +19,13 @@ function generatePassword(displayName: string): string {
   return `${base}${digits}${special}${extra}`;
 }
 
-export default function CreateUserForm({ schools }: { schools: School[] }) {
+export default function CreateUserForm({
+  schools, viewerRole = "admin",
+}: {
+  schools: School[];
+  /** Un manager ne peut pas créer d'admin : l'option ne lui est pas proposée. */
+  viewerRole?: "admin" | "manager";
+}) {
   const [open, setOpen]             = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [loading, setLoading]       = useState(false);
@@ -112,7 +118,7 @@ export default function CreateUserForm({ schools }: { schools: School[] }) {
                   <option value="teacher">Professeur</option>
                   <option value="student">Élève</option>
                   <option value="parent">Parent</option>
-                  <option value="admin">Admin</option>
+                  {viewerRole === "admin" && <option value="admin">Admin</option>}
                 </select>
               </div>
 

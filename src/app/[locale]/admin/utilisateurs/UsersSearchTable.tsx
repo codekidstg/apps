@@ -127,7 +127,14 @@ const DASHBOARD: Record<string, string> = {
   parent: "/fr/suivi",
 };
 
-export default function UsersSearchTable({ users, canDelete = true }: { users: UserRow[]; canDelete?: boolean }) {
+export default function UsersSearchTable({
+  users, canDelete = true, viewerRole = "admin",
+}: {
+  users: UserRow[];
+  canDelete?: boolean;
+  /** Rôle de qui regarde. Un manager voit les comptes admin, sans pouvoir y toucher. */
+  viewerRole?: "admin" | "manager";
+}) {
   const [q, setQ] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
@@ -148,7 +155,7 @@ export default function UsersSearchTable({ users, canDelete = true }: { users: U
   return (
     <div className="space-y-4">
       {editingUser && (
-        <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} />
+        <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} viewerRole={viewerRole} />
       )}
       {/* Barre de recherche + filtres */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -205,13 +212,23 @@ export default function UsersSearchTable({ users, canDelete = true }: { users: U
               const base = BASE_URL || "http://localhost:3000";
               const loginUrl = `${base}/fr/connexion`;
               const dash = DASHBOARD[u.role] ? `${base}${DASHBOARD[u.role]}` : null;
+              // Un manager voit le compte admin — il doit savoir à qui s'adresser —
+              // mais sans aucune prise dessus. Les actions refuseraient de toute
+              // façon côté serveur ; autant ne pas proposer le bouton.
+              const horsPortee = viewerRole === "manager" && u.role === "admin";
               return (
-                <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
+                <tr key={u.id} className={`border-b border-gray-50 transition-colors ${horsPortee ? "bg-gray-50/40" : "hover:bg-gray-50/60"}`}>
                   <td className="px-5 py-3">
-                    <div className="font-bold text-gray-900">{u.display_name}</div>
+                    <div className={`font-bold ${horsPortee ? "text-gray-500" : "text-gray-900"}`}>{u.display_name}</div>
                     <div className="text-xs text-gray-400 font-mono">{u.id.slice(0, 8)}…</div>
                   </td>
                   <td className="px-5 py-3">
+                    {horsPortee ? (
+                      <div className="space-y-1">
+                        <div className="text-xs text-gray-400">{u.email || "—"}</div>
+                        <div className="text-xs text-gray-400 italic">🔒 Compte administrateur — hors de votre périmètre</div>
+                      </div>
+                    ) : (
                     <div className="space-y-1.5">
                       {u.email ? <CopyCell email={u.email} /> : <span className="text-xs text-gray-400">—</span>}
                       <PasswordCell userId={u.id} email={u.email} password={u.temp_password} />
@@ -223,6 +240,7 @@ export default function UsersSearchTable({ users, canDelete = true }: { users: U
                           className="text-xs font-bold text-gray-400 hover:text-gray-700 hover:underline">🏠 Espace ↗</a>}
                       </div>
                     </div>
+                    )}
                   </td>
                   <td className="px-5 py-3"><RoleBadge role={u.role} /></td>
                   <td className="px-5 py-3">
@@ -234,6 +252,9 @@ export default function UsersSearchTable({ users, canDelete = true }: { users: U
                     <span className="text-xs text-gray-400">{new Date(u.created_at).toLocaleDateString("fr-FR")}</span>
                   </td>
                   <td className="px-5 py-3">
+                    {horsPortee ? (
+                      <span className="text-xs text-gray-400">—</span>
+                    ) : (
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => setEditingUser(u)}
@@ -245,6 +266,7 @@ export default function UsersSearchTable({ users, canDelete = true }: { users: U
                       <ToggleButton userId={u.id} active={u.active} />
                       {canDelete && <DeleteButton userId={u.id} />}
                     </div>
+                    )}
                   </td>
                 </tr>
               );

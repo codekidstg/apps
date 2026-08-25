@@ -32,12 +32,12 @@ export default async function ManagerUtilisateursPage() {
         actions={
           <div className="flex gap-2">
             <LinkParentForm users={(users ?? []).map((u: any) => ({ id: u.id, display_name: u.display_name ?? "", role: u.role }))} />
-            <CreateUserForm schools={schools ?? []} />
+            <CreateUserForm schools={schools ?? []} viewerRole="manager" />
           </div>
         }
       />
       <div className="p-8">
-        <UsersSearchTable users={enriched} canDelete={false} />
+        <UsersSearchTable users={enriched} canDelete={false} viewerRole="manager" />
       </div>
     </div>
   );

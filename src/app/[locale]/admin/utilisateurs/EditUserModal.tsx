@@ -23,7 +23,9 @@ const ROLES: { value: Role; label: string }[] = [
   { value: "admin",    label: "Admin" },
 ];
 
-export default function EditUserModal({ user, onClose }: Props) {
+export default function EditUserModal({
+  user, onClose, viewerRole = "admin",
+}: Props & { viewerRole?: "admin" | "manager" }) {
   const [name,  setName]  = useState(user.display_name ?? "");
   const [email, setEmail] = useState(user.email);
   const [role,  setRole]  = useState<Role>(user.role as Role);
@@ -83,7 +85,7 @@ export default function EditUserModal({ user, onClose }: Props) {
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-1.5">Rôle</label>
             <div className="grid grid-cols-5 gap-1.5">
-              {ROLES.map((r) => (
+              {ROLES.filter((r) => r.value !== "admin" || viewerRole === "admin").map((r) => (
                 <button
                   key={r.value}
                   onClick={() => setRole(r.value)}
