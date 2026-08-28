@@ -512,7 +512,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                         </div>
                         {result == null && (
                           <div className="flex flex-wrap gap-2 ml-10">
-                            {s.options.map((opt, oi) => (
+                            {seededShuffle(s.options.map((_, i) => i), key).map((oi) => (
                               <button key={oi} onClick={() => {
                                 if (result != null || completed) return;
                                 setFillAnswers(prev => ({ ...prev, [key]: oi }));
@@ -520,7 +520,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                               }}
                                 className="px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
                                 style={{ background: "#1e293b", border: "1px solid #334155", color: "#cbd5e1" }}>
-                                {opt}
+                                {s.options[oi]}
                               </button>
                             ))}
                           </div>

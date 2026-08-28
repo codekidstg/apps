@@ -1,5 +1,17 @@
 "use client";
 import { useState, useTransition, useEffect, useCallback, useRef } from "react";
+
+/* Mélange déterministe basé sur une clé stable (même principe que TrainingReader) */
+function seededShuffle<T>(arr: T[], seed: string): T[] {
+  const result = [...arr];
+  let h = seed.split("").reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0);
+  for (let i = result.length - 1; i > 0; i--) {
+    h = ((h << 5) - h + i) | 0;
+    const j = Math.abs(h) % (i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
 import { completeLesson, solveBlockly, syncBlockProgress } from "../../actions";
 import { showBadgeToast } from "@/components/eleve/BadgeToast";
 import type { BadgeId } from "@/lib/gamification/badges";
@@ -288,7 +300,8 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
                           <p className="font-bold text-base leading-snug text-white">{q.question}</p>
                         </div>
                         <div className="space-y-2 ml-10">
-                          {(q.choices ?? []).map((choice, ci) => {
+                          {seededShuffle((q.choices ?? []).map((_, i) => i), qKey).map((ci, di) => {
+                            const choice = (q.choices ?? [])[ci];
                             const isChosen  = chosen === ci;
                             const isCorrect = ci === q.answer;
                             let bg = "#0f172a", border = "#334155", color = "#94a3b8";
@@ -305,7 +318,7 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
                                 className="w-full text-left px-5 py-3.5 rounded-xl font-semibold text-sm transition-all duration-150 hover:brightness-110"
                                 style={{ background: bg, border: `1px solid ${border}`, color }}
                               >
-                                <span className="mr-2 font-mono" style={{ color: "#334155" }}>{["A", "B", "C", "D"][ci]}.</span>
+                                <span className="mr-2 font-mono" style={{ color: "#334155" }}>{["A", "B", "C", "D"][di]}.</span>
                                 {isCorrect && result != null ? "✓ " : ""}{choice}
                               </button>
                             );
@@ -478,6 +491,11 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
             if (gameType === "memory") {
               const pairs = (cfg.pairs as { left: string; right: string }[]) ?? [];
               return <MemoryGame key={block.id} blockId={block.id} title={cfg.title as string} description={cfg.description as string | undefined} pairs={pairs} done={done} onSolved={markDone} savedMatched={(gameStates[block.id] as string[]) ?? []} onStateChange={(s) => saveGameState(block.id, s)} />;
+            }
+
+            if (gameType === "association") {
+              const pairs = (cfg.pairs as { left: string; right: string }[]) ?? [];
+              return <AssociationGame key={block.id} blockId={block.id} title={cfg.title as string} description={cfg.description as string | undefined} pairs={pairs} done={done} onSolved={markDone} savedMatched={(gameStates[block.id] as string[]) ?? []} onStateChange={(s) => saveGameState(block.id, s)} />;
             }
 
             if (gameType === "sort") {
@@ -727,6 +745,99 @@ function MemoryGame({ title, description, pairs, done, onSolved, savedMatched, o
             </button>
           );
         })}
+      </div>
+      <div className="mt-3 text-xs text-center font-mono" style={{ color: "#334155" }}>
+        {matched.length / 2}/{pairs.length} paires trouvées
+      </div>
+    </div>
+  );
+}
+
+// ── AssociationGame ──────────────────────────────────────────────────────────
+// Cartes toujours visibles (pas de retournement) : clique un concept à gauche,
+// puis sa définition à droite. Mauvaise paire → flash rouge, on peut réessayer.
+function AssociationGame({ title, description, pairs, done, onSolved, savedMatched, onStateChange }: {
+  blockId: string; title?: string; description?: string; pairs: { left: string; right: string }[];
+  done: boolean; onSolved: () => void;
+  savedMatched: string[]; onStateChange: (s: string[]) => void;
+}) {
+  const [selectedLeft, setSelectedLeft] = useState<number | null>(null);
+  const [matched, setMatched] = useState<string[]>(savedMatched);
+  const [wrongAttempt, setWrongAttempt] = useState<{ left: number; right: number } | null>(null);
+
+  const shuffledRight = seededShuffle(
+    pairs.map((p, i) => ({ label: p.right, pairIdx: i })),
+    `assoc-${pairs.map((p) => p.left).join("|")}`
+  );
+
+  function isMatched(pi: number) { return matched.includes(`L${pi}`); }
+
+  function clickLeft(pi: number) {
+    if (isMatched(pi) || wrongAttempt) return;
+    setSelectedLeft(selectedLeft === pi ? null : pi);
+  }
+
+  function clickRight(pi: number) {
+    if (selectedLeft == null || isMatched(pi) || wrongAttempt) return;
+    if (selectedLeft === pi) {
+      const next = [...matched, `L${pi}`, `R${pi}`];
+      setMatched(next);
+      setSelectedLeft(null);
+      onStateChange(next);
+      if (next.length === pairs.length * 2 && !done) onSolved();
+    } else {
+      setWrongAttempt({ left: selectedLeft, right: pi });
+      setSelectedLeft(null);
+      setTimeout(() => setWrongAttempt(null), 800);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl p-6" style={{ background: "#1e293b", border: "1px solid #334155" }}>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🔗</span>
+        <span className="font-black text-white">{title ?? "Associe les paires"}</span>
+        {done && <span className="ml-auto text-xs font-mono font-black px-2 py-0.5 rounded-full"
+          style={{ background: "#10b98120", color: "#10b981", border: "1px solid #10b98140" }}>✅ Réussi</span>}
+      </div>
+      {description && <p className="text-sm mb-4 leading-relaxed" style={{ color: "#94a3b8" }}>{description}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          {pairs.map((p, pi) => {
+            const isSelected = selectedLeft === pi;
+            const isWrong = wrongAttempt?.left === pi;
+            const done_ = isMatched(pi);
+            return (
+              <button key={pi} onClick={() => clickLeft(pi)} disabled={done_}
+                className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all"
+                style={{
+                  background: done_ ? "#10b98120" : isWrong ? "#ef444420" : isSelected ? "#a78bfa20" : "#0f172a",
+                  border: `2px solid ${done_ ? "#10b98160" : isWrong ? "#ef444460" : isSelected ? "#a78bfa" : "#334155"}`,
+                  color: done_ ? "#10b981" : isWrong ? "#ef4444" : isSelected ? "#e9d5ff" : "#cbd5e1",
+                }}>
+                {p.left}
+              </button>
+            );
+          })}
+        </div>
+        <div className="space-y-2">
+          {shuffledRight.map(({ label, pairIdx }) => {
+            const isWrong = wrongAttempt?.right === pairIdx;
+            const done_ = isMatched(pairIdx);
+            return (
+              <button key={pairIdx} onClick={() => clickRight(pairIdx)} disabled={done_ || selectedLeft == null}
+                className="w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all"
+                style={{
+                  background: done_ ? "#10b98120" : isWrong ? "#ef444420" : "#0f172a",
+                  border: `2px solid ${done_ ? "#10b98160" : isWrong ? "#ef444460" : selectedLeft != null ? "#a78bfa40" : "#334155"}`,
+                  color: done_ ? "#10b981" : isWrong ? "#ef4444" : "#94a3b8",
+                  cursor: selectedLeft == null && !done_ ? "default" : "pointer",
+                }}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div className="mt-3 text-xs text-center font-mono" style={{ color: "#334155" }}>
         {matched.length / 2}/{pairs.length} paires trouvées
