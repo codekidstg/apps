@@ -3,7 +3,7 @@
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/supabase/types";
-import { sendWelcomeEmail } from "@/lib/email";
+import { sendWelcomeEmail, buildWelcomeEmail, type WelcomeEmail } from "@/lib/email";
 import { slugFromNum } from "@/lib/levels";
 
 /**
@@ -256,31 +256,66 @@ export async function updateUser(userId: string, data: { display_name?: string; 
   return { success: true };
 }
 
-export async function resendWelcomeEmail(userId: string): Promise<Resultat> {
-  const qui = await appelant();
-  if (!qui) return { error: "Non autorisé" };
-  // Le renvoi expédie les identifiants en clair : à protéger comme le reste.
-  if (await cibleInterdite(qui, userId)) return REFUS_ADMIN;
+/**
+ * Rassemble ce qu'il faut pour composer le message d'accès d'un utilisateur.
+ *
+ * Partagé par l'aperçu et par l'envoi : les deux doivent porter exactement le
+ * même contenu, sinon l'admin relit un message et en expédie un autre.
+ */
+type Destinataire =
+  | { error: string }
+  | { params: { email: string; displayName: string; password: string; role: any } };
 
+async function destinataire(userId: string): Promise<Destinataire> {
   const admin = createAdminClient();
   const { data: profile } = await (admin.from("profiles") as any)
     .select("display_name, role, temp_password")
     .eq("id", userId)
     .single() as { data: { display_name: string; role: string; temp_password: string | null } | null };
 
-  if (!profile?.temp_password) return { error: "Aucun mot de passe enregistré pour cet utilisateur" };
+  if (!profile?.temp_password) {
+    return { error: "Aucun mot de passe enregistré pour cet utilisateur." };
+  }
 
   const { data: authUser } = await admin.auth.admin.getUserById(userId);
   const email = authUser?.user?.email;
   if (!email) return { error: "Email introuvable" };
 
-  try {
-    await sendWelcomeEmail({
+  return {
+    params: {
       email,
       displayName: profile.display_name,
       password: profile.temp_password,
       role: profile.role as any,
-    });
+    },
+  };
+}
+
+/** Message tel qu'il partira — pour l'afficher et le copier avant d'envoyer. */
+export async function getWelcomeEmail(
+  userId: string,
+): Promise<{ error: string } | { email: WelcomeEmail; to: string }> {
+  const qui = await appelant();
+  if (!qui) return { error: "Non autorisé" };
+  if (await cibleInterdite(qui, userId)) return REFUS_ADMIN as { error: string };
+
+  const d = await destinataire(userId);
+  if ("error" in d) return d;
+
+  return { email: buildWelcomeEmail(d.params), to: d.params.email };
+}
+
+export async function resendWelcomeEmail(userId: string): Promise<Resultat> {
+  const qui = await appelant();
+  if (!qui) return { error: "Non autorisé" };
+  // Le renvoi expédie les identifiants en clair : à protéger comme le reste.
+  if (await cibleInterdite(qui, userId)) return REFUS_ADMIN;
+
+  const d = await destinataire(userId);
+  if ("error" in d) return { error: d.error };
+
+  try {
+    await sendWelcomeEmail(d.params);
     return { success: true };
   } catch (e: any) {
     return { error: e.message };

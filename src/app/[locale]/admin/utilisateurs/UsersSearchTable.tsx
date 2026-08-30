@@ -7,6 +7,7 @@ import { ResetPasswordCell } from "./ResetPasswordCell";
 import { toggleUserActive, resendWelcomeEmail, deleteUser } from "./actions";
 import { useTransition } from "react";
 import EditUserModal from "./EditUserModal";
+import AccessEmailModal from "./AccessEmailModal";
 
 type UserRow = {
   id: string;
@@ -19,13 +20,14 @@ type UserRow = {
   schools: { name: string } | null;
 };
 
-function PasswordCell({ userId, email, password }: { userId: string; email: string; password: string | null }) {
+function PasswordCell({ userId, email, password, nom }: { userId: string; email: string; password: string | null; nom: string }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedBoth, setCopiedBoth] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [apercu, setApercu] = useState(false);
 
   if (!password) return <span className="text-xs text-gray-300 italic">—</span>;
 
@@ -72,6 +74,14 @@ function PasswordCell({ userId, email, password }: { userId: string; email: stri
           {sending ? "…" : sent ? "✓ Envoyé !" : "📧 Renvoyer"}
         </button>
       </div>
+      {/* Voir le message avant de le transmettre, et le copier pour WhatsApp. */}
+      <button onClick={() => setApercu(true)}
+        className="text-xs font-bold text-brand-navy hover:underline">
+        ✉️ Voir le message d&apos;accès
+      </button>
+      {apercu && (
+        <AccessEmailModal userId={userId} nom={nom} onClose={() => setApercu(false)} />
+      )}
       {sendError && <p className="text-xs text-red-500">{sendError}</p>}
     </div>
   );
@@ -231,7 +241,7 @@ export default function UsersSearchTable({
                     ) : (
                     <div className="space-y-1.5">
                       {u.email ? <CopyCell email={u.email} /> : <span className="text-xs text-gray-400">—</span>}
-                      <PasswordCell userId={u.id} email={u.email} password={u.temp_password} />
+                      <PasswordCell userId={u.id} email={u.email} password={u.temp_password} nom={u.display_name ?? u.email} />
                       <ResetPasswordCell userId={u.id} />
                       <div className="flex items-center gap-3 pt-0.5">
                         <a href={loginUrl} target="_blank" rel="noopener noreferrer"
