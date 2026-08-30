@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { routing } from "@/i18n/routing";
+
+/**
+ * Locale de la redirection après connexion.
+ *
+ * Elle était déduite du chemin de la requête — or ce chemin est
+ * `/api/auth/login`, donc le premier segment vaut « api ». Toute connexion
+ * réussie redirigeait vers `/api/admin` au lieu de `/fr/admin` : en production
+ * cette URL renvoie vers /connexion, si bien que l'utilisateur, authentifié et
+ * son cookie posé, retombait sur la page de connexion — indiscernable d'un
+ * mauvais mot de passe.
+ *
+ * On lit donc la locale envoyée par le formulaire, et on ne retient qu'une
+ * valeur réellement supportée.
+ */
+const LOCALES = new Set<string>(routing.locales);
+
+function localeValide(...candidats: (string | null | undefined)[]) {
+  for (const c of candidats) if (c && LOCALES.has(c)) return c;
+  return routing.defaultLocale;
+}
 
 const WINDOW_MS    = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -44,15 +65,16 @@ function errRedirect(msg: string, locale = "fr", req?: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const locale = req.nextUrl.pathname.split("/")[1] || "fr";
+  // Le corps est lu avant le compteur de tentatives : c'est lui qui porte la
+  // locale, et un message d'erreur doit déjà pouvoir être redirigé correctement.
+  const body = await req.formData();
+  const locale = localeValide(body.get("locale") as string | null);
 
   // Rate limit
   const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
   const { allowed, remaining, resetIn } = checkRateLimit(ip);
   if (!allowed) return errRedirect(`Trop de tentatives. Réessaie dans ${resetIn} minute${resetIn > 1 ? "s" : ""}.`, locale, req);
 
-  // Parse form data
-  const body = await req.formData();
   if (body.get("website")) {
     await new Promise(r => setTimeout(r, 2000));
     return errRedirect("Une erreur est survenue.", locale, req);

@@ -155,6 +155,10 @@ export default function ConnexionPage() {
             onSubmit={() => setPending(true)}
             className="flex flex-col gap-5"
           >
+            {/* La route est sous /api : elle ne peut pas deviner la locale
+                depuis son propre chemin, c'est au formulaire de la lui dire. */}
+            <input type="hidden" name="locale" value={locale} />
+
             {/* Honeypot — invisible pour les humains, piège pour les bots */}
             <input
               type="text"
