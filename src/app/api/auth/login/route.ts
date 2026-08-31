@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { routing } from "@/i18n/routing";
+import { createAdminClient } from "@/lib/supabase/server";
+import { ressembleAUnEmail } from "@/lib/username";
 
 /**
  * Locale de la redirection après connexion.
@@ -16,6 +18,32 @@ import { routing } from "@/i18n/routing";
  * On lit donc la locale envoyée par le formulaire, et on ne retient qu'une
  * valeur réellement supportée.
  */
+/**
+ * Adresse du compte portant cet identifiant.
+ *
+ * La table profiles n'est pas lisible sans session : la recherche passe donc
+ * par le client service-role, côté serveur uniquement.
+ *
+ * Renvoie null si l'identifiant est inconnu — et aussi tant que la migration
+ * 026 n'a pas ajouté la colonne. La connexion par email continue alors de
+ * fonctionner normalement au lieu de tomber avec elle.
+ */
+async function emailDeLIdentifiant(identifiant: string): Promise<string | null> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await (admin.from("profiles") as any)
+      .select("id, username").ilike("username", identifiant).maybeSingle();
+    if (error) { console.error("connexion — identifiant :", error.message); return null; }
+    if (!data?.id) return null;
+
+    const { data: authUser } = await admin.auth.admin.getUserById(data.id);
+    return authUser?.user?.email ?? null;
+  } catch (e: any) {
+    console.error("connexion — identifiant :", e?.message);
+    return null;
+  }
+}
+
 const LOCALES = new Set<string>(routing.locales);
 
 function localeValide(...candidats: (string | null | undefined)[]) {
@@ -80,11 +108,19 @@ export async function POST(req: NextRequest) {
     return errRedirect("Une erreur est survenue.", locale, req);
   }
 
-  const email      = ((body.get("email") as string) ?? "").trim().toLowerCase();
+  const saisie     = ((body.get("email") as string) ?? "").trim().toLowerCase();
   const password   = (body.get("password") as string) ?? "";
   const redirectTo = (body.get("redirect") as string) ?? null;
 
-  if (!email || !password || password.length < 6) return errRedirect("Identifiants invalides.", locale, req);
+  if (!saisie || !password || password.length < 6) return errRedirect("Identifiants invalides.", locale, req);
+
+  // Le champ accepte une adresse ou un identifiant. Dans le second cas on
+  // retrouve l'adresse du compte — souvent fabriquée — pour la donner à
+  // Supabase, qui ne sait s'authentifier que par email.
+  const email = ressembleAUnEmail(saisie) ? saisie : await emailDeLIdentifiant(saisie);
+  // Identifiant inconnu et mot de passe faux renvoient le même message : sans
+  // ça, le formulaire dirait lesquels de vos identifiants existent.
+  if (!email) return errRedirect("Email ou mot de passe incorrect.", locale, req);
 
   // Build Supabase client with response cookies
   const cookieStore = await cookies();

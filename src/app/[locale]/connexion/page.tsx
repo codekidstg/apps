@@ -116,6 +116,7 @@ export default function ConnexionPage() {
   const locale        = (params?.locale as string) ?? "fr";
 
   const [pending, setPending] = useState(false);
+  const [voirMdp, setVoirMdp] = useState(false);
 
   return (
     <div className="relative min-h-screen bg-cream flex items-center justify-center px-4 overflow-hidden">
@@ -175,15 +176,19 @@ export default function ConnexionPage() {
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor="email" className="text-sm font-medium text-ink">
-                Adresse email
+                Email ou identifiant
               </label>
+              {/* type="text" et non "email" : le navigateur refuserait une
+                  saisie sans @, donc tous les identifiants. */}
               <input
                 id="email"
                 name="email"
-                type="email"
+                type="text"
                 required
-                autoComplete="email"
-                placeholder="toi@exemple.com"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="toi@exemple.com  ou  uriel.a"
                 className="w-full rounded-xl border border-stone-200 px-4 py-3 text-ink placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition"
               />
             </div>
@@ -192,15 +197,28 @@ export default function ConnexionPage() {
               <label htmlFor="password" className="text-sm font-medium text-ink">
                 Mot de passe
               </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-                placeholder="••••••••"
-                className="w-full rounded-xl border border-stone-200 px-4 py-3 text-ink placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={voirMdp ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  className="w-full rounded-xl border border-stone-200 pl-4 pr-12 py-3 text-ink placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition"
+                />
+                {/* Un mot de passe attribué se recopie de travers : pouvoir le
+                    relire évite l'essentiel des échecs de première connexion. */}
+                <button
+                  type="button"
+                  onClick={() => setVoirMdp(v => !v)}
+                  aria-label={voirMdp ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  aria-pressed={voirMdp}
+                  className="absolute inset-y-0 right-0 w-12 flex items-center justify-center text-lg text-stone-400 hover:text-stone-600 transition-colors"
+                >
+                  {voirMdp ? "🙈" : "👁️"}
+                </button>
+              </div>
             </div>
 
             <button

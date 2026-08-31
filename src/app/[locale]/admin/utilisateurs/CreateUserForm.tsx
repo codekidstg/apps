@@ -2,9 +2,10 @@
 
 import { useState, useRef } from "react";
 import { createUser } from "./actions";
+import { identifiantDepuisNom, estEmailInterne } from "@/lib/username";
 
 type School = { id: string; name: string };
-type Credentials = { email: string; password: string };
+type Credentials = { email: string; username: string; password: string; envoye: boolean };
 
 const SPECIAL = ["@", "!", "#", "$", "%"];
 
@@ -32,6 +33,9 @@ export default function CreateUserForm({
   const [creds, setCreds]           = useState<Credentials | null>(null);
   const [password, setPassword]     = useState("");
   const [displayName, setDisplayName] = useState("");
+  // Aperçu de l'identifiant pendant la saisie du nom. Un chiffre peut s'ajouter
+  // à la création si celui-ci est déjà pris.
+  const identifiantPrevu = identifiantDepuisNom(displayName);
   const formRef = useRef<HTMLFormElement>(null);
 
   function handleGenerate() {
@@ -43,8 +47,7 @@ export default function CreateUserForm({
     setLoading(true);
     setError(null);
     const fd = new FormData(e.currentTarget);
-    const email = fd.get("email") as string;
-    const pw    = fd.get("password") as string;
+    const pw = fd.get("password") as string;
     const result = await createUser(fd);
     setLoading(false);
     if (result?.error) { setError(result.error); return; }
@@ -52,7 +55,13 @@ export default function CreateUserForm({
     setPassword("");
     setDisplayName("");
     setOpen(false);
-    setCreds({ email, password: pw });
+    // On affiche ce que le serveur a réellement retenu, pas ce qui a été saisi.
+    setCreds({
+      email: result.email ?? "",
+      username: result.username ?? "",
+      password: pw,
+      envoye: !!result.envoye,
+    });
   }
 
   return (
@@ -84,7 +93,18 @@ export default function CreateUserForm({
                 />
               </div>
 
-              <Field label="Email" name="email" type="email" required />
+              {/* Facultatif : sans adresse, le compte reçoit un identifiant
+                  prénom.initiale et se connecte avec. */}
+              <div>
+                <label className="block text-xs font-extrabold text-ink-light mb-1.5">
+                  Email <span className="font-bold text-ink-light/60">— facultatif</span>
+                </label>
+                <input type="email" name="email" className={inputClass} placeholder="laisser vide si la personne n'en donne pas" />
+                <p className="mt-1.5 text-[11px] text-ink-light/70 leading-relaxed">
+                  Sans email, la connexion se fera avec l&apos;identifiant
+                  {identifiantPrevu ? <> <b className="text-ink">{identifiantPrevu}</b></> : " généré depuis le nom"}.
+                </p>
+              </div>
 
               {/* Mot de passe + bouton Générer */}
               <div>
@@ -164,14 +184,18 @@ export default function CreateUserForm({
               <h2 className="font-display font-black text-xl text-ink">Compte créé !</h2>
             </div>
             <p className="text-sm text-ink-muted mb-2">
-              Un email de bienvenue avec les identifiants a été envoyé à l&apos;utilisateur.
+              {creds.envoye
+                ? "Un email de bienvenue avec les identifiants a été envoyé à l'utilisateur."
+                : "Aucun email n'a été envoyé — transmettez ces accès vous-même, le bouton « Voir le message d'accès » prépare le texte à copier."}
             </p>
             <p className="text-xs text-ink-light mb-6">
-              Conservez également ces identifiants ici — le mot de passe ne sera plus affiché après fermeture.
+              Conservez ces identifiants — le mot de passe ne sera plus affiché après fermeture.
             </p>
 
             <div className="space-y-3">
-              <CredentialRow label="Email" value={creds.email} masked={false} />
+              {estEmailInterne(creds.email)
+                ? <CredentialRow label="Identifiant" value={creds.username} masked={false} />
+                : <CredentialRow label="Email" value={creds.email} masked={false} />}
               <CredentialRow label="Mot de passe" value={creds.password} masked />
             </div>
 

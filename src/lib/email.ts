@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { estEmailInterne } from "@/lib/username";
 
 const FROM = "CodeKids <noreply@codekids.tg>";
 
@@ -42,17 +43,6 @@ function echappe(s: string) {
 }
 
 /**
- * Compose le message d'accès d'un utilisateur.
- *
- * Une seule source pour les trois usages — aperçu, copie, envoi. Les avoir
- * séparés aurait garanti qu'ils divergent : c'est exactement ce qui est arrivé
- * cette semaine aux écrans dupliqués entre admin et manager.
- *
- * Deux tons : le modèle formel pour les adultes, la version enjouée pour les
- * élèves. Un enfant de neuf ans ne reçoit pas un courrier des ressources
- * humaines.
- */
-/**
  * Prénom d'appel : tout sauf le dernier mot.
  *
  * Les prénoms composés sont courants ici — « Jean pierre Gaba », « Ryshawn
@@ -67,8 +57,20 @@ function prenomDAppel(displayName: string) {
   return mots.slice(0, -1).join(" ");
 }
 
+/**
+ * Compose le message d'accès d'un utilisateur.
+ *
+ * Une seule source pour les trois usages — aperçu, copie, envoi. Les avoir
+ * séparés aurait garanti qu'ils divergent : c'est exactement ce qui est arrivé
+ * cette semaine aux écrans dupliqués entre admin et manager.
+ *
+ * Deux tons : le modèle formel pour les adultes, la version enjouée pour les
+ * élèves. Un enfant de neuf ans ne reçoit pas un courrier des ressources
+ * humaines.
+ */
 export function buildWelcomeEmail({ email, displayName, password, role }: Params): WelcomeEmail {
-  const prenom = prenomDAppel(displayName);
+  const prenom  = prenomDAppel(displayName);
+  const idTexte = identifiants(email);
 
   if (role === "student") {
     const texte = [
@@ -77,7 +79,7 @@ export function buildWelcomeEmail({ email, displayName, password, role }: Params
       `Ton compte CodeKids est pret. Voici comment y entrer :`,
       ``,
       `Lien : ${SITE_URL}`,
-      `Email : ${email}`,
+      `${idTexte.libelle} : ${idTexte.valeur}`,
       `Mot de passe : ${password}`,
       ``,
       `A tout de suite dans la cite numerique !`,
@@ -107,7 +109,7 @@ export function buildWelcomeEmail({ email, displayName, password, role }: Params
     `Voici vos identifiants de connexion a la plateforme CodeKids :`,
     ``,
     `Lien : ${SITE_URL}`,
-    `Email : ${email}`,
+    `${idTexte.libelle} : ${idTexte.valeur}`,
     `Mot de passe : ${password}`,
     ``,
     `N'hesitez pas a me contacter si vous rencontrez la moindre difficulte.`,
@@ -150,7 +152,19 @@ function enveloppe(corps: string) {
 </div>`;
 }
 
+/**
+ * Une adresse fabriquée ne se montre jamais : on affiche l'identifiant, c'est
+ * lui que la personne tapera. Il se lit directement dans l'adresse, ce qui
+ * évite d'aller chercher la colonne username.
+ */
+function identifiants(email: string): { libelle: string; valeur: string } {
+  return estEmailInterne(email)
+    ? { libelle: "Identifiant", valeur: email.split("@")[0] }
+    : { libelle: "Email",       valeur: email };
+}
+
 function bloc(email: string, password: string) {
+  const id = identifiants(email);
   return `
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin:0 0 24px;">
       <tr><td style="padding:18px 20px;">
@@ -158,7 +172,7 @@ function bloc(email: string, password: string) {
         <p style="margin:0 0 6px;font-size:14px;color:#1B2D5E;">
           <strong>Lien :</strong> <a href="${SITE_URL}" style="color:#F47B20;">${SITE_URL}</a>
         </p>
-        <p style="margin:0 0 6px;font-size:14px;color:#1B2D5E;"><strong>Email :</strong> ${echappe(email)}</p>
+        <p style="margin:0 0 6px;font-size:14px;color:#1B2D5E;"><strong>${id.libelle} :</strong> ${echappe(id.valeur)}</p>
         <p style="margin:0;font-size:14px;color:#1B2D5E;">
           <strong>Mot de passe :</strong>
           <code style="background:#e2e8f0;padding:3px 8px;border-radius:5px;font-size:14px;">${echappe(password)}</code>

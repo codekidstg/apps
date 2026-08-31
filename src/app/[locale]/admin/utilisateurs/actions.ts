@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/supabase/types";
 import { sendWelcomeEmail, buildWelcomeEmail, type WelcomeEmail } from "@/lib/email";
 import { slugFromNum } from "@/lib/levels";
+import {
+  identifiantDepuisNom, identifiantLibre, emailInterne, estEmailInterne,
+} from "@/lib/username";
 
 /**
  * Garde d'accès à la gestion des utilisateurs.
@@ -80,11 +83,13 @@ async function ensureStudentRow(
   });
 }
 
-export async function createUser(formData: FormData): Promise<Resultat> {
+export async function createUser(
+  formData: FormData,
+): Promise<Resultat & { username?: string; email?: string; envoye?: boolean }> {
   const qui = await appelant();
   if (!qui) return { error: "Non autorisé" };
 
-  const email       = formData.get("email") as string;
+  const emailSaisi  = ((formData.get("email") as string) ?? "").trim();
   const password    = formData.get("password") as string;
   const displayName = formData.get("display_name") as string;
   const role        = formData.get("role") as Role;
@@ -93,6 +98,21 @@ export async function createUser(formData: FormData): Promise<Resultat> {
   if (qui.role === "manager" && role === "admin") return REFUS_ROLE;
 
   const admin = createAdminClient();
+
+  // Identifiant de connexion, systématique : il sert à tout le monde, et il
+  // remplace l'adresse pour ceux qui n'en donnent pas.
+  const base = identifiantDepuisNom(displayName);
+  const { data: prisRaw } = await (admin.from("profiles") as any).select("username");
+  const pris = new Set(
+    ((prisRaw ?? []) as { username: string | null }[])
+      .map(p => (p.username ?? "").toLowerCase()).filter(Boolean)
+  );
+  const username = base ? identifiantLibre(base, pris) : "";
+
+  // Sans adresse fournie, on en fabrique une pour Supabase. Elle n'est jamais
+  // montrée ni utilisée pour écrire — d'où l'absence d'envoi plus bas.
+  const email = emailSaisi || (username ? emailInterne(username) : "");
+  if (!email) return { error: "Renseignez un email, ou un nom permettant de créer un identifiant." };
 
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -107,27 +127,45 @@ export async function createUser(formData: FormData): Promise<Resultat> {
   // Update profile (créé automatiquement par le trigger handle_new_user).
   // Le trigger lit raw_user_meta_data->>'role' mais on envoie app_metadata,
   // donc on corrige role explicitement ici.
-  await (admin.from("profiles") as any).update({
+  const majProfil: Record<string, unknown> = {
     display_name: displayName,
     role: role || "student",
     school_id: schoolId || null,
     temp_password: password,
-  }).eq("id", data.user.id);
+  };
+  if (username) majProfil.username = username;
+
+  const { error: errProfil } = await (admin.from("profiles") as any)
+    .update(majProfil).eq("id", data.user.id);
+  // Tant que la migration 026 n'est pas passée, la colonne username n'existe
+  // pas : on réessaie sans elle plutôt que de perdre toute la mise à jour.
+  if (errProfil) {
+    delete majProfil.username;
+    await (admin.from("profiles") as any).update(majProfil).eq("id", data.user.id);
+    console.error("createUser — username non enregistré :", errProfil.message);
+  }
 
   // Un profil role=student ne suffit pas : tout le reste de l'application
   // (progression, affectation d'un prof, lien parent, niveau) s'appuie sur la
   // ligne `students`. Sans elle, l'élève est invisible partout.
   await ensureStudentRow(admin, data.user.id, role || "student");
 
-  // Envoyer email de bienvenue avec les identifiants
-  try {
-    await sendWelcomeEmail({ email, displayName, password, role: role || "student" });
-  } catch {
-    // Ne pas bloquer la création si l'email échoue
+  // Rien à envoyer vers une adresse fabriquée : personne ne la relève. Ces
+  // comptes reçoivent leurs accès par le bouton « Voir le message d'accès ».
+  let envoye = false;
+  if (!estEmailInterne(email)) {
+    try {
+      await sendWelcomeEmail({ email, displayName, password, role: role || "student" });
+      envoye = true;
+    } catch {
+      // Ne pas bloquer la création si l'email échoue
+    }
   }
 
   revalidatePath("/admin/utilisateurs");
-  return { success: true };
+  // L'écran de confirmation doit annoncer ce qui s'est réellement passé, et
+  // afficher l'identifiant retenu — un chiffre a pu s'y ajouter.
+  return { success: true, username, email, envoye };
 }
 
 export async function updateUserRole(userId: string, role: Role): Promise<Resultat> {
