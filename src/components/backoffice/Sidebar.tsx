@@ -22,6 +22,7 @@ const adminNav: NavItem[] = [
   },
   { label: "Écoles",           href: "/admin/ecoles",       icon: "🏫", pageKey: "admin.ecoles" },
   { label: "Thèmes & Cours",   href: "/admin/themes",       icon: "📚", pageKey: "admin.themes" },
+  { label: "Rapports de séance", href: "/admin/rapports",   icon: "📝", pageKey: "admin.rapports" },
   {
     label: "Compta",           href: "/admin/compta",       icon: "💰", pageKey: "admin.compta",
     children: [
@@ -46,6 +47,7 @@ const managerNav: NavItem[] = [
     ],
   },
   { label: "Mes thèmes",      href: "/manager/themes",       icon: "📚", pageKey: "manager.themes" },
+  { label: "Rapports de séance", href: "/manager/rapports",   icon: "📝", pageKey: "manager.rapports" },
   { label: "Affectations",    href: "/manager/affectations",  icon: "📋", pageKey: "manager.affectations" },
   {
     label: "Compta",          href: "/manager/compta",       icon: "💰", pageKey: "manager.compta",

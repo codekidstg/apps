@@ -3,6 +3,7 @@ import { getDashboardComptaKPIs } from "@/lib/compta/treasury";
 import { redirect } from "next/navigation";
 import PageHeader from "@/components/backoffice/PageHeader";
 import Link from "next/link";
+import { AVANCEMENT, ENGAGEMENT } from "@/lib/rapports";
 
 const WEEKDAY_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
@@ -50,9 +51,12 @@ export default async function ManagerDashboard() {
     (admin.from("teacher_sessions") as any)
       .select("*, profiles!teacher_id(display_name), students(id, profiles!profile_id(display_name))")
       .order("weekday").order("start_time").order("scheduled_at"),
+    // `title` et `status` n'existent pas dans session_reports : la requête
+    // était rejetée en bloc et l'encadré affichait « Aucun rapport. » depuis
+    // toujours. Les colonnes réelles sont celles-ci.
     (admin.from("session_reports") as any)
-      .select("id, title, status, created_at, teacher_id, profiles!teacher_id(display_name), advancement, engagement")
-      .order("created_at", { ascending: false })
+      .select("id, occurrence_date, reported_at, teacher_id, profiles!teacher_id(display_name), advancement, engagement")
+      .order("reported_at", { ascending: false })
       .limit(6),
     getDashboardComptaKPIs(month, year),
   ]);
@@ -127,37 +131,36 @@ export default async function ManagerDashboard() {
           <div className="bg-white rounded-2xl border border-cream-border overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-cream-border">
               <h2 className="font-display font-black text-base text-ink">📝 Rapports de séance récents</h2>
+              <Link href="/fr/manager/rapports" className="text-xs font-black text-brand-orange hover:underline">
+                Tout voir →
+              </Link>
             </div>
             {(reports ?? []).length === 0 ? (
               <div className="px-6 py-8 text-center text-ink-muted font-bold text-sm">Aucun rapport.</div>
             ) : (
               <div className="divide-y divide-cream-border">
                 {(reports as any[]).map((r) => {
-                  const adv = r.advancement ?? 0;
-                  const eng = r.engagement  ?? 0;
+                  // advancement et engagement sont des textes, pas des notes :
+                  // le code d'avant en tirait des étoiles, ce qui n'a jamais
+                  // pu s'afficher correctement.
+                  const av = AVANCEMENT[r.advancement ?? ""];
+                  const en = ENGAGEMENT[r.engagement  ?? ""];
                   return (
                     <div key={r.id} className="flex items-center gap-4 px-5 py-3">
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-ink text-sm truncate">{r.title ?? "Rapport"}</div>
+                        <div className="font-bold text-ink text-sm truncate">
+                          {av ? `${av.icon} ${av.label}` : "Rapport de séance"}
+                        </div>
                         <div className="text-xs text-ink-muted mt-0.5 flex items-center gap-2">
                           <span>👩‍🏫 {r.profiles?.display_name ?? "Prof"}</span>
-                          <span>· {new Date(r.created_at).toLocaleDateString("fr-FR")}</span>
+                          <span>· {new Date(r.occurrence_date ?? r.reported_at).toLocaleDateString("fr-FR")}</span>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-gray-400">Avancement</span>
-                          <span className="text-xs font-black" style={{ color: adv >= 3 ? "#10b981" : adv >= 2 ? "#f59e0b" : "#ef4444" }}>
-                            {"★".repeat(adv)}{"☆".repeat(Math.max(0, 5 - adv))}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-gray-400">Engagement</span>
-                          <span className="text-xs font-black" style={{ color: eng >= 3 ? "#10b981" : eng >= 2 ? "#f59e0b" : "#ef4444" }}>
-                            {"★".repeat(eng)}{"☆".repeat(Math.max(0, 5 - eng))}
-                          </span>
-                        </div>
-                      </div>
+                      {en && (
+                        <span className="shrink-0 text-xs font-bold px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 whitespace-nowrap">
+                          {en.icon} {en.label}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
