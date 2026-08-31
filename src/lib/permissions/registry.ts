@@ -45,6 +45,7 @@ export const NAV_PAGES: NavPageDef[] = [
   { role: "admin", key: "admin.compta.mentors",           label: "↳ Mentors",        href: "/admin/compta/mentors",            parentKey: "admin.compta" },
   { role: "admin", key: "admin.compta.parents",           label: "↳ Parents",        href: "/admin/compta/parents",            parentKey: "admin.compta" },
   { role: "admin", key: "admin.compta.tresorerie",        label: "↳ Trésorerie",     href: "/admin/compta/tresorerie",         parentKey: "admin.compta" },
+  { role: "admin", key: "admin.compta.justificatifs",     label: "↳ Justificatifs",  href: "/admin/compta/justificatifs",      parentKey: "admin.compta" },
   { role: "admin", key: "admin.atelier",                  label: "Atelier",          href: "/admin/atelier",                   icon: "🎓" },
   { role: "admin", key: "admin.droits",                   label: "Gestion des droits", href: "/admin/droits",                  icon: "🔐" },
 
@@ -62,6 +63,7 @@ export const NAV_PAGES: NavPageDef[] = [
   { role: "manager", key: "manager.compta.mentors",           label: "↳ Mentors",        href: "/manager/compta/mentors",            parentKey: "manager.compta" },
   { role: "manager", key: "manager.compta.parents",           label: "↳ Parents",        href: "/manager/compta/parents",            parentKey: "manager.compta" },
   { role: "manager", key: "manager.compta.tresorerie",        label: "↳ Trésorerie",     href: "/manager/compta/tresorerie",         parentKey: "manager.compta" },
+  { role: "manager", key: "manager.compta.justificatifs",     label: "↳ Justificatifs",  href: "/manager/compta/justificatifs",      parentKey: "manager.compta" },
   { role: "manager", key: "manager.atelier",                  label: "Atelier",          href: "/atelier/lecon",                     icon: "🎓" },
 
   // ── Teacher ──────────────────────────────────────────────────────────────────
