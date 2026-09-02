@@ -18,6 +18,16 @@ import { completeTraining } from "../../actions";
 const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), { ssr: false });
 const BlocklyKodi  = dynamic(() => import("@/components/eleve/BlocklyKodi"), { ssr: false });
 const PythonMaze   = dynamic(() => import("@/components/eleve/PythonMaze"), { ssr: false });
+const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { ssr: false });
+
+/**
+ * La contrainte CHECK de training_blocks n'accepte pas de nouveau type : les
+ * jeux Python voyagent donc sous `blockly_challenge`, distingués par game_type.
+ * Cette liste est le seul endroit à compléter quand un jeu s'ajoute.
+ */
+const JEUX_PYTHON = ["python_maze", "python_piano", "python_arcade"];
+const estJeuPython = (b: { type: string; content: unknown }) =>
+  b.type === "blockly_challenge" && JEUX_PYTHON.includes((b.content as any)?.game_type);
 
 type Block = { id: string; type: string; content: Record<string, unknown>; order_index: number };
 
@@ -78,12 +88,12 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
 
   const quizBlocks    = blocks.filter(b => b.type === "quiz");
   const codeBlocks    = blocks.filter(b => b.type === "code_challenge");
-  const blocklyBlocks = blocks.filter(b => b.type === "blockly_challenge" && (b.content as any)?.game_type !== "python_maze");
+  const blocklyBlocks = blocks.filter(b => b.type === "blockly_challenge" && !estJeuPython(b));
   const fillBlocks    = blocks.filter(b => b.type === "fill_blank");
   const matchBlocks   = blocks.filter(b => b.type === "match");
   const swipeBlocks   = blocks.filter(b => b.type === "swipe_sort");
   const dragBlocks    = blocks.filter(b => b.type === "drag_to_bin");
-  const mazeBlocks    = blocks.filter(b => b.type === "blockly_challenge" && (b.content as any)?.game_type === "python_maze");
+  const mazeBlocks    = blocks.filter(estJeuPython);
 
   // — Progression —
   const allQuizKeys = quizBlocks.flatMap(b => {
@@ -389,9 +399,10 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
           /* Labyrinthe piloté en Python. La contrainte de training_blocks n'autorise
              pas de nouveau type : on le porte par blockly_challenge + game_type,
              comme les leçons le font avec leurs jeux. */
-          if (block.type === "blockly_challenge" && (block.content as any)?.game_type === "python_maze") {
+          if (estJeuPython(block)) {
+            const Jeu = (block.content as any).game_type === "python_piano" ? PythonPiano : PythonMaze;
             return (
-              <PythonMaze
+              <Jeu
                 key={block.id}
                 config={block.content as any}
                 done={!!gameDone[block.id]}

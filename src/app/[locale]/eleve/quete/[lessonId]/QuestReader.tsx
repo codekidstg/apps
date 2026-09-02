@@ -23,6 +23,7 @@ import dynamic from "next/dynamic";
 const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), { ssr: false });
 const PythonMaze   = dynamic(() => import("@/components/eleve/PythonMaze"), { ssr: false });
 const PythonArcade = dynamic(() => import("@/components/eleve/PythonArcade"), { ssr: false });
+const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { ssr: false });
 
 type Block = {
   id: string;
@@ -440,6 +441,20 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
             if (gameType === "python_maze") {
               return (
                 <PythonMaze
+                  key={block.id}
+                  config={cfg as any}
+                  done={done}
+                  onSolved={done ? () => {} : markDone}
+                  savedCode={gameStates[block.id] as string | undefined}
+                  onCodeChange={(c) => saveGameState(block.id, c)}
+                />
+              );
+            }
+
+            // Bâtisseur : la mélodie écrite en Python — c'est sa liste qui sonne
+            if (gameType === "python_piano") {
+              return (
+                <PythonPiano
                   key={block.id}
                   config={cfg as any}
                   done={done}
@@ -996,7 +1011,10 @@ function BugHuntGame({ title, description, context, instructions, bugIndex, fix,
                 cursor:     solved ? "default" : "pointer",
               }}>
               <span className="text-xs font-bold w-5 text-right flex-shrink-0" style={{ color: "#334155" }}>{idx + 1}.</span>
-              <span className="flex-1">{inst}</span>
+              {/* whitespace-pre : sans lui le HTML mange les espaces de tête, et
+                  une erreur de décalage — la moitié de nos chasses au bug —
+                  devient invisible. */}
+              <span className="flex-1 whitespace-pre overflow-x-auto">{inst}</span>
               {isBug    && <span className="text-xs font-bold" style={{ color: "#10b981" }}>← BUG !</span>}
               {isWrong  && <span className="text-xs font-bold" style={{ color: "#ef4444" }}>✗</span>}
             </button>
@@ -1009,9 +1027,9 @@ function BugHuntGame({ title, description, context, instructions, bugIndex, fix,
           <div className="font-black text-sm" style={{ color: "#10b981" }}>🎉 Bravo — bug trouvé !</div>
           <div className="text-sm font-mono" style={{ color: "#4ade80" }}>
             Ligne {bugIndex + 1} :{" "}
-            <span style={{ color: "#ef4444", textDecoration: "line-through" }}>{instructions[bugIndex]}</span>
+            <span className="whitespace-pre" style={{ color: "#ef4444", textDecoration: "line-through" }}>{instructions[bugIndex]}</span>
             {" → "}
-            <span style={{ color: "#10b981" }}>{fix}</span>
+            <span className="whitespace-pre" style={{ color: "#10b981" }}>{fix}</span>
           </div>
           {explanation && <div className="text-xs leading-relaxed mt-1" style={{ color: "#86efac" }}>💡 {explanation}</div>}
         </div>
