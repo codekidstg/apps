@@ -97,9 +97,14 @@ export default function PythonPiano({
       if (i === -1) {
         return { ok: false, msg: `Il manque des notes : ${obtenu.length} sur ${attendu.length}.` };
       }
-      const att = attendu[i] ? NOTE_LABEL[attendu[i]!] : "rien";
-      const obt = obtenu[i]  ? NOTE_LABEL[obtenu[i]!]  : "rien";
-      return { ok: false, msg: `Couac au ${i + 1}${i === 0 ? "er" : "e"} temps : ${obt} au lieu de ${att}.` };
+      // silence() produit une entrée vide : la nommer « un silence » plutôt que
+      // « rien », sans quoi le message ne dit pas ce qu'il faut ajouter.
+      const nom = (n: Note | null | undefined, absent: string) =>
+        n ? NOTE_LABEL[n] : absent;
+      const att = nom(attendu[i], "un silence");
+      const obt = nom(obtenu[i],  obtenu.length > i ? "un silence" : "plus rien");
+      const de = /^[aeiouâàéèêîôû]/i.test(att) ? "d'" : "de ";
+      return { ok: false, msg: `Couac au ${i + 1}${i === 0 ? "er" : "e"} temps : ${obt} au lieu ${de}${att}.` };
     }
 
     const mini = config.min_notes ?? 1;
