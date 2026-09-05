@@ -49,11 +49,19 @@ export async function processGamificationEvent(
   const newLevel = getLevelForXp(newXp);
   const levelUp  = newLevel.num > oldLevel.num;
 
-  // Update student XP + level
+  // Seuls l'XP et les points sont écrits ici.
+  //
+  // `level_num` était mis à jour depuis les paliers d'XP — or c'est le niveau
+  // pédagogique, fixé par l'administration, qui décide des thèmes accessibles.
+  // Chaque leçon terminée le rétrogradait donc silencieusement : un élève
+  // inscrit en Bâtisseur repassait Explorateur dès qu'il gagnait de l'XP, et
+  // la colonne `level` restait « builder », désynchronisée.
+  //
+  // Le palier d'XP reste calculé pour annoncer une montée de niveau, il n'est
+  // simplement plus persisté.
   await sb.from("students").update({
-    xp:        newXp,
-    level_num: newLevel.num,
-    points:    newXp,
+    xp:     newXp,
+    points: newXp,
   }).eq("id", studentId);
 
   // Check badges to award

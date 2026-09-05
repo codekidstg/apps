@@ -26,7 +26,9 @@ export default async function EleveLayout({ children, params }: { children: Reac
   // profile + student en parallèle
   const [profileRes, studentRes] = await Promise.all([
     supabase.from("profiles").select("display_name, role").eq("id", user.id).single<{ display_name: string; role: string }>(),
-    supabase.from("students").select("id, xp, points, atelier_active").eq("profile_id", user.id).single<{ id: string; xp: number; points: number; atelier_active: boolean }>(),
+    // level_num vient avec : c'est le niveau pédagogique fixé par l'admin, à ne
+    // pas confondre avec le palier d'XP qui porte malheureusement les mêmes noms.
+    supabase.from("students").select("id, xp, points, atelier_active, level_num").eq("profile_id", user.id).single<{ id: string; xp: number; points: number; atelier_active: boolean; level_num: number | null }>(),
   ]);
   const profile = profileRes.data;
   const student = studentRes.data;
@@ -115,7 +117,7 @@ export default async function EleveLayout({ children, params }: { children: Reac
         </div>
 
         {/* XP Bar */}
-        <XPBar xp={xp} />
+        <XPBar xp={xp} niveauNum={student?.level_num ?? 1} />
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-3 space-y-1">
