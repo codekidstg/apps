@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { jourTogo, minuit, jourSemaine, libelleEcart, semaineDe } from "@/lib/planning/dates";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function buildNextSession(sessions: any[]): { title: string; at: Date; studentName: string | null } | null {
@@ -12,10 +13,11 @@ function buildNextSession(sessions: any[]): { title: string; at: Date; studentNa
   for (const s of sessions) {
     if (s.session_type === "recurring") {
       const [h, m] = (s.start_time as string).split(":").map(Number);
-      const cursor = new Date(now);
-      cursor.setHours(h, m, 0, 0);
-      const daysUntil = (s.weekday - cursor.getDay() + 7) % 7;
-      cursor.setDate(cursor.getDate() + (daysUntil === 0 && cursor > now ? 0 : daysUntil === 0 ? 7 : daysUntil));
+      // Heure du Togo : setHours() aurait posé l'heure du serveur.
+      const cursor = minuit(jourTogo(now));
+      cursor.setUTCHours(h, m, 0, 0);
+      const ecart = (s.weekday - jourSemaine(cursor) + 7) % 7;
+      cursor.setUTCDate(cursor.getUTCDate() + (ecart === 0 && cursor > now ? 0 : ecart === 0 ? 7 : ecart));
       if (!best || cursor < best.at) best = { title: s.title, at: new Date(cursor), studentName: s.students?.profiles?.display_name ?? null };
     } else if (s.session_type === "once" && s.scheduled_at) {
       const at = new Date(s.scheduled_at);
@@ -25,35 +27,21 @@ function buildNextSession(sessions: any[]): { title: string; at: Date; studentNa
   return best;
 }
 
-function daysUntil(d: Date): string {
-  const diff = Math.ceil((d.getTime() - Date.now()) / 86400000);
-  if (diff === 0) return "Aujourd'hui";
-  if (diff === 1) return "Demain";
-  return `Dans ${diff} jours`;
-}
-
 // Compte les sessions récurrentes + ponctuelles qui tombent dans la semaine courante (lun–dim)
 function countSessionsThisWeek(sessions: any[]): number {
-  const now = new Date();
-  const dow = now.getDay(); // 0=dim
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
+  const { lundi, dimanche } = semaineDe();
+  const monday = minuit(lundi);
+  const sunday = new Date(minuit(dimanche).getTime() + 86399999);
 
   let count = 0;
   for (const s of sessions) {
     if (s.session_type === "recurring") {
-      const activeFrom = new Date(s.active_from ?? s.created_at);
-      activeFrom.setHours(0, 0, 0, 0);
-      const activeUntil = s.active_until ? new Date(s.active_until) : null;
+      const activeFrom = minuit(jourTogo(new Date(s.active_from ?? s.created_at)));
+      const activeUntil = s.active_until ? minuit(jourTogo(new Date(s.active_until))) : null;
       // jour de la semaine courante correspondant au weekday de la session
       const offset = s.weekday === 0 ? 6 : s.weekday - 1; // offset depuis lundi
       const occDay = new Date(monday);
-      occDay.setDate(monday.getDate() + offset);
-      occDay.setHours(0, 0, 0, 0);
+      occDay.setUTCDate(occDay.getUTCDate() + offset);
       if (occDay >= activeFrom && (!activeUntil || occDay <= activeUntil)) count++;
     } else if (s.session_type === "once" && s.scheduled_at) {
       const at = new Date(s.scheduled_at);
@@ -71,22 +59,20 @@ function countPendingReports(sessions: any[], reportedKeys: Set<string>): number
 
   for (const s of sessions) {
     if (s.session_type === "recurring") {
-      const startStr = s.active_from ?? s.created_at;
-      const startDate = new Date(startStr);
-      startDate.setHours(0, 0, 0, 0);
+      const startDate = minuit(jourTogo(new Date(s.active_from ?? s.created_at)));
 
       const [h, m] = (s.start_time as string).split(":").map(Number);
       const cursor = new Date(startDate);
-      cursor.setHours(h, m, 0, 0);
-      const daysUntil2 = (s.weekday - cursor.getDay() + 7) % 7;
-      cursor.setDate(cursor.getDate() + (daysUntil2 === 0 && cursor >= startDate ? 0 : daysUntil2 === 0 ? 7 : daysUntil2));
+      cursor.setUTCHours(h, m, 0, 0);
+      const ecart2 = (s.weekday - jourSemaine(cursor) + 7) % 7;
+      cursor.setUTCDate(cursor.getUTCDate() + (ecart2 === 0 && cursor >= startDate ? 0 : ecart2 === 0 ? 7 : ecart2));
 
       while (cursor <= to) {
         if (!s.active_until || cursor <= new Date(s.active_until)) {
           const key = `${s.id}|${cursor.toISOString().slice(0, 10)}`;
           if (!reportedKeys.has(key)) pending++;
         }
-        cursor.setDate(cursor.getDate() + 7);
+        cursor.setUTCDate(cursor.getUTCDate() + 7);
       }
     } else if (s.session_type === "once" && s.scheduled_at) {
       const at = new Date(s.scheduled_at);
@@ -244,18 +230,18 @@ export default async function ProfDashboard() {
             <div className="px-5 py-4">
               <div className="flex items-center gap-3">
                 <div className="w-14 text-center shrink-0 bg-indigo-50 rounded-xl py-2">
-                  <div className="text-[10px] font-black text-indigo-400 uppercase">{WEEKDAY[nextSession.at.getDay()]}</div>
-                  <div className="text-2xl font-black text-indigo-700 leading-none">{nextSession.at.getDate()}</div>
-                  <div className="text-[10px] text-indigo-400">{nextSession.at.toLocaleDateString("fr-FR", { month: "short" })}</div>
+                  <div className="text-[10px] font-black text-indigo-400 uppercase">{WEEKDAY[jourSemaine(nextSession.at)]}</div>
+                  <div className="text-2xl font-black text-indigo-700 leading-none">{nextSession.at.getUTCDate()}</div>
+                  <div className="text-[10px] text-indigo-400">{nextSession.at.toLocaleDateString("fr-FR", { month: "short", timeZone: "UTC" })}</div>
                 </div>
                 <div className="flex-1">
                   <div className="font-black text-sm" style={{ color: "#1B2D5E" }}>{nextSession.title}</div>
                   <div className="text-xs mt-0.5" style={{ color: "#64748B" }}>
-                    {nextSession.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    {nextSession.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })}
                     {nextSession.studentName && <> · 👦 {nextSession.studentName}</>}
                   </div>
                   <span className="inline-block mt-2 text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: "#f0fdf4", color: "#16a34a" }}>
-                    {daysUntil(nextSession.at)}
+                    {libelleEcart(nextSession.at)}
                   </span>
                 </div>
               </div>
