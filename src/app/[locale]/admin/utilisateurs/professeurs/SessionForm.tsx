@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useMemo } from "react";
 import { createTeacherSession } from "./session-actions";
+import { analyserConflit, messageConflit, type Seance } from "@/lib/planning/conflits";
 
 const WEEKDAYS = [
   { label: "Lun", value: 1 },
@@ -21,8 +22,6 @@ const DURATIONS = [
   { label: "2h",     value: 120 },
 ];
 
-const BUFFER_MIN = 180;
-
 type Student = { id: string; display_name: string };
 type ExistingSession = {
   id: string;
@@ -33,31 +32,6 @@ type ExistingSession = {
   scheduled_at?: string;
   duration_min: number;
 };
-
-function timeToMin(t: string) {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
-
-function findConflict(
-  newWeekday: number,
-  newStartMin: number,
-  existing: ExistingSession[],
-): string | null {
-  for (const s of existing) {
-    let existingMin: number | null = null;
-    if (s.session_type === "recurring" && s.weekday === newWeekday && s.start_time) {
-      existingMin = timeToMin(s.start_time);
-    } else if (s.session_type === "once" && s.scheduled_at) {
-      const d = new Date(s.scheduled_at);
-      if (d.getDay() === newWeekday) existingMin = d.getHours() * 60 + d.getMinutes();
-    }
-    if (existingMin !== null && Math.abs(newStartMin - existingMin) < BUFFER_MIN) {
-      return s.title;
-    }
-  }
-  return null;
-}
 
 export default function SessionForm({
   teacherId,
@@ -74,23 +48,34 @@ export default function SessionForm({
   const [scheduledAt, setScheduledAt] = useState("");
   const [duration,   setDuration]  = useState(60);
   const [studentId,  setStudentId] = useState<string>("all");
+  // Contrôlés : l'aperçu de conflit a besoin de la période pour être exact.
+  const [activeFrom,  setActiveFrom]  = useState(new Date().toISOString().slice(0, 10));
+  const [activeUntil, setActiveUntil] = useState("");
   const [pending,    startTransition] = useTransition();
-  const [status,     setStatus]    = useState<"idle" | "ok" | "error">("idle");
+  const [status,     setStatus]    = useState<"idle" | "ok" | "warning" | "error">("idle");
   const [errorMsg,   setErrorMsg]  = useState("");
 
-  // Avertissement de conflit en temps réel
-  const conflictWarning = useMemo(() => {
+  // Aperçu du conflit pendant la saisie — même analyse que le serveur, pour ne
+  // pas annoncer un problème que l'enregistrement accepterait, ni l'inverse.
+  const apercuConflit = useMemo(() => {
+    const existantes = existingSessions as unknown as Seance[];
     if (type === "recurring" && startTime) {
-      return findConflict(weekday, timeToMin(startTime), existingSessions);
+      return analyserConflit(
+        { type: "recurring", weekday, startTime, duration, from: activeFrom, until: activeUntil || null },
+        existantes,
+      );
     }
     if (type === "once" && scheduledAt) {
       const d = new Date(scheduledAt);
       if (!isNaN(d.getTime())) {
-        return findConflict(d.getDay(), d.getHours() * 60 + d.getMinutes(), existingSessions);
+        return analyserConflit({ type: "once", scheduledAt, duration }, existantes);
       }
     }
-    return null;
-  }, [type, weekday, startTime, scheduledAt, existingSessions]);
+    return { kind: "libre" } as const;
+  }, [type, weekday, startTime, scheduledAt, duration, activeFrom, activeUntil, existingSessions]);
+
+  const conflictWarning = apercuConflit.kind === "libre" ? null : messageConflit(apercuConflit);
+  const bloquant = apercuConflit.kind === "chevauchement";
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -103,11 +88,16 @@ export default function SessionForm({
     startTransition(async () => {
       const res = await createTeacherSession(fd);
       if ("error" in res) { setStatus("error"); setErrorMsg(res.error); return; }
-      setStatus("ok");
+      // La séance est créée : un espacement trop court se signale sans empêcher.
+      const avert = "warning" in res ? (res.warning as string) : "";
+      setStatus(avert ? "warning" : "ok");
+      setErrorMsg(avert);
       (e.target as HTMLFormElement).reset();
       setType("recurring"); setWeekday(1); setStartTime("09:00");
       setScheduledAt(""); setDuration(60); setStudentId("all");
-      setTimeout(() => setStatus("idle"), 3000);
+      // Ces deux champs sont contrôlés : form.reset() ne les remet pas à zéro.
+      setActiveFrom(new Date().toISOString().slice(0, 10)); setActiveUntil("");
+      setTimeout(() => setStatus("idle"), avert ? 9000 : 3000);
     });
   }
 
@@ -196,7 +186,7 @@ export default function SessionForm({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-1.5">À partir du</label>
-              <input name="active_from" type="date" required defaultValue={new Date().toISOString().slice(0, 10)}
+              <input name="active_from" type="date" required value={activeFrom} onChange={(e) => setActiveFrom(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent transition"
               />
             </div>
@@ -204,7 +194,7 @@ export default function SessionForm({
               <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-1.5">
                 Jusqu&apos;au <span className="font-normal normal-case">(optionnel)</span>
               </label>
-              <input name="active_until" type="date"
+              <input name="active_until" type="date" value={activeUntil} onChange={(e) => setActiveUntil(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent transition"
               />
             </div>
@@ -219,7 +209,7 @@ export default function SessionForm({
               conflictWarning ? "border-amber-400 bg-amber-50" : "border-gray-200"
             }`}
           />
-          <input name="active_from" type="hidden" value={new Date().toISOString().slice(0, 10)} />
+          <input name="active_from" type="hidden" value={activeFrom} />
         </div>
       )}
 
@@ -229,7 +219,7 @@ export default function SessionForm({
           <span className="text-amber-500 text-base shrink-0">⚠️</span>
           <div>
             <span className="font-black text-amber-800">Conflit potentiel (tampon 3h) :</span>
-            <span className="text-amber-700 ml-1">« {conflictWarning} » est déjà planifié proche de ce créneau.</span>
+            <span className="text-amber-700 ml-1">{conflictWarning}</span>
           </div>
         </div>
       )}
@@ -261,7 +251,8 @@ export default function SessionForm({
           {pending ? "Enregistrement…" : "＋ Ajouter cette session"}
         </button>
         {status === "ok"    && <span className="text-xs text-emerald-600 font-bold">✅ Session ajoutée !</span>}
-        {status === "error" && <span className="text-xs text-red-500 font-bold">{errorMsg}</span>}
+        {status === "warning" && <span className="text-xs text-amber-600 font-bold">⚠️ {errorMsg}</span>}
+        {status === "error"   && <span className="text-xs text-red-500 font-bold">{errorMsg}</span>}
       </div>
     </form>
   );
