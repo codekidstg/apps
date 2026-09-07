@@ -518,7 +518,9 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                               style={{ background: result === true ? "#052e16" : result === false ? "#2d0a0a" : "#1e293b", color: result === true ? "#6ee7b7" : result === false ? "#fca5a5" : "#FDB813", border: `1px solid ${result === true ? "#10b981" : result === false ? "#ef4444" : "#FDB81360"}`, minWidth: 80, textAlign: "center" }}>
                               {chosen !== null ? s.options[chosen] : "______"}
                             </span>
-                            {s.after ?? ""}
+                            {/* Le rendu collait le trou au mot suivant : « ______cases ».
+                                Une espace, sauf devant une ponctuation. */}
+                            {s.after ? (/^[.,;:!?)]/.test(s.after) ? s.after : ` ${s.after}`) : ""}
                           </p>
                         </div>
                         {result == null && (
@@ -559,7 +561,9 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
           /* ── match ── */
           if (block.type === "match") {
             type Pair = { left: string; right: string };
-            const raw = block.content as { title?: string; pairs: Pair[] };
+            // Les en-têtes « Concept / Définition » ne conviennent pas à tous
+            // les appariements — un trajet n'est pas un concept.
+            const raw = block.content as { title?: string; pairs: Pair[]; left_label?: string; right_label?: string };
             const bMatchPairs  = matchPairs[block.id] ?? {};
             const bMatchSel    = matchSel[block.id] ?? null;
             const isDone       = !!matchDone[block.id];
@@ -612,7 +616,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                   <div className="grid grid-cols-2 gap-3">
                     {/* Colonne gauche */}
                     <div className="space-y-2">
-                      <div className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: "#6b21a8" }}>Concept</div>
+                      <div className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: "#6b21a8" }}>{raw.left_label ?? "Concept"}</div>
                       {raw.pairs.map((p, pi) => {
                         const leftId = `l${pi}`;
                         const paired = bMatchPairs[leftId];
@@ -641,7 +645,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                     </div>
                     {/* Colonne droite — mélangée */}
                     <div className="space-y-2">
-                      <div className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: "#6b21a8" }}>Définition</div>
+                      <div className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: "#6b21a8" }}>{raw.right_label ?? "Définition"}</div>
                       {shuffledRight.map(({ label, id: rightId }) => {
                         const pi = parseInt(rightId.replace("r", ""));
                         // Correctement associé = la paire gauche correspondante pointe vers ce rightId
@@ -875,7 +879,14 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                   )}
 
                   {/* Bacs cibles */}
-                  <div className={`grid gap-3 mb-6 ${raw.bins.length <= 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                  {/* Quatre bacs tombaient en 3 + 1 sur une grille de trois
+                      colonnes. Une boussole se lit en 2 × 2, et ça tient sur
+                      un téléphone. */}
+                  <div className={`grid gap-3 mb-6 ${
+                    raw.bins.length <= 2 ? "grid-cols-2"
+                    : raw.bins.length === 4 ? "grid-cols-2"
+                    : "grid-cols-3"
+                  }`}>
                     {raw.bins.map(bin => {
                       const itemsInBin = answeredItems.filter(item => dragResults[`${block.id}-${item.id}`]?.chosen === bin.id);
                       const isActive = !!bDragSelected && !allAnswered;
