@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { LEVELS, xpProgressInLevel } from "@/lib/gamification/levels";
+import { chargerParcours, PARCOURS_VIDE } from "@/lib/progression";
+import { slugFromNum } from "@/lib/levels";
 import { BADGES } from "@/lib/gamification/badges";
 import type { BadgeId } from "@/lib/gamification/badges";
 
@@ -19,7 +21,7 @@ export default async function SuiviDashboard({
   // Requêtes indépendantes en parallèle
   const [linksRes, consentsRes, subsRes] = await Promise.all([
     (admin.from("parent_children") as any)
-      .select(`student_id, students (id, xp, level_num, streak_days, teacher_id, profiles!students_profile_id_fkey ( display_name ))`)
+      .select(`student_id, students (id, xp, level, level_num, streak_days, teacher_id, profiles!students_profile_id_fkey ( display_name ))`)
       .eq("parent_id", user.id),
     (supabase.from("parental_consents") as any)
       .select("student_id, revoked_at")
@@ -39,10 +41,13 @@ export default async function SuiviDashboard({
   const teacherIds = [...new Set(children.map((c: any) => c.teacher_id).filter(Boolean))];
 
   // Toutes les requêtes dépendant de childIds — en parallèle
-  const [progressRes, trainingRes, sessionsRes, achivRes] = await Promise.all([
+  const [progressRes, trainingRes, sessionsRes, achivRes, parcoursParEnfant] = await Promise.all([
     childIds.length
+      // `updated_at` n'existe pas sur lesson_progress. PostgREST rejetait donc
+      // la requête entière, `data` valait null, et TOUS les parents voyaient
+      // 0 leçon, 0 activité et une semaine vide. L'erreur n'était jamais lue.
       ? (admin.from("lesson_progress") as any)
-          .select("student_id, status, lesson_id, completed_at, updated_at")
+          .select("student_id, status, lesson_id, completed_at")
           .in("student_id", childIds)
       : Promise.resolve({ data: [] }),
     childIds.length
@@ -62,8 +67,15 @@ export default async function SuiviDashboard({
           .in("student_id", childIds)
           .order("earned_at", { ascending: false })
       : Promise.resolve({ data: [] }),
+    // Même définition de la progression que les écrans admin et manager.
+    chargerParcours(admin, children.map((c: any) => ({
+      id: c.id,
+      niveau: c.level ?? slugFromNum(c.level_num),
+    }))),
   ]);
 
+  if ((progressRes as any).error)
+    console.error("[suivi] lesson_progress :", (progressRes as any).error.message);
   const progressRaw = (progressRes as any).data ?? [];
   const trainingProgressRaw = (trainingRes as any).data ?? [];
   const sessionsRaw = (sessionsRes as any).data ?? [];
@@ -76,12 +88,13 @@ export default async function SuiviDashboard({
   const weeklyByChild = new Map<string, { lessons: number; activeDays: Set<string> }>();
   for (const c of children) weeklyByChild.set(c.id, { lessons: 0, activeDays: new Set() });
 
-  const progressByChild = new Map<string, { total: number; done: number; lastActivity: Date | null }>();
+  // Ce relevé ne sert plus qu'à dater la dernière activité : le compteur de
+  // leçons vient désormais de `chargerParcours`, qui compare aux leçons
+  // réellement ouvertes à l'enfant et non aux lignes de suivi existantes.
+  const progressByChild = new Map<string, { lastActivity: Date | null }>();
   for (const p of progressRaw) {
-    const cur = progressByChild.get(p.student_id) ?? { total: 0, done: 0, lastActivity: null };
-    cur.total++;
+    const cur = progressByChild.get(p.student_id) ?? { lastActivity: null };
     if (p.status === "completed") {
-      cur.done++;
       const at = p.completed_at ? new Date(p.completed_at) : null;
       if (at && (!cur.lastActivity || at > cur.lastActivity)) cur.lastActivity = at;
       if (at && at >= weekAgo) {
@@ -92,7 +105,7 @@ export default async function SuiviDashboard({
     progressByChild.set(p.student_id, cur);
   }
   for (const c of children) {
-    if (!progressByChild.has(c.id)) progressByChild.set(c.id, { total: 0, done: 0, lastActivity: null });
+    if (!progressByChild.has(c.id)) progressByChild.set(c.id, { lastActivity: null });
   }
 
   const weeklyTrainingsByChild = new Map<string, number>();
@@ -167,7 +180,8 @@ export default async function SuiviDashboard({
         const xp     = child.xp ?? 0;
         const lvl    = LEVELS.find((l) => l.num === (child.level_num ?? 1)) ?? LEVELS[0];
         const { pct } = xpProgressInLevel(xp);
-        const prog   = progressByChild.get(child.id) ?? { total: 0, done: 0, lastActivity: null };
+        const prog   = progressByChild.get(child.id) ?? { lastActivity: null };
+        const par    = parcoursParEnfant.get(child.id) ?? PARCOURS_VIDE;
         const badges = (badgesByChild.get(child.id) ?? []).slice(0, 4);
         const sub         = activeSubs.get(child.id);
         const hasConsent  = consentedIds.has(child.id);
@@ -239,8 +253,10 @@ export default async function SuiviDashboard({
                 <div className="text-xs text-slate-400 mt-0.5">XP total</div>
               </div>
               <div className="bg-slate-900/60 rounded-xl p-3 text-center">
-                <div className="text-2xl font-black text-white">{prog.done}/{prog.total}</div>
-                <div className="text-xs text-slate-400 mt-0.5">Leçons</div>
+                <div className="text-2xl font-black text-white">{par.faites}/{par.total}</div>
+                <div className="text-xs text-slate-400 mt-0.5 truncate" title={par.themeCourant ?? undefined}>
+                  {par.themeCourant ?? "Leçons"}
+                </div>
               </div>
               <div className="bg-slate-900/60 rounded-xl p-3 text-center">
                 <div className="text-sm font-black text-white leading-tight">{relativeDate(lastAt)}</div>

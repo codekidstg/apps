@@ -34,6 +34,18 @@
         "/private/tmp/claude-501/-Users-roland-codekids/055e92b4-f881-4898-b01b-7470f382f9c2/scratchpad"
       ],
       "port": 4242
+    },
+    {
+      "name": "navor-site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4301",
+        "--directory",
+        "/private/tmp/claude-501/-Users-roland-codekids/33ee3746-662c-4058-aace-db6c709e81df/scratchpad/preview"
+      ],
+      "port": 4301
     }
   ]
 }

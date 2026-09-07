@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import LevelSelect from "./LevelSelect";
+import type { Parcours } from "@/lib/progression";
 
 const LEVELS = [
   { num: 1, name: "Explorateur 🌱", color: "#10B981" },
@@ -18,9 +19,7 @@ type StudentRow = {
   xp: number;
   streak_days: number;
   level_num: number;
-  done: number;
-  total: number;
-  currentTheme: string | null;
+  parcours: Parcours;
   parents: string[];
 };
 
@@ -36,7 +35,7 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
       return (
         s.name.toLowerCase().includes(lower) ||
         s.email.toLowerCase().includes(lower) ||
-        (s.currentTheme ?? "").toLowerCase().includes(lower) ||
+        (s.parcours.themeCourant ?? "").toLowerCase().includes(lower) ||
         s.parents.some((p) => p.toLowerCase().includes(lower))
       );
     });
@@ -79,7 +78,7 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              {["Élève", "Niveau", "Progression", "Thème actif", "Parent(s)"].map((h) => (
+              {["Élève", "Niveau", "Progression", "Thème en cours", "Parent(s)"].map((h) => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-black text-gray-400 uppercase tracking-widest">{h}</th>
               ))}
             </tr>
@@ -91,7 +90,8 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
               </td></tr>
             ) : filtered.map((s) => {
               const lvl = LEVELS.find((l) => l.num === s.level_num) ?? LEVELS[0];
-              const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+              const p   = s.parcours;
+              const pct = p.total ? Math.round((p.faites / p.total) * 100) : 0;
               return (
                 <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
@@ -108,20 +108,50 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
                   </td>
                   <td className="px-4 py-3">
                     <LevelSelect studentId={s.id} currentLevel={s.level_num} levels={LEVELS} />
-                    <div className="text-xs text-gray-400 mt-0.5">{s.xp} XP · 🔥 {s.streak_days}j</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="text-sm font-bold text-gray-700">{s.done}/{s.total} leçons</div>
-                    <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden w-24">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: lvl.color }} />
+                    <div className="text-xs text-gray-400 mt-0.5"
+                      title="L'XP vient des leçons, des entraînements, des jeux et de la série : elle ne suit pas le compteur de leçons.">
+                      {s.xp} XP · 🔥 {s.streak_days}j
                     </div>
                   </td>
+                  {/* Progression dans le thème en cours — pas sur le catalogue entier. */}
                   <td className="px-4 py-3">
-                    {s.currentTheme ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded-full">
-                        📚 {s.currentTheme}
-                      </span>
-                    ) : <span className="text-xs text-gray-300">—</span>}
+                    {p.aucunThemeActive ? (
+                      <span className="text-xs font-bold text-amber-600">Aucun thème activé</span>
+                    ) : (
+                      <>
+                        <div className="text-sm font-bold text-gray-700">{p.faites}/{p.total} leçons</div>
+                        <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden w-24">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: lvl.color }} />
+                        </div>
+                        {p.rangTheme && (
+                          <div className="text-[11px] text-gray-400 font-medium mt-1">
+                            Thème {p.rangTheme} sur {p.themesDuNiveau}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {p.themeCourant ? (
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="inline-flex items-center gap-1 text-xs font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded-full">
+                          📚 {p.themeCourant}
+                        </span>
+                        {p.termine ? (
+                          <span className="text-[11px] font-bold text-emerald-600">✓ Thème terminé</span>
+                        ) : p.prochaineLecon ? (
+                          <span className="text-[11px] text-gray-400">Prochaine : {p.prochaineLecon}</span>
+                        ) : null}
+                        {p.horsParcours > 0 && (
+                          <span className="text-[11px] font-bold text-gray-400"
+                            title="Leçons travaillées dans des thèmes qui ne lui sont pas activés — elles ne comptent pas dans sa progression.">
+                            ⚠ {p.horsParcours} leçon{p.horsParcours > 1 ? "s" : ""} hors parcours
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs font-bold text-amber-600">Aucun thème activé</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {s.parents.length > 0 ? (

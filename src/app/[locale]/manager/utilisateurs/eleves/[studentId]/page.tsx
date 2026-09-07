@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import StudentProfileForm from "@/app/[locale]/admin/utilisateurs/eleves/[studentId]/StudentProfileForm";
+import { chargerParcoursEleve } from "@/lib/backoffice/eleves";
 
 const LEVELS = [
   { num: 1, name: "Explorateur 🌱", color: "#10B981" },
@@ -32,7 +33,7 @@ export default async function ManagerStudentDetailPage({
   const admin = createAdminClient();
 
   const { data: student } = await (admin.from("students") as any)
-    .select("id, xp, level_num, streak_days, profile_id, gender, birth_year, device, school_level, objective, notes, profiles!profile_id(id, display_name, created_at)")
+    .select("id, xp, level, level_num, streak_days, profile_id, gender, birth_year, device, school_level, objective, notes, profiles!profile_id(id, display_name, created_at)")
     .eq("id", studentId)
     .single();
 
@@ -46,11 +47,9 @@ export default async function ManagerStudentDetailPage({
     .eq("student_id", studentId);
   const parents = (parentLinks ?? []).map((l: any) => l.profiles?.display_name ?? "Parent");
 
-  const { data: progressRaw } = await (admin.from("lesson_progress") as any)
-    .select("status")
-    .eq("student_id", studentId);
-  const done  = (progressRaw ?? []).filter((p: any) => p.status === "completed").length;
-  const total = (progressRaw ?? []).length;
+  // Le denominateur etait le nombre de lignes de suivi : il grandissait a
+  // chaque lecon ouverte, si bien qu'avancer faisait baisser le pourcentage.
+  const parcours = await chargerParcoursEleve(studentId, student.level, student.level_num);
 
   const lvl = LEVELS.find(l => l.num === (student.level_num ?? 1)) ?? LEVELS[0];
   const age  = student.birth_year ? new Date().getFullYear() - student.birth_year : null;
@@ -72,7 +71,9 @@ export default async function ManagerStudentDetailPage({
             <span className="text-xs font-black px-2 py-0.5 rounded-full text-white" style={{ background: lvl.color }}>{lvl.name}</span>
             <span className="text-xs text-gray-500 font-bold">⚡ {student.xp ?? 0} XP</span>
             <span className="text-xs text-gray-500 font-bold">🔥 {student.streak_days ?? 0}j streak</span>
-            <span className="text-xs text-gray-500 font-bold">📖 {done}/{total} leçons</span>
+            <span className="text-xs text-gray-500 font-bold">📖 {parcours.faites}/{parcours.total} leçons
+              {parcours.themeCourant ? ` · ${parcours.themeCourant}` : " · aucun thème activé"}
+            </span>
             {age && <span className="text-xs text-gray-500 font-bold">🎂 {age} ans</span>}
             {student.device && <span className="text-xs text-gray-500 font-bold">{DEVICE_LABEL[student.device]}</span>}
             {student.objective && <span className="text-xs text-gray-500 font-bold">{OBJECTIVE_LABEL[student.objective]}</span>}
