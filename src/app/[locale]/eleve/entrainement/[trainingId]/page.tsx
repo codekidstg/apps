@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import TrainingReader from "./TrainingReader";
+import { accesEntrainement, urlRefus } from "@/lib/eleve/acces";
 
 type Block = { id: string; type: string; content: Record<string, unknown>; order_index: number };
 
@@ -21,6 +23,10 @@ export default async function TrainingPage({
     .eq("profile_id", user.id)
     .single<{ id: string }>();
   if (!student) redirect("/fr/connexion");
+
+  // Un entrainement suit la lecon dont il depend : meme regle d'acces.
+  const verdict = await accesEntrainement(createAdminClient(), student.id, trainingId);
+  if (!verdict.ok) redirect(urlRefus("fr", verdict.raison));
 
   const { data: training } = await (supabase.from("trainings") as any)
     .select("id, title, description, xp_reward, lesson_id, lessons(id, title)")

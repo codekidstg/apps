@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import QuestReader from "./QuestReader";
+import { visiteurEleve, accesLecon, urlRefus } from "@/lib/eleve/acces";
 
 const EXPLORER_THEME1_ID = "8979e87c-058c-4003-95fd-1531c649bd1d";
 const EXPLORER_THEME2_ID = "b82126de-7df6-410a-8089-5c39330a035d";
@@ -295,12 +297,17 @@ export default async function QuestePage({ params }: { params: Promise<{ lessonI
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
 
-  const { data: student } = await supabase
-    .from("students")
-    .select("id")
-    .eq("profile_id", user.id)
-    .single<{ id: string }>();
-  if (!student) redirect("/fr/connexion");
+  const visiteur = await visiteurEleve(supabase, user.id);
+  if (!visiteur) redirect("/fr/connexion");
+
+  // Le contrôle passe AVANT tout le reste : c'est le simple chargement de
+  // cette page qui créait la ligne « en cours », y compris dans un thème que
+  // l'élève n'avait jamais eu le droit d'ouvrir.
+  if (visiteur.mode === "eleve") {
+    const verdict = await accesLecon(createAdminClient(), visiteur.studentId, lessonId);
+    if (!verdict.ok) redirect(urlRefus("fr", verdict.raison));
+  }
+  const apercu = visiteur.mode === "apercu";
 
   const { data: lesson } = await supabase
     .from("lessons")
@@ -347,17 +354,21 @@ export default async function QuestePage({ params }: { params: Promise<{ lessonI
     .order("created_at");
   const trainings = (trainingsRaw ?? []) as { id: string; title: string; xp_reward: number }[];
 
-  const { data: progress } = await (supabase.from("lesson_progress") as any)
-    .select("status, block_progress")
-    .eq("student_id", student.id)
-    .eq("lesson_id", lessonId)
-    .maybeSingle();
+  // En aperçu (admin), on ne lit ni n'écrit la moindre progression : feuilleter
+  // une leçon ne doit rien laisser dans les données de l'enfant.
+  const { data: progress } = apercu
+    ? { data: null }
+    : await (supabase.from("lesson_progress") as any)
+        .select("status, block_progress")
+        .eq("student_id", (visiteur as { studentId: string }).studentId)
+        .eq("lesson_id", lessonId)
+        .maybeSingle();
   const alreadyCompleted = progress?.status === "completed";
   const savedBlockProgress = (progress?.block_progress as Record<string, unknown> | null) ?? null;
 
-  if (!progress) {
+  if (!apercu && !progress) {
     await (supabase.from("lesson_progress") as any).upsert({
-      student_id: student.id,
+      student_id: (visiteur as { studentId: string }).studentId,
       lesson_id: lessonId,
       status: "in_progress",
       attempts: 1,
@@ -394,6 +405,14 @@ export default async function QuestePage({ params }: { params: Promise<{ lessonI
           </div>
         )}
       </div>
+
+      {apercu && (
+        <div className="mb-6 rounded-2xl px-5 py-3 flex items-center gap-3 text-sm"
+          style={{ background: "#0f172a", border: "1px solid #f9731640", color: "#fdba74" }}>
+          <span className="text-lg">👁</span>
+          <span><b className="font-black">Aperçu</b> — rien n&apos;est enregistré : ni progression, ni XP.</span>
+        </div>
+      )}
 
       {/* Brief de Kodi + objectifs — Thèmes 1 & 2 */}
       {(() => {
@@ -451,6 +470,7 @@ export default async function QuestePage({ params }: { params: Promise<{ lessonI
         nextLessonId={nextLessonId}
         themeId={chapter?.theme_id ?? ""}
         savedBlockProgress={savedBlockProgress}
+        readOnly={apercu}
         trainings={trainings}
       />
     </div>

@@ -6,6 +6,7 @@ import { processGamificationEvent } from "@/lib/gamification/process-event";
 import { checkThemeCompletion, issueCertificate } from "@/lib/certificates/generate";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
+import { accesLecon, accesEntrainement, MESSAGE_REFUS } from "@/lib/eleve/acces";
 
 async function getStudentId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
   const { data } = await supabase
@@ -16,6 +17,16 @@ async function getStudentId(supabase: Awaited<ReturnType<typeof createClient>>, 
   return data?.id ?? null;
 }
 
+/**
+ * Aucune de ces actions ne vérifiait que la leçon appartenait au parcours de
+ * l'élève : il suffisait de connaître un identifiant. Elles écrivent toutes
+ * dans `lesson_progress` ou versent de l'XP, donc elles se contrôlent toutes.
+ */
+async function refusLecon(studentId: string, lessonId: string): Promise<string | null> {
+  const verdict = await accesLecon(createAdminClient(), studentId, lessonId);
+  return verdict.ok ? null : MESSAGE_REFUS[verdict.raison];
+}
+
 export async function completeLesson(lessonId: string, score: number, perfect: boolean) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -23,6 +34,9 @@ export async function completeLesson(lessonId: string, score: number, perfect: b
 
   const studentId = await getStudentId(supabase, user.id);
   if (!studentId) return { error: "Élève introuvable" };
+
+  const refus = await refusLecon(studentId, lessonId);
+  if (refus) return { error: refus };
 
   // Upsert lesson progress
   await (supabase.from("lesson_progress") as any).upsert({
@@ -68,7 +82,7 @@ export async function completeLesson(lessonId: string, score: number, perfect: b
   return { success: true, ...result };
 }
 
-export async function solveBlockly(lessonId: string) {
+export async function solveBlockly(lessonId: string, blockId?: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Non authentifié" };
@@ -76,7 +90,12 @@ export async function solveBlockly(lessonId: string) {
   const studentId = await getStudentId(supabase, user.id);
   if (!studentId) return { error: "Élève introuvable" };
 
-  const result = await processGamificationEvent(studentId, "blockly_solved", { lessonId });
+  const refus = await refusLecon(studentId, lessonId);
+  if (refus) return { error: refus };
+
+  // `blockId` sert de clé d'idempotence : chaque défi d'une leçon se paie
+  // une fois, mais une leçon à deux défis paie bien deux fois.
+  const result = await processGamificationEvent(studentId, "blockly_solved", { lessonId, blockId });
 
   revalidatePath("/eleve");
   return { success: true, ...result };
@@ -89,6 +108,9 @@ export async function completeTraining(trainingId: string, score: number) {
 
   const studentId = await getStudentId(supabase, user.id);
   if (!studentId) return { error: "Élève introuvable" };
+
+  const verdict = await accesEntrainement(createAdminClient(), studentId, trainingId);
+  if (!verdict.ok) return { error: MESSAGE_REFUS[verdict.raison] };
 
   // Récupère le nombre de tentatives précédentes
   const { data: existing } = await (supabase.from("training_progress") as any)
@@ -134,6 +156,9 @@ export async function syncBlockProgress(lessonId: string, blockProgress: Record<
 
   const studentId = await getStudentId(supabase, user.id);
   if (!studentId) return { error: "Élève introuvable" };
+
+  const refus = await refusLecon(studentId, lessonId);
+  if (refus) return { error: refus };
 
   try {
     const { data: existing } = await (supabase.from("lesson_progress") as any)

@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { MESSAGE_REFUS, type Refus } from "@/lib/eleve/acces";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -22,7 +23,12 @@ const LEVEL_META: Record<string, { label: string; icon: string; color: string }>
 
 const THEME_ICONS = ["🏛️","🔁","🌉","🧪","🐍","🌐","🔒","🤖","⚡","🧠"];
 
-export default async function EleveDashboard() {
+export default async function EleveDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ acces?: string }>;
+}) {
+  const { acces } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
@@ -152,6 +158,15 @@ export default async function EleveDashboard() {
 
   return (
     <div className="p-8 space-y-8 max-w-4xl">
+      {/* Une leçon refusée renvoie ici avec la raison — plutôt qu'un 404 sec. */}
+      {acces && acces in MESSAGE_REFUS && (
+        <div className="rounded-2xl px-5 py-4 flex items-start gap-3 text-sm"
+          style={{ background: "#0f172a", border: "1px solid #f59e0b40", color: "#fcd34d" }}>
+          <span className="text-lg leading-none mt-0.5">🔒</span>
+          <span>{MESSAGE_REFUS[acces as Refus]}</span>
+        </div>
+      )}
+
       {/* Top HUD */}
       <div className="flex items-center gap-3 pb-6" style={{ borderBottom: "1px solid #1e293b" }}>
         <div>

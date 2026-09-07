@@ -51,7 +51,7 @@ export function useOfflineSync() {
           res = await fetch("/api/sync/solve-blockly", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lessonId: action.lessonId }),
+            body: JSON.stringify({ lessonId: action.lessonId, blockId: action.blockId }),
           });
         }
         if (res.ok) { await deleteAction(action.id); synced++; }

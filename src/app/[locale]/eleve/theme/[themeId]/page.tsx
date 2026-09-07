@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireStudentPermission } from "@/lib/permissions/student";
+import { perimetreEleve, verdictPourTheme, urlRefus } from "@/lib/eleve/acces";
 
 type Lesson   = { id: string; title: string; xp_reward: number; chapter_id: string; order_index: number };
 type Chapter  = { id: string; title: string; order_index: number };
@@ -39,14 +40,13 @@ export default async function ThemePage({
   const theme = themeRaw as { id: string; title: string; level: string } | null;
   if (!theme) redirect("/fr/eleve");
 
-  // Vérifier l'accès au thème (si des accès sont configurés pour cet élève)
-  const { data: accessRows } = await (admin.from("student_theme_access") as any)
-    .select("theme_id")
-    .eq("student_id", student.id);
-  if (accessRows && accessRows.length > 0) {
-    const hasAccess = accessRows.some((r: { theme_id: string }) => r.theme_id === themeId);
-    if (!hasAccess) redirect("/fr/eleve");
-  }
+  // La règle était inversée : l'accès n'était vérifié QUE si l'élève avait au
+  // moins une ligne, donc un élève sans aucun accès configuré ouvrait tout.
+  // Le statut du thème n'était pas regardé non plus. Même règle que partout
+  // ailleurs désormais : publié ET activé.
+  const perimetre = await perimetreEleve(admin, student.id);
+  const verdict = verdictPourTheme(themeId, perimetre);
+  if (!verdict.ok) redirect(urlRefus("fr", verdict.raison));
 
   const { data: chaptersRaw } = await admin
     .from("chapters")

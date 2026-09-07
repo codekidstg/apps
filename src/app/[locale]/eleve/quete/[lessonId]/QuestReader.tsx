@@ -175,7 +175,7 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
     markGameDone(blockId);
     if (readOnly) return;
     startTransition(async () => {
-      const res = await solveBlockly(lessonId) as any;
+      const res = await solveBlockly(lessonId, blockId) as any;
       if (res?.newBadges?.length) {
         (res.newBadges as BadgeId[]).forEach((id) => {
           const b = BADGES[id];

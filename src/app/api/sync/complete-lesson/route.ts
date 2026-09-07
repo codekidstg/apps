@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processGamificationEvent } from "@/lib/gamification/process-event";
 import { syncLimiter, checkRateLimit } from "@/lib/ratelimit";
+import { accesLecon, MESSAGE_REFUS } from "@/lib/eleve/acces";
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for") ?? "anonymous";
@@ -27,6 +28,11 @@ export async function POST(req: NextRequest) {
   if (!student) return NextResponse.json({ error: "Élève introuvable" }, { status: 404 });
 
   const admin = createAdminClient();
+
+  // La leçon doit appartenir au parcours ouvert à l'élève : cette route écrit
+  // avec la clé de service, donc la RLS ne la retient pas.
+  const verdict = await accesLecon(admin, student.id, lessonId);
+  if (!verdict.ok) return NextResponse.json({ error: MESSAGE_REFUS[verdict.raison] }, { status: 403 });
 
   // Merge optimiste : on récupère le score existant et on garde le MAX
   const { data: existingRaw } = await (admin.from("lesson_progress") as any)

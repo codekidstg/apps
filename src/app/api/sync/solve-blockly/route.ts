@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { processGamificationEvent } from "@/lib/gamification/process-event";
+import { accesLecon, MESSAGE_REFUS } from "@/lib/eleve/acces";
 import { syncLimiter, checkRateLimit } from "@/lib/ratelimit";
 
 export async function POST(req: NextRequest) {
@@ -14,7 +16,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const { lessonId } = await req.json() as { lessonId: string };
+  const { lessonId, blockId } = await req.json() as { lessonId: string; blockId?: string };
 
   const { data: student } = await supabase
     .from("students")
@@ -23,6 +25,11 @@ export async function POST(req: NextRequest) {
     .single<{ id: string }>();
   if (!student) return NextResponse.json({ error: "Élève introuvable" }, { status: 404 });
 
-  const result = await processGamificationEvent(student.id, "blockly_solved", { lessonId });
+  // Cette route ne vérifiait rien : ni que la leçon existe, ni qu'elle était
+  // ouverte à l'élève. L'anti-rejeu vit dans processGamificationEvent.
+  const verdict = await accesLecon(createAdminClient(), student.id, lessonId);
+  if (!verdict.ok) return NextResponse.json({ error: MESSAGE_REFUS[verdict.raison] }, { status: 403 });
+
+  const result = await processGamificationEvent(student.id, "blockly_solved", { lessonId, blockId });
   return NextResponse.json({ ok: true, ...result });
 }

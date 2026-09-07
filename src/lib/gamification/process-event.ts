@@ -28,6 +28,40 @@ export async function processGamificationEvent(
 
   if (!student) return { xpGained: 0, newBadges: [], levelUp: false, newLevel: 1 };
 
+  // ── Anti-rejeu ──────────────────────────────────────────────────────────
+  //
+  // Le même geste était écrit deux fois — l'action serveur pour l'usage en
+  // ligne, la route /api/sync pour rejouer la file hors ligne — et seules les
+  // routes vérifiaient qu'on n'avait pas déjà payé. `completeLesson` et
+  // `solveBlockly` reversaient donc leur XP à chaque appel : une boucle sur
+  // `solveBlockly` créditait 40 XP par tour, sans même vérifier que la leçon
+  // existe.
+  //
+  // Le garde est ici plutôt que chez les appelants : c'est exactement la
+  // divergence entre les deux copies qui a ouvert le trou. `payload` est déjà
+  // inséré dans `gamification_events` à chaque appel — il sert de clé
+  // d'idempotence, sans nouvelle table.
+  if (eventType === "lesson_completed" || eventType === "blockly_solved") {
+    const lessonId = payload.lessonId ? String(payload.lessonId) : null;
+    const blockId  = payload.blockId  ? String(payload.blockId)  : null;
+    if (lessonId) {
+      let q = sb.from("gamification_events")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", studentId)
+        .eq("event_type", eventType)
+        .eq("payload->>lessonId", lessonId);
+      // Une leçon peut porter plusieurs défis : chacun se paie une fois.
+      // Sans `blockId` — file hors ligne remplie avant cette version — on
+      // retombe sur une prime par leçon plutôt que de payer en boucle.
+      if (blockId) q = q.eq("payload->>blockId", blockId);
+      const { count, error } = await q;
+      if (error) console.error("[gamification] anti-rejeu :", error.message);
+      if ((count ?? 0) > 0) {
+        return { xpGained: 0, newBadges: [], levelUp: false, newLevel: getLevelForXp(student.xp).num };
+      }
+    }
+  }
+
   // Determine XP to award
   let xpGained = 0;
   if (eventType === "lesson_completed") {

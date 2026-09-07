@@ -7,7 +7,9 @@ const STORE = "pending_actions";
 
 export type OfflineAction =
   | { type: "completeLesson"; lessonId: string; score: number; perfect: boolean }
-  | { type: "solveBlockly"; lessonId: string };
+  // `blockId` identifie le defi resolu : c'est la cle d'idempotence cote
+  // serveur, un meme defi ne se paie qu'une fois.
+  | { type: "solveBlockly"; lessonId: string; blockId?: string };
 
 let db: IDBDatabase | null = null;
 

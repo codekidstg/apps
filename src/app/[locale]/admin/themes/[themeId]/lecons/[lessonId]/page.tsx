@@ -44,7 +44,10 @@ export default async function AdminLessonPage({
     .eq("id", lesson.chapter_id)
     .single() as { data: { title: string } | null };
 
-  const studentPreviewUrl = `/${locale}/eleve/themes/${themeId}/lecons/${lessonId}`;
+  // Le lien pointait vers /eleve/themes/…/lecons/… — cette route n'existe pas.
+  // La vraie page de leçon est /eleve/quete/[lessonId] ; elle s'ouvre en
+  // aperçu pour un admin, sans rien enregistrer.
+  const studentPreviewUrl = `/${locale}/eleve/quete/${lessonId}`;
 
   return (
     <div>
