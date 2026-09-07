@@ -581,9 +581,31 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
             </div>
           </div>
         ) : readOnly ? (
-          <div className="rounded-2xl px-6 py-4 text-center font-bold text-sm"
-            style={{ background: "#1e293b", border: "1px solid #334155", color: "#94a3b8" }}>
-            👁️ Mode aperçu professeur — aucune progression enregistrée
+          /* En aperçu, la leçon n'est jamais « terminée » : les entraînements
+             restaient donc invisibles alors qu'ils font partie de la séance. */
+          <div className="space-y-3">
+            {trainings.length > 0 && (
+              <div className="rounded-2xl p-4" style={{ background: "#1a1035", border: "1px solid #a78bfa40" }}>
+                <div className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#a78bfa" }}>
+                  💪 Les {trainings.length} entraînements de cette leçon
+                </div>
+                <div className="space-y-2">
+                  {trainings.map((t) => (
+                    <a key={t.id} href={`/eleve/entrainement/${t.id}`}
+                      className="flex items-center gap-3 rounded-xl px-4 py-3 transition-all hover:scale-[1.01]"
+                      style={{ background: "#1e293b", border: "1px solid #a78bfa30" }}>
+                      <span className="text-lg">🏋️</span>
+                      <span className="font-bold text-sm text-white flex-1">{t.title}</span>
+                      <span className="text-xs font-mono font-black" style={{ color: "#FDB813" }}>+{t.xp_reward} XP →</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="rounded-2xl px-6 py-4 text-center font-bold text-sm"
+              style={{ background: "#1e293b", border: "1px solid #334155", color: "#94a3b8" }}>
+              👁️ Mode aperçu — aucune progression enregistrée
+            </div>
           </div>
         ) : (
           <div className="space-y-3">

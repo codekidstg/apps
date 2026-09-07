@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import TrainingReader from "./TrainingReader";
-import { accesEntrainement, urlRefus } from "@/lib/eleve/acces";
+import { visiteurEleve, accesEntrainement, urlRefus } from "@/lib/eleve/acces";
 
 type Block = { id: string; type: string; content: Record<string, unknown>; order_index: number };
 
@@ -17,16 +17,15 @@ export default async function TrainingPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
 
-  const { data: student } = await supabase
-    .from("students")
-    .select("id")
-    .eq("profile_id", user.id)
-    .single<{ id: string }>();
-  if (!student) redirect("/fr/connexion");
+  const visiteur = await visiteurEleve(supabase, user.id);
+  if (!visiteur) redirect("/fr/connexion");
 
-  // Un entrainement suit la lecon dont il depend : meme regle d'acces.
-  const verdict = await accesEntrainement(createAdminClient(), student.id, trainingId);
-  if (!verdict.ok) redirect(urlRefus("fr", verdict.raison));
+  // Un entraînement suit la leçon dont il dépend : même règle d'accès.
+  if (visiteur.mode === "eleve") {
+    const verdict = await accesEntrainement(createAdminClient(), visiteur.studentId, trainingId);
+    if (!verdict.ok) redirect(urlRefus("fr", verdict.raison));
+  }
+  const apercu = visiteur.mode === "apercu";
 
   const { data: training } = await (supabase.from("trainings") as any)
     .select("id, title, description, xp_reward, lesson_id, lessons(id, title)")
@@ -40,12 +39,14 @@ export default async function TrainingPage({
     .order("order_index");
   const blocks = (blocksRaw ?? []) as Block[];
 
-  // Training progress (for attempt count + best score)
-  const { data: progress } = await (supabase.from("training_progress") as any)
-    .select("status, score, attempts, completed_at")
-    .eq("student_id", student.id)
-    .eq("training_id", trainingId)
-    .maybeSingle();
+  // En aperçu, aucune progression n'est lue ni écrite.
+  const { data: progress } = apercu
+    ? { data: null }
+    : await (supabase.from("training_progress") as any)
+        .select("status, score, attempts, completed_at")
+        .eq("student_id", (visiteur as { studentId: string }).studentId)
+        .eq("training_id", trainingId)
+        .maybeSingle();
 
   return (
     <div className="p-6 lg:p-10">
@@ -53,7 +54,9 @@ export default async function TrainingPage({
       <div className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-6 flex-wrap">
         <Link href="/eleve" className="hover:text-slate-300 transition-colors">Ma Cité</Link>
         <span>›</span>
-        <Link href="/eleve/entrainement" className="hover:text-slate-300 transition-colors">Mon Entraînement</Link>
+        {apercu
+          ? <Link href={`/eleve/quete/${training.lesson_id}`} className="hover:text-slate-300 transition-colors">← Retour à la leçon</Link>
+          : <Link href="/eleve/entrainement" className="hover:text-slate-300 transition-colors">Mon Entraînement</Link>}
         <span>›</span>
         <span className="text-white">{training.title}</span>
       </div>
@@ -98,6 +101,7 @@ export default async function TrainingPage({
           xpReward={training.xp_reward}
           previousAttempts={progress?.attempts ?? 0}
           previousScore={progress?.score ?? null}
+          readOnly={apercu}
         />
       )}
     </div>
