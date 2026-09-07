@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { requireParentPermission } from "@/lib/permissions/parent";
+import { perimetreEleve } from "@/lib/eleve/acces";
+import EnteteTheme from "./EnteteTheme";
 
 export default async function ProgressionPage({
   params,
@@ -30,22 +32,28 @@ export default async function ProgressionPage({
   // Sélection de l'enfant via ?child=<id>, sinon le premier
   const child = children.find((c: any) => c.id === childParam) ?? children[0];
 
-  const LEVEL_MAP: Record<number, string> = { 1: "explorer", 2: "builder", 3: "architect" };
-  const childLevel = LEVEL_MAP[child.level_num ?? 1] ?? "explorer";
-
   const admin = createAdminClient();
-  const [{ data: progRaw }, { data: themes }] = await Promise.all([
+
+  // Le périmètre de l'enfant plutôt que son niveau : c'est la règle appliquée
+  // partout ailleurs, et la seule que l'enfant voit dans son propre espace.
+  const [{ data: progRaw, error: erreurProgres }, perimetre] = await Promise.all([
     (admin.from("lesson_progress") as any)
       .select("lesson_id, status, score, attempts, completed_at")
       .eq("student_id", child.id),
-    admin
-      .from("themes")
-      .select("id, title, order_index, chapters(id, title, order_index, lessons(id, title, order_index))")
-      .eq("status", "published")
-      .eq("level", childLevel)
-      // Le parent suit une progression : l'ordre doit être celui du programme
-      .order("order_index"),
+    perimetreEleve(admin, child.id),
   ]);
+  if (erreurProgres) console.error("[suivi/progression] lesson_progress :", erreurProgres.message);
+
+  const idsAutorises = [...perimetre.autorises];
+  const { data: themes, error: erreurThemes } = idsAutorises.length
+    ? await admin
+        .from("themes")
+        .select("id, title, order_index, chapters(id, title, order_index, lessons(id, title, order_index))")
+        .in("id", idsAutorises)
+        // Le parent suit une progression : l'ordre doit être celui du programme
+        .order("order_index")
+    : { data: [], error: null };
+  if (erreurThemes) console.error("[suivi/progression] themes :", erreurThemes.message);
 
   const progMap = new Map<string, { status: string; score?: number; attempts?: number }>(
     (progRaw ?? []).map((p: any) => [p.lesson_id, p])
@@ -53,16 +61,33 @@ export default async function ProgressionPage({
   // Leçons commencées par l'enfant
   const startedLessonIds = new Set((progRaw ?? []).map((p: any) => p.lesson_id));
 
-  // Filtrer : garder seulement les chapitres/leçons que l'enfant a commencés
-  const filteredThemes = (themes ?? []).map((theme: any) => ({
-    ...theme,
-    chapters: (theme.chapters ?? [])
-      .map((ch: any) => ({
-        ...ch,
-        lessons: (ch.lessons ?? []).filter((l: any) => startedLessonIds.has(l.id)),
-      }))
-      .filter((ch: any) => ch.lessons.length > 0),
-  })).filter((theme: any) => theme.chapters.length > 0);
+  const parIndex = (a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0);
+
+  /**
+   * Le compteur se calcule sur le THÈME, pas sur le chapitre.
+   *
+   * Chaque chapitre ne contient qu'une leçon : la barre du chapitre valait donc
+   * éternellement 0/1 ou 1/1, toujours vide ou toujours pleine. Un enfant ayant
+   * fait une séance sur cinq affichait une barre verte à 100 % — le parent
+   * lisait « c'est terminé ». Le dénominateur honnête, c'est le thème entier.
+   */
+  const filteredThemes = (themes ?? []).map((theme: any) => {
+    const chapitres = [...(theme.chapters ?? [])].sort(parIndex);
+    const toutesLecons = chapitres.flatMap((ch: any) => ch.lessons ?? []);
+    return {
+      ...theme,
+      // Le détail reste limité à ce que l'enfant a touché : la liste sert à
+      // montrer son travail, pas à dérouler tout le programme à venir.
+      chapters: chapitres
+        .map((ch: any) => ({
+          ...ch,
+          lessons: (ch.lessons ?? []).filter((l: any) => startedLessonIds.has(l.id)),
+        }))
+        .filter((ch: any) => ch.lessons.length > 0),
+      faites: toutesLecons.filter((l: any) => progMap.get(l.id)?.status === "completed").length,
+      total: toutesLecons.length,
+    };
+  }).filter((theme: any) => theme.chapters.length > 0);
 
   const hasAnyProgress = filteredThemes.length > 0;
 
@@ -103,28 +128,15 @@ export default async function ProgressionPage({
 
         return (
           <div key={theme.id}>
-            <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-3">
-              📚 {theme.title}
-            </h2>
+            <EnteteTheme titre={theme.title} faites={theme.faites} total={theme.total} />
             <div className="space-y-3">
               {chapters.map((ch: any) => {
                 const lessons = [...(ch.lessons ?? [])].sort((a: any, b: any) => a.order_index - b.order_index);
-                const done = lessons.filter((l: any) => progMap.get(l.id)?.status === "completed").length;
-                const pct  = lessons.length ? Math.round((done / lessons.length) * 100) : 0;
 
                 return (
                   <div key={ch.id} className="bg-slate-800/60 border border-slate-700 rounded-2xl overflow-hidden">
-                    <div className="px-5 py-4 border-b border-slate-700">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="font-black text-white">{ch.title}</div>
-                        <span className="text-xs font-bold text-slate-400">{done}/{lessons.length} leçons</span>
-                      </div>
-                      <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-500 rounded-full transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
+                    <div className="px-5 py-3.5 border-b border-slate-700">
+                      <div className="font-black text-white">{ch.title}</div>
                     </div>
                     <div className="divide-y divide-slate-700/50">
                       {lessons.map((l: any) => {
