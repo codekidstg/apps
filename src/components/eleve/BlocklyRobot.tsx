@@ -1,4 +1,5 @@
 "use client";
+import { messagesFr } from "./blocklyFr";
 import { useEffect, useRef, useState, useCallback } from "react";
 
 import {
@@ -74,6 +75,7 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange }
 
     async function init() {
       const Blockly = await import("blockly");
+      messagesFr(Blockly);
       const Blocks = Blockly.Blocks as Record<string, unknown>;
 
       if (!Blocks["robot_move"]) {

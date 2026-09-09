@@ -1,4 +1,5 @@
 "use client";
+import { messagesFr } from "./blocklyFr";
 import { useEffect, useRef, useState, useCallback } from "react";
 
 type KodiOutputConfig = {
@@ -65,6 +66,7 @@ export default function BlocklyKodi({ config, onSolved, savedXml, onXmlChange }:
 
     async function init() {
       const Blockly = await import("blockly");
+      messagesFr(Blockly);
       const { javascriptGenerator, Order } = await import("blockly/javascript");
 
       // ── Custom CodeKids dark theme ───────────────────────────────────
@@ -135,6 +137,9 @@ export default function BlocklyKodi({ config, onSolved, savedXml, onXmlChange }:
       if (xml) {
         try {
           Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(xml), ws as any);
+          // Le compteur n'était alimenté que par les changements : un exercice
+          // livré avec des blocs de départ affichait « 0 / 4 blocs ».
+          setBlockCount((ws as any).getAllBlocks(false).length);
         } catch { /* XML invalide ignoré */ }
       }
 
@@ -157,6 +162,7 @@ export default function BlocklyKodi({ config, onSolved, savedXml, onXmlChange }:
 
   const run = useCallback(async () => {
     const Blockly = await import("blockly");
+      messagesFr(Blockly);
     const ws = workspaceRef.current as any;
     if (!ws) return;
     const { javascriptGenerator } = await import("blockly/javascript");

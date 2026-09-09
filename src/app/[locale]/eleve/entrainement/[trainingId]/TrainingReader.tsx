@@ -454,6 +454,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
               expected_contains?: string[];
               max_blocks?: number;
               available_blocks?: string[];
+              starter_xml?: string;
               required?: boolean;
             };
             const done = !!codeResults[block.id];
@@ -475,6 +476,9 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                       expected_contains: cfg.expected_contains,
                       max_blocks: cfg.max_blocks,
                       available_blocks: cfg.available_blocks,
+                      // Oublié jusqu'ici : un exercice qui pose des blocs de
+                      // départ arrivait avec un espace de travail vide.
+                      starter_xml: cfg.starter_xml,
                     }}
                     onSolved={() => { if (!completed) setCodeResults(prev => ({ ...prev, [block.id]: true })); }}
                   />

@@ -1,4 +1,5 @@
 "use client";
+import { messagesFr } from "./blocklyFr";
 import { useEffect, useRef, useState, useCallback } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -201,6 +202,7 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
 
     async function init() {
       const Blockly = await import("blockly");
+      messagesFr(Blockly);
       const { javascriptGenerator } = await import("blockly/javascript");
       if (!mounted) return; // aborted by cleanup
 
