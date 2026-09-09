@@ -296,26 +296,9 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange }
         await smoothMove(cur.x, cur.y, nx, ny, cur.dir);
         cur = { ...cur, x: nx, y: ny };
 
-        // Collect items on this cell
-        if (config.collectibles) {
-          for (const c of config.collectibles) {
-            const ck = `${c.x},${c.y}`;
-            if (c.x === cur.x && c.y === cur.y && !coll.has(ck)) {
-              coll.add(ck);
-              setCollected(new Set(coll));
-
-              // If picked a key, open matching locked doors
-              if (c.type === "key" && config.locked_doors) {
-                for (const d of config.locked_doors) {
-                  if (d.requires === "key") {
-                    dOpen.add(`${d.x},${d.y}`);
-                  }
-                }
-                setDoorsOpen(new Set(dOpen));
-              }
-            }
-          }
-        }
+        // Les objets ne se ramassent plus en passant dessus : il faut poser un
+        // bloc 🧲 Ramasser. Sinon le bloc ne servait à rien — et la consigne du
+        // défi final, « utilise Ramasser sur chaque gemme », était fausse.
       } else if (cmd.type === "pick") {
         // Manual pick (robot_pick block)
         if (config.collectibles) {
@@ -339,6 +322,15 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange }
 
     if (testMode) {
       setStatus("idle");
+      return;
+    }
+
+    const oublies = (config.collectibles ?? []).filter((c) => !coll.has(`${c.x},${c.y}`));
+    if (cur.x === config.goal.x && cur.y === config.goal.y && oublies.length > 0) {
+      setStatus("fail");
+      setMsg(oublies.length === 1
+        ? "💎 Kirikou est bien arrivé, mais il a laissé un objet en chemin ! Ajoute un bloc 🧲 Ramasser sur la case qui le porte."
+        : `💎 Kirikou est bien arrivé, mais il a laissé ${oublies.length} objets en chemin ! Il faut un bloc 🧲 Ramasser sur chaque case qui en porte un.`);
       return;
     }
 
