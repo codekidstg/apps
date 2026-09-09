@@ -149,6 +149,9 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange }
         try {
           const xml = (Blockly as any).utils.xml.textToDom(savedXml);
           (Blockly as any).Xml.domToWorkspace(xml, ws);
+          // Le compteur n'était alimenté que par les changements : un élève qui
+          // revenait sur son labyrinthe retrouvait ses blocs et un « 0/7 ».
+          setBlockCount((ws as any).getAllBlocks(false).length);
         } catch { /* ignore stale XML */ }
       }
 

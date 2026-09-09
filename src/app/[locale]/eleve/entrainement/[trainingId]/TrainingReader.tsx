@@ -19,6 +19,9 @@ const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), {
 const BlocklyKodi  = dynamic(() => import("@/components/eleve/BlocklyKodi"), { ssr: false });
 const PythonMaze   = dynamic(() => import("@/components/eleve/PythonMaze"), { ssr: false });
 const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { ssr: false });
+const BlocklyRobot = dynamic(() => import("@/components/eleve/BlocklyRobotLoader"), { ssr: false });
+const PatternSelect = dynamic(() => import("@/components/eleve/PatternSelect"), { ssr: false });
+import { MemoryGame, AssociationGame, SortGame, BugHuntGame } from "@/components/eleve/jeux";
 
 /**
  * La contrainte CHECK de training_blocks n'accepte pas de nouveau type : les
@@ -28,6 +31,18 @@ const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { s
 const JEUX_PYTHON = ["python_maze", "python_piano", "python_arcade"];
 const estJeuPython = (b: { type: string; content: unknown }) =>
   b.type === "blockly_challenge" && JEUX_PYTHON.includes((b.content as any)?.game_type);
+
+/**
+ * Les jeux de leçon, ouverts aux entraînements.
+ *
+ * Ils existaient déjà et fonctionnaient — mais seulement côté séance. Un enfant
+ * ne pouvait donc jamais rejouer en entraînement le geste qu'il venait
+ * d'apprendre : les entraînements se rabattaient sur des versions papier.
+ * Même véhicule que les jeux Python : blockly_challenge + game_type.
+ */
+const JEUX_LECON = ["maze", "bug_hunt", "sort", "memory", "association", "pattern_select"];
+const estJeuLecon = (b: { type: string; content: unknown }) =>
+  b.type === "blockly_challenge" && JEUX_LECON.includes((b.content as any)?.game_type);
 
 type Block = { id: string; type: string; content: Record<string, unknown>; order_index: number };
 
@@ -78,8 +93,9 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
   // drag_to_bin : blockId-itemId → chosen binId
   const [dragResults,  setDragResults]  = useState<Record<string, { chosen: string; correct: boolean } | null>>({});
   const [dragSelected, setDragSelected] = useState<Record<string, string | null>>({});  // blockId → selected itemId
-  // python_maze : blockId → résolu
+  // jeux (labyrinthe, motif, tri, bug_hunt…) : blockId → résolu, et leur état
   const [gameDone,     setGameDone]     = useState<Record<string, boolean>>({});
+  const [gameStates,   setGameStates]   = useState<Record<string, unknown>>({});
 
   const [completed, setCompleted]    = useState(false);
   const [xpGained, setXpGained]     = useState<number | null>(null);
@@ -88,12 +104,12 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
 
   const quizBlocks    = blocks.filter(b => b.type === "quiz");
   const codeBlocks    = blocks.filter(b => b.type === "code_challenge");
-  const blocklyBlocks = blocks.filter(b => b.type === "blockly_challenge" && !estJeuPython(b));
+  const blocklyBlocks = blocks.filter(b => b.type === "blockly_challenge" && !estJeuPython(b) && !estJeuLecon(b));
   const fillBlocks    = blocks.filter(b => b.type === "fill_blank");
   const matchBlocks   = blocks.filter(b => b.type === "match");
   const swipeBlocks   = blocks.filter(b => b.type === "swipe_sort");
   const dragBlocks    = blocks.filter(b => b.type === "drag_to_bin");
-  const mazeBlocks    = blocks.filter(estJeuPython);
+  const mazeBlocks    = blocks.filter(b => estJeuPython(b) || estJeuLecon(b));
 
   // — Progression —
   const allQuizKeys = quizBlocks.flatMap(b => {
@@ -409,6 +425,45 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                 onSolved={() => setGameDone(g => ({ ...g, [block.id]: true }))}
               />
             );
+          }
+
+          /* Jeux de leçon — mêmes composants, mêmes contenus. */
+          if (estJeuLecon(block)) {
+            const cfg = block.content as any;
+            const fait = !!gameDone[block.id];
+            const resolu = () => setGameDone(g => ({ ...g, [block.id]: true }));
+            const etat = gameStates[block.id];
+            const garder = (s: unknown) => setGameStates(g => ({ ...g, [block.id]: s }));
+
+            if (cfg.game_type === "maze") {
+              return <BlocklyRobot key={block.id} config={cfg} onSolved={resolu} />;
+            }
+            if (cfg.game_type === "pattern_select") {
+              return <PatternSelect key={block.id} config={cfg} done={fait} onSolved={resolu}
+                savedState={(etat as [number, number]) ?? null} onStateChange={garder} />;
+            }
+            if (cfg.game_type === "sort") {
+              return <SortGame key={block.id} blockId={block.id} title={cfg.title} description={cfg.description}
+                items={cfg.items ?? []} done={fait} onSolved={resolu}
+                savedOrder={(etat as string[]) ?? []} onStateChange={garder} />;
+            }
+            if (cfg.game_type === "bug_hunt") {
+              return <BugHuntGame key={block.id} blockId={block.id} title={cfg.title} description={cfg.description}
+                context={cfg.context} instructions={cfg.instructions ?? []} bugIndex={cfg.bug_index ?? 0}
+                fix={cfg.fix ?? ""} explanation={cfg.explanation} done={fait} onSolved={resolu}
+                savedState={(etat as string) ?? null} onStateChange={garder} />;
+            }
+            if (cfg.game_type === "memory") {
+              return <MemoryGame key={block.id} blockId={block.id} title={cfg.title} description={cfg.description}
+                pairs={cfg.pairs ?? []} done={fait} onSolved={resolu}
+                savedMatched={(etat as string[]) ?? []} onStateChange={garder} />;
+            }
+            if (cfg.game_type === "association") {
+              return <AssociationGame key={block.id} blockId={block.id} title={cfg.title} description={cfg.description}
+                pairs={cfg.pairs ?? []} done={fait} onSolved={resolu}
+                savedMatched={(etat as string[]) ?? []} onStateChange={garder} />;
+            }
+            return null;
           }
 
           /* Code */

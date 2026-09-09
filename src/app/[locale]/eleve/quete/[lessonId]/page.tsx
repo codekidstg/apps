@@ -55,12 +55,12 @@ const KODI_BRIEFS: Record<string, KodiBrief> = {
       "Compter le nombre de répétitions nécessaires",
     ],
   },
-  "La boucle qui fait tout": {
-    message: "Regarde… les routes commencent à s'éclairer ! Tu m'as rendu mes jambes. Encore une boucle et je traverserai tout le village.",
+  "Trouver le motif": {
+    message: "Regarde ce chemin : avancer, descendre, avancer, descendre… Ce n'est plus « Avancer » qui se répète, c'est tout un morceau. Apprends-moi à le repérer et je descendrai n'importe quel escalier.",
     objectifs: [
-      "Maîtriser la boucle « répéter N fois » dans un contexte complexe",
-      "Combiner une boucle avec des instructions variées",
-      "Traverser un labyrinthe complet en utilisant uniquement des boucles",
+      "Repérer le motif qui se répète dans un chemin ou un programme",
+      "Compter les répétitions pour régler le nombre de la boucle",
+      "Comprendre que la boucle ne couvre que ce qui se répète — le reste s'écrit à côté",
     ],
   },
   "Plan avant code": {
