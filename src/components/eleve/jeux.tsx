@@ -202,8 +202,8 @@ export function AssociationGame({ title, description, pairs, done, onSolved, sav
 }
 
 // ── SortGame ─────────────────────────────────────────────────────────────────
-export function SortGame({ title, description, items, done, onSolved, savedOrder, onStateChange }: {
-  blockId: string; title?: string; description?: string; items: string[];
+export function SortGame({ title, description, items, hint, done, onSolved, savedOrder, onStateChange }: {
+  blockId: string; title?: string; description?: string; items: string[]; hint?: string;
   done: boolean; onSolved: () => void;
   savedOrder: string[]; onStateChange: (s: string[]) => void;
 }) {
@@ -221,10 +221,21 @@ export function SortGame({ title, description, items, done, onSolved, savedOrder
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Le jeu vient des exercices Python : l'aide y montre la sortie attendue du
+   * programme, ce qui aiguille sans jamais donner l'ordre des lignes. Avec des
+   * consignes en français — « Avancer », « Cueillir la mangue » —, cette même
+   * aide affiche la réponse elle-même, rangée dans le bon ordre.
+   *
+   * On ne la propose donc que pour du Python ; ailleurs, seul l'indice écrit
+   * par l'auteur de l'exercice s'affiche, et à défaut le bouton disparaît.
+   */
+  const estPython = items.some(item => /print\s*\(/.test(item));
   const expectedOutput = items.map(item => {
     const m = item.match(/print\(["'](.*)["']\)/);
     return m ? m[1] : item;
   }).join("\n");
+  const aideDisponible = estPython || !!hint;
 
   function move(idx: number, dir: -1 | 1) {
     const next = [...order];
@@ -279,16 +290,22 @@ export function SortGame({ title, description, items, done, onSolved, savedOrder
             style={{ background: "#FDB813", color: "#0f172a" }}>
             Vérifier l'ordre
           </button>
-          <button onClick={() => setShowHint(!showHint)} className="text-xs font-bold px-3 py-2 rounded-xl transition-colors"
-            style={{ background: "#0f172a", color: "#475569", border: "1px solid #1e293b" }}>
-            💡 Aide
-          </button>
+          {aideDisponible && (
+            <button onClick={() => setShowHint(!showHint)} className="text-xs font-bold px-3 py-2 rounded-xl transition-colors"
+              style={{ background: "#0f172a", color: "#475569", border: "1px solid #1e293b" }}>
+              💡 Aide
+            </button>
+          )}
         </div>
       )}
-      {showHint && (
+      {showHint && aideDisponible && (
         <div className="mt-3 rounded-xl p-4" style={{ background: "#0f172a", border: "1px solid #1e293b" }}>
-          <div className="text-xs font-mono font-black mb-2" style={{ color: "#334155" }}>Sortie attendue :</div>
-          <pre className="font-mono text-xs leading-relaxed" style={{ color: "#FDB813" }}>{expectedOutput}</pre>
+          <div className="text-xs font-mono font-black mb-2" style={{ color: "#334155" }}>
+            {estPython ? "Sortie attendue :" : "Indice :"}
+          </div>
+          {estPython
+            ? <pre className="font-mono text-xs leading-relaxed" style={{ color: "#FDB813" }}>{expectedOutput}</pre>
+            : <p className="text-sm leading-relaxed" style={{ color: "#FDB813" }}>{hint}</p>}
         </div>
       )}
     </div>

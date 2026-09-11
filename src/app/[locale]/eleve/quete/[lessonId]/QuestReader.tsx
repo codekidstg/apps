@@ -517,7 +517,7 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
 
             if (gameType === "sort") {
               const items = (cfg.items as string[]) ?? [];
-              return <SortGame key={block.id} blockId={block.id} title={cfg.title as string} description={cfg.description as string | undefined} items={items} done={done} onSolved={markDone} savedOrder={(gameStates[block.id] as string[]) ?? []} onStateChange={(s) => saveGameState(block.id, s)} />;
+              return <SortGame key={block.id} blockId={block.id} title={cfg.title as string} description={cfg.description as string | undefined} items={items} hint={cfg.hint as string | undefined} done={done} onSolved={markDone} savedOrder={(gameStates[block.id] as string[]) ?? []} onStateChange={(s) => saveGameState(block.id, s)} />;
             }
 
             if (gameType === "fill_blank") {

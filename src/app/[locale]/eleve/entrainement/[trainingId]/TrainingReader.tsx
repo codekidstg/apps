@@ -444,7 +444,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
             }
             if (cfg.game_type === "sort") {
               return <SortGame key={block.id} blockId={block.id} title={cfg.title} description={cfg.description}
-                items={cfg.items ?? []} done={fait} onSolved={resolu}
+                items={cfg.items ?? []} hint={cfg.hint} done={fait} onSolved={resolu}
                 savedOrder={(etat as string[]) ?? []} onStateChange={garder} />;
             }
             if (cfg.game_type === "bug_hunt") {
@@ -959,7 +959,9 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                             border: `2px solid ${isActive ? bin.color : `${bin.color}40`}`,
                             transform: isActive ? "scale(1.02)" : "scale(1)",
                           }}>
-                          <div className="font-black text-sm mb-2" style={{ color: bin.color }}>{bin.emoji} {bin.label}</div>
+                          {/* Trois bacs sur un téléphone font des colonnes de 87 px :
+                              un mot long comme « instruction » débordait du cadre. */}
+                          <div className="font-black text-sm mb-2 break-words" style={{ color: bin.color }}>{bin.emoji} {bin.label}</div>
                           <div className="flex flex-wrap gap-1 justify-center">
                             {itemsInBin.map(item => {
                               const res = dragResults[`${block.id}-${item.id}`];

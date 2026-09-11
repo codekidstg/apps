@@ -8,17 +8,24 @@ import {
 } from "./mazeCanvas";
 import type { ChallengeConfig, Dir, Collectible, LockedDoor } from "./mazeCanvas";
 
-// Palette de blocs — propre à l'éditeur Blockly, pas au rendu
+/**
+ * La légende du bas — propre à l'éditeur Blockly, pas au rendu du labyrinthe.
+ *
+ * Elle listait aussi « Si…alors », « Sinon » et « Regarder », qui ne sont
+ * proposés dans aucun exercice de la plateforme : trois blocs promis qui
+ * n'arrivent jamais. Et les numéros de séance dataient d'un plan antérieur —
+ * 🧲 Ramasser annonçait la séance 4 alors qu'il sert dès la séance 2, 🔁
+ * Répéter la séance 3 alors qu'il arrive à la 5.
+ *
+ * Le badge ne s'affiche donc plus que sur un bloc encore verrouillé, où il
+ * veut dire « tu l'auras à cette séance-là ».
+ */
 const ALL_BLOCKS = [
   { id: "robot_move",          label: "🚀 Avancer",        color: "#3b82f6" },
-  { id: "robot_turn_left",     label: "↰ Gauche",          color: "#8b5cf6" },
-  { id: "robot_turn_right",    label: "↱ Droite",          color: "#8b5cf6" },
-  { id: "controls_repeat_ext", label: "🔁 Répéter",        color: "#059669", badge: "Niv.3" },
-  { id: "robot_pick",          label: "🧲 Ramasser",       color: "#d97706", badge: "Niv.4" },
-  { id: "controls_if",         label: "❓ Si…alors",       color: "#dc2626", badge: "Niv.5" },
-  { id: "controls_if_else",    label: "↩ Sinon",           color: "#dc2626", badge: "Niv.5" },
-  { id: "sensor_look",         label: "👁️ Regarder",       color: "#0891b2", badge: "Niv.7" },
-  { id: "end",                 label: "⏹ Fin",             color: "#374151" },
+  { id: "robot_pick",          label: "🧲 Ramasser",       color: "#d97706", badge: "Séance 2" },
+  { id: "robot_turn_left",     label: "↰ Gauche",          color: "#8b5cf6", badge: "Séance 3" },
+  { id: "robot_turn_right",    label: "↱ Droite",          color: "#8b5cf6", badge: "Séance 3" },
+  { id: "controls_repeat_ext", label: "🔁 Répéter",        color: "#059669", badge: "Séance 5" },
 ];
 
 type Props = {
@@ -72,6 +79,7 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange }
   useEffect(() => {
     if (!blocklyRef.current) return;
     let ws: unknown = null;
+    let observateur: ResizeObserver | null = null;
 
     async function init() {
       const Blockly = await import("blockly");
@@ -165,11 +173,29 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange }
         }
       });
 
-      requestAnimationFrame(() => setTimeout(() => (Blockly as any).svgResize?.(ws), 100));
+      // Blockly lit la taille de son conteneur au moment de l'injection et n'y
+      // revient jamais. Empilé sur un téléphone, le conteneur n'avait pas
+      // encore sa hauteur : l'atelier s'installait dans zéro pixel de haut et
+      // y restait. On le prévient à chaque changement de taille — ce qui règle
+      // aussi la rotation de l'écran, que le seul appel différé ci-dessous
+      // laissait passer.
+      if (blocklyRef.current && typeof ResizeObserver !== "undefined") {
+        observateur = new ResizeObserver(() => (Blockly as any).svgResize?.(ws));
+        observateur.observe(blocklyRef.current);
+      }
+      // Et un rappel qui ne dépend d'aucune frame : `requestAnimationFrame` ne
+      // s'exécute pas dans un onglet en arrière-plan, or c'est exactement là
+      // que l'atelier s'ouvre quand l'enfant change d'onglet pendant le
+      // chargement — il retrouvait un atelier vide.
+      const redimensionner = () => (Blockly as any).svgResize?.(ws);
+      setTimeout(redimensionner, 0);
+      setTimeout(redimensionner, 300);
+      requestAnimationFrame(() => setTimeout(redimensionner, 100));
     }
 
     init().catch(console.error);
     return () => {
+      observateur?.disconnect();
       if (ws && (ws as any).dispose) (ws as any).dispose();
       cancelAnimationFrame(animRef.current);
     };
@@ -396,19 +422,32 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange }
         )}
       </div>
 
-      {/* ── Main area: Blockly left | Maze+Mission right ── */}
-      <div className="flex flex-1 min-h-0" style={{ minHeight: 420 }}>
+      {/* ── Main area: Blockly left | Maze+Mission right ──
+          Côte à côte sur un téléphone, l'éditeur Blockly était réduit à un
+          pixel de large et le labyrinthe débordait du cadre : sur une grille
+          de 8, les deux dernières colonnes — le couloir qui continue après
+          l'étoile — étaient purement invisibles. On empile donc les deux
+          panneaux en dessous de `lg`. */}
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0" style={{ minHeight: 420 }}>
 
         {/* LEFT — Blockly */}
-        <div className="flex flex-col flex-1 border-r border-slate-700 min-w-0">
+        <div className="flex flex-col flex-1 border-b lg:border-b-0 lg:border-r border-slate-700 min-w-0">
           <div className="bg-slate-800 px-3 py-1.5 border-b border-slate-700">
             <span className="text-xs font-bold text-slate-400">🔧 Programme</span>
           </div>
-          <div ref={blocklyRef} style={{ flex: 1, minHeight: 360 }} />
+          {/* Empilé, ce conteneur n'a plus de hauteur définie à donner à
+              Blockly, qui s'injecte alors dans zéro pixel de haut : on la fixe
+              sous `lg`, et on rend l'étirement au format deux colonnes. */}
+          {/* Empilé, ce conteneur tirait sa hauteur du `flex: 1` d'une colonne
+              dimensionnée par son contenu : une hauteur que Blockly ne peut pas
+              reprendre, et il s'installait dans zéro pixel de haut. Sous `lg`
+              on lui donne donc une hauteur ferme ; en deux colonnes, la
+              répartition d'origine reprend la main. */}
+          <div ref={blocklyRef} className="h-[360px] lg:h-auto lg:flex-1 lg:min-h-[360px]" />
         </div>
 
         {/* RIGHT — Mission + Maze + Controls */}
-        <div className="flex flex-col items-center gap-2 p-3 bg-slate-900" style={{ minWidth: canvasSize + 24 }}>
+        <div className="flex flex-col items-center gap-2 p-3 bg-slate-900" style={{ minWidth: `min(${canvasSize + 24}px, 100%)` }}>
 
           {/* Mission steps */}
           {(config.steps || config.instructions) && (
@@ -435,7 +474,10 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange }
             width={canvasSize}
             height={canvasSize}
             className="rounded-xl border border-slate-700 block"
-            style={{ imageRendering: "pixelated" }}
+            /* La grille est dessinée à sa taille naturelle puis réduite pour
+               tenir sur l'écran ; « pixelated » hachait les emojis une fois
+               le canevas mis à l'échelle. */
+            style={{ maxWidth: "100%", height: "auto" }}
           />
 
           {/* Status message */}
@@ -501,8 +543,8 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange }
                 onMouseLeave={() => setHoveredTurn(null)}
               >
                 {b.label}
-                {b.badge && (
-                  <span className={`text-[9px] px-1 rounded ${unlocked ? "bg-slate-600 text-slate-400" : "bg-slate-800 text-slate-700"}`}>
+                {b.badge && !unlocked && (
+                  <span className="text-[9px] px-1 rounded bg-slate-800 text-slate-500">
                     {b.badge}
                   </span>
                 )}
