@@ -6,6 +6,7 @@ import { chargerParcours, PARCOURS_VIDE } from "@/lib/progression";
 import { slugFromNum } from "@/lib/levels";
 import { BADGES } from "@/lib/gamification/badges";
 import type { BadgeId } from "@/lib/gamification/badges";
+import AvatarSvg from "@/components/eleve/AvatarSvg";
 
 export default async function SuiviDashboard({
   params,
@@ -39,6 +40,14 @@ export default async function SuiviDashboard({
   const activeSubs = new Map((subsRes.data ?? []).map((s: any) => [s.student_id, s]));
   const childIds = children.map((c: any) => c.id);
   const teacherIds = [...new Set(children.map((c: any) => c.teacher_id).filter(Boolean))];
+
+  // Le robot de l'enfant. Les parents voyaient un émoji générique ; ils voient
+  // maintenant ce que leur enfant a construit, et gagné.
+  const { data: avatarsRaw, error: errAvatars } = childIds.length
+    ? await (admin.from("student_avatar") as any).select("*").in("student_id", childIds)
+    : { data: [], error: null };
+  if (errAvatars) console.error("[suivi] avatars:", errAvatars.message);
+  const avatarsParEnfant = new Map<string, any>((avatarsRaw ?? []).map((a: any) => [a.student_id as string, a]));
 
   // Toutes les requêtes dépendant de childIds — en parallèle
   const [progressRes, trainingRes, sessionsRes, achivRes, parcoursParEnfant] = await Promise.all([
@@ -206,7 +215,18 @@ export default async function SuiviDashboard({
             {/* Header enfant */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-2xl">👦</div>
+                {(() => {
+                  const av = avatarsParEnfant.get(child.id);
+                  return av ? (
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
+                      style={{ background: `${av.color}1a`, border: `1px solid ${av.color}40` }}>
+                      <AvatarSvg base={av.base} hat={av.hat} accessory={av.accessory}
+                        color={av.color} accent={av.accent} size={40} />
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-2xl">👦</div>
+                  );
+                })()}
                 <div>
                   <div className="font-black text-white text-lg">{name}</div>
                   <div className="text-xs font-bold" style={{ color: lvl.color }}>

@@ -2,13 +2,8 @@
 import { useState, useTransition } from "react";
 import AvatarSvg from "@/components/eleve/AvatarSvg";
 import { saveAvatar } from "../actions";
+import { MODELES, ACCENT_DEFAUT } from "@/components/eleve/robots";
 
-const BASES = [
-  { id: "robot_blue",   name: "NEXUS-7",    unlockAt: 0,    emoji: "🔵", desc: "Unité de base" },
-  { id: "robot_orange", name: "VULCAN-X",   unlockAt: 500,  emoji: "🔴", desc: "Modèle combat" },
-  { id: "robot_green",  name: "BIO-ALPHA",  unlockAt: 1500, emoji: "🟢", desc: "Nano-organique" },
-  { id: "robot_gold",   name: "AURUM-∞",    unlockAt: 3000, emoji: "🟡", desc: "Prototype légendaire" },
-];
 const HATS = [
   { id: "",           name: "Aucun",       unlockAt: 0,   icon: "⬜" },
   { id: "hat_cap",    name: "Casquette",   unlockAt: 0,   icon: "🧢" },
@@ -36,7 +31,7 @@ type Props = {
   xp: number;
   level?: number;
   name?: string;
-  initial: { base: string; hat: string | null; accessory: string | null; color: string };
+  initial: { base: string; hat: string | null; accessory: string | null; color: string; accent?: string | null };
 };
 
 type Tab = "model" | "hat" | "accessory" | "color";
@@ -46,26 +41,35 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
   const [hat, setHat]             = useState(initial.hat ?? "");
   const [accessory, setAccessory] = useState(initial.accessory ?? "");
   const [color, setColor]         = useState(initial.color ?? "#3b82f6");
+  const [accent, setAccent]       = useState(initial.accent ?? ACCENT_DEFAUT);
   const [saved, setSaved]         = useState(false);
+  const [echec, setEchec]         = useState<string | null>(null);
   const [tab, setTab]             = useState<Tab>("model");
   const [isPending, start]        = useTransition();
 
   const isUnlocked = (at: number) => xp >= at;
-  const currentBase = BASES.find(b => b.id === base) ?? BASES[0];
+  const currentBase = MODELES.find(b => b.id === base) ?? MODELES[0];
   const currentColor = COLORS.find(c => c.hex === color) ?? COLORS[0];
+  const currentAccent = COLORS.find(c => c.hex === accent);
 
   function handleSave() {
     const fd = new FormData();
     fd.append("base", base); fd.append("hat", hat);
     fd.append("accessory", accessory); fd.append("color", color);
-    start(async () => { await saveAvatar(fd); setSaved(true); setTimeout(() => setSaved(false), 3000); });
+    fd.append("accent", accent);
+    start(async () => {
+      setEchec(null);
+      const res = await saveAvatar(fd);
+      if (res && "error" in res && res.error) { setEchec(res.error); return; }
+      setSaved(true); setTimeout(() => setSaved(false), 3000);
+    });
   }
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
     { id: "model",     label: "Modèle",     icon: "🤖" },
     { id: "hat",       label: "Coiffe",      icon: "🎩" },
     { id: "accessory", label: "Accessoire",  icon: "⚡" },
-    { id: "color",     label: "Couleur",     icon: "🎨" },
+    { id: "color",     label: "Couleurs",    icon: "🎨" },
   ];
 
   return (
@@ -118,7 +122,7 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
             {/* Avatar container */}
             <div className="relative w-56 h-56 flex items-center justify-center rounded-full"
               style={{ background: `radial-gradient(circle at 40% 30%, ${color}22, #0f172a 70%)`, boxShadow: `0 0 40px ${color}33, inset 0 0 30px rgba(0,0,0,0.5)` }}>
-              <AvatarSvg base={base} hat={hat || null} accessory={accessory || null} color={color} size={180} animated />
+              <AvatarSvg base={base} hat={hat || null} accessory={accessory || null} color={color} accent={accent} size={180} animated />
             </div>
           </div>
 
@@ -132,14 +136,21 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
               </div>
               <div className="text-right">
                 <div className="text-xs text-slate-500 font-mono tracking-widest uppercase">Modèle</div>
-                <div className="font-black text-sm" style={{ color }}>{currentBase.name}</div>
+                <div className="font-black text-sm" style={{ color }}>{currentBase.nom}</div>
               </div>
             </div>
-            <div className="flex items-center justify-between text-xs mb-2">
-              <span className="text-slate-500">Couleur active</span>
+            <div className="flex items-center justify-between text-xs mb-1.5">
+              <span className="text-slate-500">Corps</span>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full border border-white/20" style={{ background: color }} />
                 <span className="text-slate-300 font-bold">{currentColor.name}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-xs mb-2">
+              <span className="text-slate-500">Accent</span>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full border border-white/20" style={{ background: accent }} />
+                <span className="text-slate-300 font-bold">{currentAccent?.name ?? "Sur mesure"}</span>
               </div>
             </div>
             <div className="flex items-center gap-1 mt-1">
@@ -162,6 +173,13 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
               {saved ? "✅ Configuration sauvegardée !" : isPending ? "⟳ Synchronisation…" : "💾 Sauvegarder la configuration"}
             </span>
           </button>
+
+          {echec && (
+            <div className="w-full max-w-xs mt-3 rounded-xl px-4 py-2.5 text-sm font-bold text-center"
+              style={{ background: "#2d0a0a", color: "#fca5a5", border: "1px solid #ef444440" }}>
+              ⚠️ {echec}
+            </div>
+          )}
 
           {/* XP progress */}
           <div className="w-full max-w-xs mt-4">
@@ -204,10 +222,10 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
             {/* ─ Models ─ */}
             {tab === "model" && (
               <div className="space-y-3">
-                <SectionTitle label="Sélectionne ton unité" sub={`${BASES.filter(b => isUnlocked(b.unlockAt)).length}/${BASES.length} débloquées`} />
+                <SectionTitle label="Sélectionne ton unité" sub={`${MODELES.filter(b => isUnlocked(b.xpRequis)).length}/${MODELES.length} débloquées`} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {BASES.map((b) => {
-                    const locked = !isUnlocked(b.unlockAt);
+                  {MODELES.map((b) => {
+                    const locked = !isUnlocked(b.xpRequis);
                     const active = base === b.id;
                     return (
                       <button
@@ -222,18 +240,23 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
                           opacity: locked ? 0.5 : 1,
                         }}
                       >
+                        {/* Chaque vignette porte les couleurs de l'élève : les
+                            quatre modèles se comparent pour de vrai, ce que
+                            l'ancienne version ne permettait pas — ils étaient
+                            identiques. */}
                         <div className="shrink-0 w-16 h-16 flex items-center justify-center rounded-xl"
                           style={{ background: active ? `${color}20` : "#0f172a" }}>
-                          <AvatarSvg base={b.id} color={active ? color : undefined} size={52} />
+                          <AvatarSvg base={b.id} color={color} accent={accent} size={56} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-black text-sm" style={{ color: active ? color : locked ? "#475569" : "#e2e8f0" }}>
-                            {b.name}
+                            {b.nom}
                           </div>
                           <div className="text-xs text-slate-500 mt-0.5">{b.desc}</div>
+                          <div className="text-[11px] mt-0.5" style={{ color: locked ? "#475569" : "#64748b" }}>{b.signe}</div>
                           {locked && (
                             <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-black text-amber-500 bg-amber-950/50 border border-amber-800/40 px-2 py-0.5 rounded-full">
-                              🔒 {b.unlockAt.toLocaleString()} XP
+                              🔒 {b.xpRequis.toLocaleString()} XP
                             </div>
                           )}
                           {active && (
@@ -322,34 +345,19 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
 
             {/* ─ Colors ─ */}
             {tab === "color" && (
-              <div className="space-y-4">
-                <SectionTitle label="Couleur principale" sub="Chaque couleur change l'apparence complète du robot" />
-                <div className="grid grid-cols-2 gap-3">
-                  {COLORS.map((c) => {
-                    const active = color === c.hex;
-                    return (
-                      <button key={c.hex} onClick={() => setColor(c.hex)}
-                        className="flex items-center gap-3 p-3 rounded-xl border transition-all duration-200"
-                        style={{
-                          borderColor: active ? c.hex : "#334155",
-                          background: active ? `${c.hex}18` : "#1e293b",
-                          boxShadow: active ? `0 0 16px ${c.hex}30` : "none",
-                        }}>
-                        <div className="w-10 h-10 rounded-xl border-2 flex items-center justify-center shrink-0 transition-all"
-                          style={{
-                            background: `radial-gradient(circle at 35% 30%, ${shadeColor(c.hex, 30)}, ${c.hex}, ${shadeColor(c.hex, -30)})`,
-                            borderColor: active ? "white" : "transparent",
-                            boxShadow: active ? `0 0 12px ${c.hex}60` : "none",
-                          }}>
-                          {active && <span className="text-white text-sm font-black">✓</span>}
-                        </div>
-                        <div>
-                          <div className="font-black text-sm" style={{ color: active ? c.hex : "#e2e8f0" }}>{c.name}</div>
-                          <div className="text-[10px] text-slate-600 font-mono">{c.hex.toUpperCase()}</div>
-                        </div>
-                      </button>
-                    );
-                  })}
+              <div className="space-y-6">
+                <div>
+                  <SectionTitle label="La carrosserie" sub="Le corps, la tête, les bras" />
+                  <NuancierCouleurs choisie={color} surChoix={setColor} />
+                </div>
+
+                <div>
+                  <SectionTitle label="L'accent" sub="Ce qui s'allume : les yeux, le réacteur, la bouche" />
+                  <NuancierCouleurs choisie={accent} surChoix={setAccent} />
+                  <p className="text-xs text-slate-500 mt-3">
+                    Dix carrosseries × dix accents : <strong className="text-slate-300">100 robots possibles</strong>.
+                    Essaie un corps sombre avec un accent vif.
+                  </p>
                 </div>
               </div>
             )}
@@ -357,6 +365,39 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Le même nuancier sert à la carrosserie et à l'accent. */
+function NuancierCouleurs({ choisie, surChoix }: { choisie: string; surChoix: (hex: string) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {COLORS.map((c) => {
+        const active = choisie === c.hex;
+        return (
+          <button key={c.hex} onClick={() => surChoix(c.hex)}
+            className="flex items-center gap-3 p-3 rounded-xl border transition-all duration-200"
+            style={{
+              borderColor: active ? c.hex : "#334155",
+              background: active ? `${c.hex}18` : "#1e293b",
+              boxShadow: active ? `0 0 16px ${c.hex}30` : "none",
+            }}>
+            <div className="w-10 h-10 rounded-xl border-2 flex items-center justify-center shrink-0 transition-all"
+              style={{
+                background: `radial-gradient(circle at 35% 30%, ${shadeColor(c.hex, 30)}, ${c.hex}, ${shadeColor(c.hex, -30)})`,
+                borderColor: active ? "white" : "transparent",
+                boxShadow: active ? `0 0 12px ${c.hex}60` : "none",
+              }}>
+              {active && <span className="text-sm font-black" style={{ color: c.hex === "#ffffff" ? "#0f172a" : "#ffffff" }}>✓</span>}
+            </div>
+            <div>
+              <div className="font-black text-sm" style={{ color: active ? c.hex : "#e2e8f0" }}>{c.name}</div>
+              <div className="text-[10px] text-slate-600 font-mono">{c.hex.toUpperCase()}</div>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -1,12 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
+import AvatarSvg from "@/components/eleve/AvatarSvg";
+
+type Avatar = { base: string; hat: string | null; accessory: string | null; color: string; accent: string | null };
 
 type RankRow = {
   student_id: string;
   display_name: string;
   xp: number;
   streak_days: number;
+  avatar: Avatar | null;
 };
 
 export default async function ClassementPage() {
@@ -28,11 +32,24 @@ export default async function ClassementPage() {
     .order("xp", { ascending: false })
     .limit(20) as any;
 
+  // Le robot que chacun s'est construit ne se voyait que dans sa propre barre
+  // latérale : personne ne le croisait jamais. Le classement est le seul écran
+  // où les élèves se regardent — c'est là qu'il a sa place.
+  const idsClasses = (rawRank ?? []).map((r: any) => r.id);
+  const { data: avatarsRaw, error: errAvatars } = idsClasses.length
+    ? await (admin.from("student_avatar") as any).select("*").in("student_id", idsClasses)
+    : { data: [], error: null };
+  if (errAvatars) console.error("[classement] avatars:", errAvatars.message);
+  const parEleve = new Map<string, Avatar>(
+    (avatarsRaw ?? []).map((a: any) => [a.student_id as string, a as Avatar]),
+  );
+
   const ranking: RankRow[] = (rawRank ?? []).map((r: any) => ({
     student_id: r.id,
     display_name: r.profiles?.display_name ?? "???",
     xp: r.xp ?? 0,
     streak_days: r.streak_days ?? 0,
+    avatar: parEleve.get(r.id) ?? null,
   }));
 
   const myRank = ranking.findIndex((r) => r.student_id === me?.id) + 1;
@@ -97,6 +114,19 @@ export default async function ClassementPage() {
                 ) : (
                   <span className="text-sm font-black font-mono" style={{ color: "#334155" }}>#{rank}</span>
                 )}
+              </div>
+
+              <div className="shrink-0 relative" style={{ width: 40, height: 40 }}>
+                <div className="absolute inset-0 rounded-full blur-md opacity-25"
+                  style={{ background: row.avatar?.color ?? "#475569" }} />
+                <AvatarSvg
+                  base={row.avatar?.base}
+                  hat={row.avatar?.hat}
+                  accessory={row.avatar?.accessory}
+                  color={row.avatar?.color ?? "#475569"}
+                  accent={row.avatar?.accent}
+                  size={40}
+                />
               </div>
 
               <div className="flex-1 min-w-0">

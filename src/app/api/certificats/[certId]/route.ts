@@ -39,6 +39,13 @@ export async function GET(
     .eq("id", cert.student_id)
     .single();
 
+  // Le robot de l'élève, pour l'imprimer sur le diplôme.
+  const { data: avatar, error: errAvatar } = await (admin.from("student_avatar") as any)
+    .select("*")
+    .eq("student_id", cert.student_id)
+    .maybeSingle();
+  if (errAvatar) console.error("[certificat] avatar:", errAvatar.message);
+
   // Prof validateur
   const { data: prof } = cert.validated_by
     ? await admin.from("profiles").select("display_name").eq("id", cert.validated_by).single()
@@ -98,6 +105,7 @@ export async function GET(
       issuedAt:      new Date(cert.issued_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
       certId:        cert.id,
       verifyHash:    cert.verify_hash ?? "",
+      avatar:        avatar ?? null,
   }) as unknown as ReactElement<DocumentProps, JSXElementConstructor<DocumentProps>>;
 
   const pdfBuffer = await renderToBuffer(element);

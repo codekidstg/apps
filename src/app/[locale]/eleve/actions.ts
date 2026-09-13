@@ -191,14 +191,22 @@ export async function saveAvatar(formData: FormData) {
   const studentId = await getStudentId(supabase, user.id);
   if (!studentId) return { error: "Élève introuvable" };
 
-  await (supabase.from("student_avatar") as any).upsert({
+  const { error } = await (supabase.from("student_avatar") as any).upsert({
     student_id: studentId,
     base:       formData.get("base") as string || "robot_blue",
     hat:        formData.get("hat")  as string || null,
     accessory:  formData.get("accessory") as string || null,
     color:      formData.get("color") as string || "#3B82F6",
+    accent:     formData.get("accent") as string || "#06b6d4",
     updated_at: new Date().toISOString(),
   }, { onConflict: "student_id" });
+
+  // L'erreur était jetée : un enfant voyait « configuration sauvegardée »
+  // alors que rien n'était parti.
+  if (error) {
+    console.error("[saveAvatar]", error.message);
+    return { error: "La sauvegarde a échoué. Réessaie dans un instant." };
+  }
 
   revalidatePath("/eleve");
   return { success: true };

@@ -1,6 +1,7 @@
 // react-pdf — rendu serveur uniquement
 import { Document, Page, View, Text, StyleSheet, Svg, Circle, Path, Polygon, Rect, Image } from "@react-pdf/renderer";
 import path from "path";
+import RobotPdf from "./RobotPdf";
 
 const LOGO_PATH = path.join(process.cwd(), "public", "logo-white.png");
 
@@ -50,6 +51,7 @@ const s = StyleSheet.create({
   sepRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
   sepLine: { flex: 1, height: 1, backgroundColor: GOLD2 },
   // "décerné à"
+  robotRow: { alignItems: "center", marginBottom: 4 },
   decrLabel: { fontFamily: "Helvetica-Oblique", fontSize: 8, color: BLUE_D, textAlign: "center", marginBottom: 4 },
   // Nom
   name: { fontFamily: "Times-Bold", fontSize: 28, color: WHITE, textAlign: "center", marginBottom: 8 },
@@ -105,6 +107,8 @@ export type CertProps = {
   issuedAt: string;
   certId: string;
   verifyHash: string;
+  /** Le robot que l'élève s'est construit — absent s'il n'y a jamais touché. */
+  avatar?: { base: string; hat: string | null; accessory: string | null; color: string; accent: string | null } | null;
 };
 
 function StarIcon({ size = 14, color = GOLD }: { size?: number; color?: string }) {
@@ -201,6 +205,15 @@ export default function CertificatePDF(p: CertProps) {
             <DiamondIcon />
             <View style={[s.sepLine, { opacity: 0.5 }]} />
           </View>
+
+          {/* Le robot de l'élève — celui qu'il a construit, pas une vignette
+              générique. C'est l'objet que la famille garde. */}
+          {p.avatar && (
+            <View style={s.robotRow}>
+              <RobotPdf base={p.avatar.base} hat={p.avatar.hat} accessory={p.avatar.accessory}
+                color={p.avatar.color} accent={p.avatar.accent} width={52} />
+            </View>
+          )}
 
           {/* Décerné à */}
           <Text style={s.decrLabel}>décerné à</Text>

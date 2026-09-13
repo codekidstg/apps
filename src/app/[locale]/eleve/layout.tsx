@@ -14,7 +14,7 @@ type StudentData = {
   display_name: string;
   xp: number;
   student_id: string;
-  avatar: { base: string; hat: string | null; accessory: string | null; color: string } | null;
+  avatar: { base: string; hat: string | null; accessory: string | null; color: string; accent: string | null } | null;
 };
 
 export default async function EleveLayout({ children, params }: { children: React.ReactNode; params: Promise<{ locale: string }> }) {
@@ -43,7 +43,7 @@ export default async function EleveLayout({ children, params }: { children: Reac
     getCachedAllTrainings(),
     student ? (supabase.from("lesson_progress") as any).select("lesson_id").eq("student_id", student.id) : Promise.resolve({ data: [] }),
     student ? (supabase.from("training_progress") as any).select("training_id").eq("student_id", student.id).gt("attempts", 0) : Promise.resolve({ data: [] }),
-    student ? (supabase.from("student_avatar") as any).select("base, hat, accessory, color").eq("student_id", student.id).maybeSingle() : Promise.resolve({ data: null }),
+    student ? (supabase.from("student_avatar") as any).select("*").eq("student_id", student.id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
 
   const startedIds = new Set((lessonProgRes.data ?? []).map((r: any) => r.lesson_id));
@@ -107,6 +107,7 @@ export default async function EleveLayout({ children, params }: { children: Reac
               hat={avatar?.hat}
               accessory={avatar?.accessory}
               color={avatar?.color}
+              accent={avatar?.accent}
               size={44}
             />
           </div>

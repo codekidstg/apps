@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import PageHeader from "@/components/backoffice/PageHeader";
 import GradeForm from "./GradeForm";
+import AvatarSvg from "@/components/eleve/AvatarSvg";
 
 type StudentRow = {
   profile: { id: string; display_name: string };
@@ -106,6 +107,13 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
     }
   }
 
+  // Le robot que l'élève s'est construit — le mentor ne l'avait jamais vu.
+  const { data: avatarsRaw, error: errAvatars } = studentIds.length
+    ? await (admin.from("student_avatar") as any).select("*").in("student_id", studentIds)
+    : { data: [], error: null };
+  if (errAvatars) console.error("[classe] avatars:", errAvatars.message);
+  const avatars = new Map<string, any>((avatarsRaw ?? []).map((a: any) => [a.student_id as string, a]));
+
   // Notes manuelles existantes
   const { data: gradesRaw } = await supabase
     .from("grades")
@@ -137,9 +145,20 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                 <div key={student.id} className="bg-white rounded-2xl border border-cream-border overflow-hidden">
                   {/* En-tête élève */}
                   <div className="px-6 py-4 bg-cream flex items-center gap-4">
-                    <div className="w-9 h-9 rounded-full bg-brand-orange flex items-center justify-center text-white font-black text-sm shrink-0">
-                      {profile.display_name.charAt(0).toUpperCase()}
-                    </div>
+                    {(() => {
+                      const av = avatars.get(student.id);
+                      return av ? (
+                        <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center"
+                          style={{ background: `${av.color}18`, border: `1px solid ${av.color}40` }}>
+                          <AvatarSvg base={av.base} hat={av.hat} accessory={av.accessory}
+                            color={av.color} accent={av.accent} size={34} />
+                        </div>
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-brand-orange flex items-center justify-center text-white font-black text-sm shrink-0">
+                          {profile.display_name.charAt(0).toUpperCase()}
+                        </div>
+                      );
+                    })()}
                     <div className="flex-1 min-w-0">
                       <div className="font-extrabold text-ink">{profile.display_name}</div>
                       <div className="text-xs text-ink-light capitalize">{student.level} · {student.xp} XP</div>
