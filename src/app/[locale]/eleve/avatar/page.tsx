@@ -14,11 +14,13 @@ export default async function AvatarPage() {
     .eq("id", user.id)
     .single<{ display_name: string | null }>();
 
+  // `maybeSingle` : un admin n'a pas de ligne `students`, et `single` traitait
+  // ce cas normal comme une erreur.
   const { data: student } = await supabase
     .from("students")
     .select("id, xp, level")
     .eq("profile_id", user.id)
-    .single<{ id: string; xp: number; level: number }>();
+    .maybeSingle<{ id: string; xp: number; level: number }>();
 
   // `select("*")` plutôt que la liste des colonnes : `accent` est arrivé après
   // coup, et nommer une colonne absente ferait échouer toute la requête au
@@ -38,5 +40,19 @@ export default async function AvatarPage() {
     accent:    avatarRaw?.accent ?? ACCENT_DEFAUT,
   };
 
-  return <AvatarClient xp={student?.xp ?? 0} level={student?.level ?? 1} name={profile?.display_name ?? "Joueur"} initial={initial} />;
+  // Sans ligne `students`, il n'y a rien à enregistrer : c'est le cas d'un
+  // admin qui visite l'espace élève. Le bouton affichait pourtant « ✅
+  // Configuration sauvegardée » alors que l'action renvoyait « Élève
+  // introuvable » depuis le début.
+  const apercu = !student;
+
+  return (
+    <AvatarClient
+      xp={student?.xp ?? 0}
+      level={student?.level ?? 1}
+      name={profile?.display_name ?? "Joueur"}
+      initial={initial}
+      apercu={apercu}
+    />
+  );
 }

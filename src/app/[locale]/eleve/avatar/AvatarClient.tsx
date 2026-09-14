@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import AvatarSvg from "@/components/eleve/AvatarSvg";
 import { saveAvatar } from "../actions";
 import { MODELES, ACCENT_DEFAUT } from "@/components/eleve/robots";
@@ -32,11 +33,15 @@ type Props = {
   level?: number;
   name?: string;
   initial: { base: string; hat: string | null; accessory: string | null; color: string; accent?: string | null };
+  /** Un admin visite l'espace élève sans être un élève : il n'a pas de robot
+   *  à enregistrer, et le bouton ne doit pas lui promettre le contraire. */
+  apercu?: boolean;
 };
 
 type Tab = "model" | "hat" | "accessory" | "color";
 
-export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }: Props) {
+export default function AvatarClient({ xp, level = 1, name = "Joueur", initial, apercu = false }: Props) {
+  const router = useRouter();
   const [base, setBase]           = useState(initial.base ?? "robot_blue");
   const [hat, setHat]             = useState(initial.hat ?? "");
   const [accessory, setAccessory] = useState(initial.accessory ?? "");
@@ -61,6 +66,10 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
       setEchec(null);
       const res = await saveAvatar(fd);
       if (res && "error" in res && res.error) { setEchec(res.error); return; }
+      // Le robot vit aussi dans la barre latérale, le classement, la fiche du
+      // mentor : sans ce rafraîchissement, l'enfant sauvegardait et retrouvait
+      // partout l'ancien jusqu'à ce qu'il recharge la page à la main.
+      router.refresh();
       setSaved(true); setTimeout(() => setSaved(false), 3000);
     });
   }
@@ -85,7 +94,7 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
         </div>
         <div className="ml-auto flex items-center gap-4 text-xs font-mono">
           <span className="text-slate-500">XP</span>
-          <span className="text-brand-orange font-black">{xp.toLocaleString()}</span>
+          <span className="text-brand-orange font-black">{xp.toLocaleString("fr-FR")}</span>
           <span className="text-slate-700">|</span>
           <span className="text-slate-500">LV</span>
           <span className="text-emerald-400 font-black">{level}</span>
@@ -162,7 +171,7 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
           {/* Save button */}
           <button
             onClick={handleSave}
-            disabled={isPending}
+            disabled={isPending || apercu}
             className="w-full max-w-xs relative overflow-hidden font-black py-4 rounded-xl text-base transition-all duration-200 disabled:opacity-60"
             style={{
               background: saved ? "linear-gradient(135deg, #059669, #10b981)" : `linear-gradient(135deg, ${color}, ${shadeColor(color, -20)})`,
@@ -170,9 +179,19 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
             }}
           >
             <span className="relative z-10">
-              {saved ? "✅ Configuration sauvegardée !" : isPending ? "⟳ Synchronisation…" : "💾 Sauvegarder la configuration"}
+              {apercu ? "👁️ Aperçu — rien n'est enregistré"
+                : saved ? "✅ Configuration sauvegardée !"
+                : isPending ? "⟳ Synchronisation…"
+                : "💾 Sauvegarder la configuration"}
             </span>
           </button>
+
+          {apercu && (
+            <p className="w-full max-w-xs mt-3 text-xs text-center" style={{ color: "#64748b" }}>
+              Ce compte n&apos;est pas un élève : il n&apos;a pas de robot à lui.
+              Vous pouvez tout essayer, rien ne sera enregistré.
+            </p>
+          )}
 
           {echec && (
             <div className="w-full max-w-xs mt-3 rounded-xl px-4 py-2.5 text-sm font-bold text-center"
@@ -185,7 +204,7 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
           <div className="w-full max-w-xs mt-4">
             <div className="flex justify-between text-xs text-slate-600 mb-1 font-mono">
               <span>XP TOTAL</span>
-              <span>{xp.toLocaleString()} / ∞</span>
+              <span>{xp.toLocaleString("fr-FR")} / ∞</span>
             </div>
             <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
               <div className="h-full rounded-full transition-all duration-500"
@@ -256,7 +275,7 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
                           <div className="text-[11px] mt-0.5" style={{ color: locked ? "#475569" : "#64748b" }}>{b.signe}</div>
                           {locked && (
                             <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-black text-amber-500 bg-amber-950/50 border border-amber-800/40 px-2 py-0.5 rounded-full">
-                              🔒 {b.xpRequis.toLocaleString()} XP
+                              🔒 {b.xpRequis.toLocaleString("fr-FR")} XP
                             </div>
                           )}
                           {active && (
@@ -333,7 +352,7 @@ export default function AvatarClient({ xp, level = 1, name = "Joueur", initial }
                           <div className="font-black text-sm text-center" style={{ color: active ? color : locked ? "#475569" : "#e2e8f0" }}>
                             {a.name}
                           </div>
-                          {locked && <div className="text-[10px] text-amber-500 text-center mt-1">🔒 {a.unlockAt.toLocaleString()} XP</div>}
+                          {locked && <div className="text-[10px] text-amber-500 text-center mt-1">🔒 {a.unlockAt.toLocaleString("fr-FR")} XP</div>}
                           {active && <div className="text-[10px] text-center mt-1 font-black" style={{ color }}>◈ ACTIF</div>}
                         </div>
                       </button>

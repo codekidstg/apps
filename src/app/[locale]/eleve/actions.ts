@@ -208,6 +208,10 @@ export async function saveAvatar(formData: FormData) {
     return { error: "La sauvegarde a échoué. Réessaie dans un instant." };
   }
 
-  revalidatePath("/eleve");
+  // Le robot s'affiche dans la barre latérale, donc dans le *layout* de
+  // `/eleve` — et `revalidatePath("/eleve")` ne revalidait que la page, sur un
+  // chemin qui ne tient même pas compte du segment de langue. L'enfant
+  // sauvegardait, et continuait de voir son ancien robot à côté de son nom.
+  revalidatePath("/[locale]/eleve", "layout");
   return { success: true };
 }

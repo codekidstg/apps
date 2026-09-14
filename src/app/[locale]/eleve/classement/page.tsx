@@ -79,12 +79,12 @@ export default async function ClassementPage() {
             <span className="text-2xl">📍</span>
             <div>
               <div className="font-black text-white">Ta position</div>
-              <div className="text-sm font-mono" style={{ color: "#94a3b8" }}>#{myRank} · {(me?.xp ?? 0).toLocaleString()} XP</div>
+              <div className="text-sm font-mono" style={{ color: "#94a3b8" }}>#{myRank} · {(me?.xp ?? 0).toLocaleString("fr-FR")} XP</div>
             </div>
           </div>
           {myRank > 3 && ranking[2]?.xp - (me?.xp ?? 0) > 0 && (
             <div className="text-sm font-black" style={{ color: "#FDB813" }}>
-              {(ranking[2].xp - (me?.xp ?? 0)).toLocaleString()} XP pour le podium
+              {(ranking[2].xp - (me?.xp ?? 0)).toLocaleString("fr-FR")} XP pour le podium
             </div>
           )}
         </div>
@@ -141,7 +141,7 @@ export default async function ClassementPage() {
 
               <div className="font-black shrink-0 font-mono">
                 <span style={{ color: isMe ? "#FDB813" : isPodium ? podiumColors[rank - 1] : "#94a3b8" }}>
-                  {row.xp.toLocaleString()}
+                  {row.xp.toLocaleString("fr-FR")}
                 </span>
                 <span className="text-xs ml-1" style={{ color: "#334155" }}>XP</span>
               </div>

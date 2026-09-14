@@ -113,7 +113,7 @@ export default async function EleveLayout({ children, params }: { children: Reac
           </div>
           <div className="min-w-0">
             <div className="font-black text-white text-sm truncate">{profile.display_name}</div>
-            <div className="text-xs mt-0.5 font-mono" style={{ color: "#FDB813" }}>{xp.toLocaleString()} XP</div>
+            <div className="text-xs mt-0.5 font-mono" style={{ color: "#FDB813" }}>{xp.toLocaleString("fr-FR")} XP</div>
           </div>
         </div>
 
