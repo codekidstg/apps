@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import BackofficeShell from "@/components/backoffice/Shell";
 import { getEffectiveNavPermissions } from "@/lib/permissions/access";
 import { PAGES_BY_ROLE } from "@/lib/permissions/registry";
+import { compterQuestionsMentor } from "@/lib/questions/donnees";
 
 export default async function ProfLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -17,12 +18,21 @@ export default async function ProfLayout({ children }: { children: React.ReactNo
 
   if (profile?.role !== "teacher" && profile?.role !== "admin") redirect("/fr/connexion");
 
-  const allowedKeys = await getEffectiveNavPermissions(user.id, "teacher");
+  // La pastille « Questions des élèves » : ce qui attend une réponse.
+  const [allowedKeys, questionsEnAttente] = await Promise.all([
+    getEffectiveNavPermissions(user.id, "teacher"),
+    compterQuestionsMentor(user.id),
+  ]);
   const allKeys     = (PAGES_BY_ROLE["teacher"] ?? []).map(p => p.key);
   const hiddenKeys  = allKeys.filter(k => !allowedKeys.has(k));
 
   return (
-    <BackofficeShell role="teacher" displayName={profile?.display_name ?? "Professeur"} hiddenKeys={hiddenKeys}>
+    <BackofficeShell
+      role="teacher"
+      displayName={profile?.display_name ?? "Professeur"}
+      hiddenKeys={hiddenKeys}
+      badges={{ "teacher.questions": questionsEnAttente }}
+    >
       {children}
     </BackofficeShell>
   );

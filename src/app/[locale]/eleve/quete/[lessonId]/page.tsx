@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import QuestReader from "./QuestReader";
+import { questionsDuContenu } from "@/lib/questions/donnees";
 import { visiteurEleve, accesLecon, urlRefus } from "@/lib/eleve/acces";
 
 const EXPLORER_THEME1_ID = "8979e87c-058c-4003-95fd-1531c649bd1d";
@@ -472,6 +473,9 @@ export default async function QuestePage({ params }: { params: Promise<{ lessonI
         savedBlockProgress={savedBlockProgress}
         readOnly={apercu}
         trainings={trainings}
+        questions={visiteur.mode === "eleve"
+          ? await questionsDuContenu(visiteur.studentId, { lessonId }, { marquerReponsesVues: true })
+          : {}}
       />
     </div>
   );

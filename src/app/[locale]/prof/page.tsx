@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { jourTogo, minuit, jourSemaine, libelleEcart, semaineDe } from "@/lib/planning/dates";
+import { compterQuestionsMentor } from "@/lib/questions/donnees";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function buildNextSession(sessions: any[]): { title: string; at: Date; studentName: string | null } | null {
@@ -147,6 +148,9 @@ export default async function ProfDashboard() {
     : { count: 0 };
   const certsPending = (certsRes as any).count ?? 0;
 
+  // Les questions posées par les élèves depuis leurs exercices.
+  const questionsEnAttente = user ? await compterQuestionsMentor(user.id) : 0;
+
   // Prochaine session
   const nextSession = buildNextSession(sessions);
 
@@ -192,8 +196,19 @@ export default async function ProfDashboard() {
       </div>
 
       {/* Alertes */}
-      {(certsPending > 0 || reportsPending > 0) && (
+      {(questionsEnAttente > 0 || certsPending > 0 || reportsPending > 0) && (
         <div className="space-y-2">
+          {questionsEnAttente > 0 && (
+            <Link href="/prof/questions" className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 hover:bg-amber-100 transition-colors">
+              <span className="text-xl">🙋</span>
+              <div className="flex-1">
+                <div className="font-black text-sm" style={{ color: "#92400e" }}>
+                  {questionsEnAttente} question{questionsEnAttente > 1 ? "s" : ""} d&apos;élève en attente
+                </div>
+                <div className="text-xs" style={{ color: "#b45309" }}>Posées depuis un exercice — cliquer pour répondre →</div>
+              </div>
+            </Link>
+          )}
           {certsPending > 0 && (
             <Link href="/prof/certificats" className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 hover:bg-amber-100 transition-colors">
               <span className="text-xl">🎓</span>

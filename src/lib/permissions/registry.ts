@@ -18,6 +18,7 @@ export const NAV_PAGES: NavPageDef[] = [
   { role: "parent", key: "parent.dashboard",     label: "Tableau de bord",    href: "/suivi",                 icon: "🏠", shortLabel: "Accueil",      bottomNav: true },
   { role: "parent", key: "parent.progression",   label: "Suivi progression",  href: "/suivi/progression",     icon: "📊", shortLabel: "Progression",  bottomNav: true },
   { role: "parent", key: "parent.entrainements", label: "Entraînements",      href: "/suivi/entrainements",   icon: "💪", shortLabel: "Entraînem.",   bottomNav: true },
+  { role: "parent", key: "parent.questions",     label: "Questions de mon enfant", href: "/suivi/questions",  icon: "🙋", shortLabel: "Questions" },
   { role: "parent", key: "parent.certificats",   label: "Certificats",        href: "/suivi/certificats",     icon: "🎓", shortLabel: "Certificats",  bottomNav: true },
   { role: "parent", key: "parent.abonnement",    label: "Abonnement",         href: "/suivi/abonnement",      icon: "💳", shortLabel: "Abonnement" },
   { role: "parent", key: "parent.consentement",  label: "Consentement",       href: "/suivi/consentement",    icon: "✅", shortLabel: "Consent." },
@@ -70,6 +71,7 @@ export const NAV_PAGES: NavPageDef[] = [
 
   // ── Teacher ──────────────────────────────────────────────────────────────────
   { role: "teacher", key: "teacher.dashboard",    label: "Tableau de bord",  href: "/prof",             icon: "◈" },
+  { role: "teacher", key: "teacher.questions",    label: "Questions des élèves", href: "/prof/questions", icon: "🙋" },
   { role: "teacher", key: "teacher.planning",     label: "Mon planning",     href: "/prof/planning",    icon: "📅" },
   { role: "teacher", key: "teacher.rapports",     label: "Mes rapports",     href: "/prof/rapports",    icon: "📝" },
   { role: "teacher", key: "teacher.cours",        label: "Mes cours",        href: "/prof/cours",       icon: "📚" },

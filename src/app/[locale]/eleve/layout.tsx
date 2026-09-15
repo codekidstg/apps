@@ -3,6 +3,7 @@ import { getCachedAllTrainings } from "@/lib/cache/queries";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import AvatarSvg from "@/components/eleve/AvatarSvg";
+import { compterReponsesNonVuesEleve } from "@/lib/questions/donnees";
 import XPBar from "@/components/eleve/XPBar";
 import Logo from "@/components/Logo";
 import BadgeToast from "@/components/eleve/BadgeToast";
@@ -39,11 +40,13 @@ export default async function EleveLayout({ children, params }: { children: Reac
 
   // Badge entraînements + avatar en parallèle
   // allTrainings depuis le cache (5 min) — évite un aller-retour DB à chaque navigation élève
-  const [allTrainings, lessonProgRes, trainingProgRes, avatarRes] = await Promise.all([
+  const [allTrainings, lessonProgRes, trainingProgRes, avatarRes, reponsesNonVues] = await Promise.all([
     getCachedAllTrainings(),
     student ? (supabase.from("lesson_progress") as any).select("lesson_id").eq("student_id", student.id) : Promise.resolve({ data: [] }),
     student ? (supabase.from("training_progress") as any).select("training_id").eq("student_id", student.id).gt("attempts", 0) : Promise.resolve({ data: [] }),
     student ? (supabase.from("student_avatar") as any).select("*").eq("student_id", student.id).maybeSingle() : Promise.resolve({ data: null }),
+    // La pastille « Mes questions » : une réponse du mentor pas encore lue.
+    student ? compterReponsesNonVuesEleve(student.id) : Promise.resolve(0),
   ]);
 
   const startedIds = new Set((lessonProgRes.data ?? []).map((r: any) => r.lesson_id));
@@ -61,6 +64,7 @@ export default async function EleveLayout({ children, params }: { children: Reac
     { href: "/eleve/classement",   label: "Classement",        icon: "🏆" },
     { href: "/eleve/badges",       label: "Badges",            icon: "⭐" },
     { href: "/eleve/avatar",       label: "Mon robot",         icon: "🤖" },
+    { href: "/eleve/questions",    label: "Mes questions",     icon: "🙋" },
     ...(student?.atelier_active
       ? [{ href: "/atelier/lecon", label: "Séance offerte", icon: "🎟️", special: true }]
       : []),
@@ -154,6 +158,13 @@ export default async function EleveLayout({ children, params }: { children: Reac
                   <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
                     style={{ background: "#FDB813", color: "#0f172a" }}>
                     {trainingBadgeCount}
+                  </span>
+                )}
+                {item.href === "/eleve/questions" && reponsesNonVues > 0 && (
+                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
+                    style={{ background: "#10b981", color: "#022c22" }}
+                    aria-label={`${reponsesNonVues} réponse${reponsesNonVues > 1 ? "s" : ""} de ton mentor`}>
+                    {reponsesNonVues}
                   </span>
                 )}
               </Link>

@@ -14,6 +14,11 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
 }
 import dynamic from "next/dynamic";
 import { completeTraining } from "../../actions";
+import { Fragment } from "react";
+import JeBloqueIci from "@/components/eleve/JeBloqueIci";
+import { indiceDuBloc } from "@/lib/questions/raisons";
+import { programmeLisible } from "@/lib/questions/programme";
+import type { Question } from "@/lib/questions/donnees";
 
 const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), { ssr: false });
 const BlocklyKodi  = dynamic(() => import("@/components/eleve/BlocklyKodi"), { ssr: false });
@@ -54,6 +59,8 @@ type Props = {
   previousAttempts: number;
   previousScore: number | null;
   readOnly?: boolean;
+  /** « Je bloque ici » : la dernière question de l'élève sur chaque exercice. */
+  questions?: Record<string, Question>;
 };
 
 function Stars({ score }: { score: number }) {
@@ -76,7 +83,7 @@ function Stars({ score }: { score: number }) {
   );
 }
 
-export default function TrainingReader({ trainingId, blocks, xpReward, previousAttempts, previousScore, readOnly = false }: Props) {
+export default function TrainingReader({ trainingId, blocks, xpReward, previousAttempts, previousScore, readOnly = false, questions = {} }: Props) {
   const [quizAnswers,  setQuizAnswers]  = useState<Record<string, number | null>>({});
   const [quizResults,  setQuizResults]  = useState<Record<string, boolean | null>>({});
   const [codeResults,  setCodeResults]  = useState<Record<string, boolean>>({});
@@ -96,11 +103,61 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
   // jeux (labyrinthe, motif, tri, bug_hunt…) : blockId → résolu, et leur état
   const [gameDone,     setGameDone]     = useState<Record<string, boolean>>({});
   const [gameStates,   setGameStates]   = useState<Record<string, unknown>>({});
+  // Les lancers ratés de chaque labyrinthe : c'est là que « Je bloque ici » se met en avant.
+  const [echecs,       setEchecs]       = useState<Record<string, number>>({});
 
   const [completed, setCompleted]    = useState(false);
   const [xpGained, setXpGained]     = useState<number | null>(null);
   const [finalScore, setFinalScore]  = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // ── « Je bloque ici » ─────────────────────────────────────────────────────
+  const EXERCICES = ["quiz", "code_challenge", "blockly_challenge", "fill_blank", "match", "swipe_sort", "drag_to_bin"];
+  const estExercice = (b: Block) => EXERCICES.includes(b.type);
+
+  /** Les réponses fausses de l'exercice, ou les lancers ratés d'un labyrinthe. */
+  function echecsDuBloc(b: Block): number {
+    const faux = (etats: Record<string, unknown>) =>
+      Object.entries(etats).filter(([k, v]) =>
+        k.startsWith(`${b.id}-`) && (v === false || (typeof v === "object" && v !== null && (v as { correct?: boolean }).correct === false)),
+      ).length;
+    if (b.type === "quiz") return faux(quizResults);
+    if (b.type === "fill_blank") return faux(fillResults);
+    if (b.type === "swipe_sort") return faux(swipeResults);
+    if (b.type === "drag_to_bin") return faux(dragResults);
+    return echecs[b.id] ?? 0;
+  }
+
+  /** Ce que l'enfant a fait jusqu'ici, rendu lisible pour son mentor. */
+  function travailDuBloc(b: Block): string | null {
+    if (b.type === "quiz") {
+      type QQ = { question?: string; choices?: string[] };
+      const raw = b.content as { questions?: QQ[] } & QQ;
+      const liste: QQ[] = raw.questions ?? [raw];
+      const lignes = liste.map((q, qi) => {
+        const choix = quizAnswers[`${b.id}-${qi}`];
+        if (choix == null) return null;
+        const juste = quizResults[`${b.id}-${qi}`];
+        return `${q.question ?? `Question ${qi + 1}`}\n→ ${q.choices?.[choix] ?? "?"}${juste === false ? " (faux)" : juste ? " (juste)" : ""}`;
+      }).filter(Boolean);
+      return lignes.length ? lignes.join("\n\n") : null;
+    }
+    if (b.type === "fill_blank") {
+      type Phrase = { before?: string; after?: string; options?: string[] };
+      const phrases = (b.content as { sentences?: Phrase[] }).sentences ?? [];
+      const lignes = phrases.map((s, i) => {
+        const choix = fillAnswers[`${b.id}-${i}`];
+        if (choix == null) return null;
+        const rate = fillResults[`${b.id}-${i}`] === false;
+        return `${s.before ?? ""} [${s.options?.[choix] ?? "?"}] ${s.after ?? ""}`.trim() + (rate ? " (faux)" : "");
+      }).filter(Boolean);
+      return lignes.length ? lignes.join("\n") : null;
+    }
+    const jeu = (b.content as { game_type?: string }).game_type;
+    if (jeu === "maze") return programmeLisible(gameStates[b.id]);
+    if (jeu === "sort" && Array.isArray(gameStates[b.id])) return (gameStates[b.id] as string[]).join("\n");
+    return null;
+  }
 
   const quizBlocks    = blocks.filter(b => b.type === "quiz");
   const codeBlocks    = blocks.filter(b => b.type === "code_challenge");
@@ -315,7 +372,11 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
 
       {/* ── Blocs ── */}
       <div className="space-y-6">
-        {blocks.map((block) => {
+        {/* Le rendu de chaque bloc est inchangé, enveloppé dans une fonction
+            appelée sur place ; « Je bloque ici » s'ajoute sous les exercices. */}
+        {blocks.map((block) => (
+        <Fragment key={block.id}>
+        {(() => {
 
           /* Texte */
           if (block.type === "text") {
@@ -436,7 +497,11 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
             const garder = (s: unknown) => setGameStates(g => ({ ...g, [block.id]: s }));
 
             if (cfg.game_type === "maze") {
-              return <BlocklyRobot key={block.id} config={cfg} onSolved={resolu} />;
+              // Le programme est gardé pour que le mentor voie ce que l'enfant
+              // avait écrit, et chaque lancer raté est compté.
+              return <BlocklyRobot key={block.id} config={cfg} onSolved={resolu}
+                onXmlChange={garder}
+                onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))} />;
             }
             if (cfg.game_type === "pattern_select") {
               return <PatternSelect key={block.id} config={cfg} done={fait} onSolved={resolu}
@@ -1029,7 +1094,20 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
           }
 
           return null;
-        })}
+        })()}
+        {estExercice(block) && (
+          <JeBloqueIci
+            cible={{ trainingId }}
+            blocId={block.id}
+            indice={indiceDuBloc(block.type, block.content)}
+            echecs={echecsDuBloc(block)}
+            question={questions[block.id] ?? null}
+            capturerTravail={() => travailDuBloc(block)}
+            apercu={readOnly}
+          />
+        )}
+        </Fragment>
+        ))}
       </div>
 
       {/* ── Bouton terminer ── */}

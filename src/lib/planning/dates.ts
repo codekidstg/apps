@@ -62,3 +62,25 @@ export function semaineDe(maintenant: Date | number = new Date()): { lundi: stri
   dimanche.setUTCDate(dimanche.getUTCDate() + 6);
   return { lundi: jourTogo(lundi), dimanche: jourTogo(dimanche) };
 }
+
+/** « 3 août à 14:29 », heure du Togo. */
+export function dateEtHeure(iso: string): string {
+  const d = new Date(iso);
+  const jour  = d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" });
+  const heure = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+  return `${jour} à ${heure}`;
+}
+
+/**
+ * « il y a 12 min », « il y a 5 h », « il y a 3 jours ».
+ *
+ * À appeler côté serveur et à transmettre tout fait : calculé dans le
+ * navigateur, le texte différerait du rendu serveur et casserait l'hydratation.
+ */
+export function ilYa(iso: string, maintenant: number = Date.now()): string {
+  const minutes = Math.max(1, Math.round((maintenant - new Date(iso).getTime()) / 60_000));
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const heures = Math.round(minutes / 60);
+  if (heures < 48) return `il y a ${heures} h`;
+  return `il y a ${Math.round(heures / 24)} jours`;
+}

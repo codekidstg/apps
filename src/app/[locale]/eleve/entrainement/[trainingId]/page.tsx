@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import TrainingReader from "./TrainingReader";
+import { questionsDuContenu } from "@/lib/questions/donnees";
 import { visiteurEleve, accesEntrainement, urlRefus } from "@/lib/eleve/acces";
 
 type Block = { id: string; type: string; content: Record<string, unknown>; order_index: number };
@@ -102,6 +103,9 @@ export default async function TrainingPage({
           previousAttempts={progress?.attempts ?? 0}
           previousScore={progress?.score ?? null}
           readOnly={apercu}
+          questions={visiteur.mode === "eleve"
+            ? await questionsDuContenu(visiteur.studentId, { trainingId }, { marquerReponsesVues: true })
+            : {}}
         />
       )}
     </div>

@@ -33,12 +33,14 @@ type Props = {
   onSolved: () => void;
   savedXml?: string;
   onXmlChange?: (xml: string) => void;
+  /** Appelé à chaque lancer raté : c'est là que « Je bloque ici » se met en avant. */
+  onEchec?: () => void;
 };
 
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange }: Props) {
+export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange, onEchec }: Props) {
   const blocklyRef    = useRef<HTMLDivElement>(null);
   const workspaceRef  = useRef<unknown>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
@@ -48,6 +50,12 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange }
   const [pos, setPos]             = useState({ x: config.start.x, y: config.start.y });
   const [status, setStatus]       = useState<"idle" | "running" | "success" | "fail">("idle");
   const [msg, setMsg]             = useState("");
+
+  // Un lancer raté fait passer le statut à « fail », et chaque nouveau lancer
+  // repasse par « running » : deux échecs de suite se comptent bien deux fois.
+  useEffect(() => {
+    if (status === "fail") onEchec?.();
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
   const [blockCount, setBlockCount] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [collected, setCollected] = useState<Set<string>>(new Set());

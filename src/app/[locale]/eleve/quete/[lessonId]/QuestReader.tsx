@@ -13,6 +13,11 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
   return result;
 }
 import { completeLesson, solveBlockly, syncBlockProgress } from "../../actions";
+import { Fragment } from "react";
+import JeBloqueIci from "@/components/eleve/JeBloqueIci";
+import { indiceDuBloc } from "@/lib/questions/raisons";
+import { programmeLisible } from "@/lib/questions/programme";
+import type { Question } from "@/lib/questions/donnees";
 import { showBadgeToast } from "@/components/eleve/BadgeToast";
 import type { BadgeId } from "@/lib/gamification/badges";
 import { BADGES } from "@/lib/gamification/badges";
@@ -45,6 +50,8 @@ type Props = {
   savedBlockProgress?: Record<string, unknown> | null;
   readOnly?: boolean;
   trainings?: { id: string; title: string; xp_reward: number }[];
+  /** « Je bloque ici » : la dernière question de l'élève sur chaque exercice. */
+  questions?: Record<string, Question>;
 };
 
 type SavedProgress = {
@@ -68,7 +75,16 @@ function saveProgress(lessonId: string, p: SavedProgress) {
   try { localStorage.setItem(`ck:quest:${lessonId}`, JSON.stringify(p)); } catch {}
 }
 
-export default function QuestReader({ lessonId, title, blocks, alreadyCompleted, xpReward, nextLessonId, themeId, savedBlockProgress, readOnly = false, trainings = [] }: Props) {
+/** Ce qu'on affiche le temps que la progression de l'enfant soit relue. */
+function AtelierEnChargement() {
+  return (
+    <div className="rounded-2xl border border-slate-700 bg-slate-900 flex items-center justify-center" style={{ height: 400 }}>
+      <div className="text-slate-400 font-bold text-sm">🔧 Chargement de ton atelier…</div>
+    </div>
+  );
+}
+
+export default function QuestReader({ lessonId, title, blocks, alreadyCompleted, xpReward, nextLessonId, themeId, savedBlockProgress, readOnly = false, trainings = [], questions = {} }: Props) {
   const [hydrated, setHydrated]             = useState(false);
   const [quizAnswers, setQuizAnswers]       = useState<Record<string, number | null>>({});
   const [quizResults, setQuizResults]       = useState<Record<string, boolean | null>>({});
@@ -79,6 +95,8 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
   const [codeResults, setCodeResults]       = useState<Record<string, boolean>>({});
   const [codeValues, setCodeValues]         = useState<Record<string, string>>({});
   const [gameStates, setGameStates]         = useState<Record<string, unknown>>({});
+  // Les lancers ratés de chaque labyrinthe : c'est là que « Je bloque ici » se met en avant.
+  const [echecs, setEchecs]                 = useState<Record<string, number>>({});
 
   const dbSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -151,10 +169,27 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
     syncBlockProgress(lessonId, full as unknown as Record<string, unknown>).catch(() => {});
   }, [solvedBlockly, quizAnswers, quizResults, codeResults, codeValues, gameStates, lessonId, readOnly]);
 
+  /**
+   * Les ateliers Blockly (robot, musique, Kodi) branchent leur écouteur une
+   * seule fois, à leur installation, et gardent donc la toute première version
+   * de cette fonction. Elle recopiait alors un état figé à ce moment-là : chaque
+   * bloc déplacé effaçait le programme des autres ateliers de la leçon, et les
+   * réponses de quiz données entre-temps — en local, puis en base deux secondes
+   * plus tard.
+   *
+   * La fonction est désormais stable et ne lit plus rien de périmé : la mise à
+   * jour fusionne dans l'état le plus récent, et la sauvegarde part d'un effet,
+   * une fois cet état validé.
+   */
+  const sauvegardeJeuEnAttente = useRef(false);
   const saveGameState = useCallback((blockId: string, state: unknown) => {
-    const newStates = { ...gameStates, [blockId]: state };
-    setGameStates(newStates);
-    persist({ gameStates: newStates });
+    setGameStates((precedent) => (precedent[blockId] === state ? precedent : { ...precedent, [blockId]: state }));
+    sauvegardeJeuEnAttente.current = true;
+  }, []);
+  useEffect(() => {
+    if (!sauvegardeJeuEnAttente.current) return;
+    sauvegardeJeuEnAttente.current = false;
+    persist({ gameStates });
   }, [gameStates, persist]);
 
   const quizBlocks  = blocks.filter((b) => b.type === "quiz");
@@ -172,6 +207,39 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
     return !cfg.required || codeResults[b.id];
   });
   const canFinish = allQuizDone && allBlocklyDone && allCodeDone;
+
+  // ── « Je bloque ici » ─────────────────────────────────────────────────────
+  const EXERCICES = ["quiz", "code_challenge", "blockly", "game"];
+  const estExercice = (b: Block) => EXERCICES.includes(b.type);
+
+  /** Les réponses fausses d'un quiz, ou les lancers ratés d'un labyrinthe. */
+  function echecsDuBloc(b: Block): number {
+    if (b.type === "quiz") {
+      return Object.entries(quizResults).filter(([k, v]) => k.startsWith(`${b.id}-`) && v === false).length;
+    }
+    return echecs[b.id] ?? 0;
+  }
+
+  /** Ce que l'enfant a fait jusqu'ici, rendu lisible pour son mentor. */
+  function travailDuBloc(b: Block): string | null {
+    if (b.type === "quiz") {
+      type QQ = { question?: string; choices?: string[] };
+      const raw = b.content as { questions?: QQ[] } & QQ;
+      const liste: QQ[] = raw.questions ?? [raw];
+      const lignes = liste.map((q, qi) => {
+        const choix = quizAnswers[`${b.id}-${qi}`];
+        if (choix == null) return null;
+        const juste = quizResults[`${b.id}-${qi}`];
+        return `${q.question ?? `Question ${qi + 1}`}\n→ ${q.choices?.[choix] ?? "?"}${juste === false ? " (faux)" : juste ? " (juste)" : ""}`;
+      }).filter(Boolean);
+      return lignes.length ? lignes.join("\n\n") : null;
+    }
+    if (b.type === "code_challenge") return codeValues[b.id] ?? null;
+    const jeu = (b.content.game_type as string | undefined) ?? "maze";
+    if (jeu === "maze" || b.type === "blockly") return programmeLisible(gameStates[b.id]);
+    if (jeu === "sort" && Array.isArray(gameStates[b.id])) return (gameStates[b.id] as string[]).join("\n");
+    return null;
+  }
 
   function handleBlocklySolved(blockId: string) {
     markGameDone(blockId);
@@ -232,7 +300,11 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
 
       {/* Blocks */}
       <div className="space-y-6">
-        {blocks.map((block) => {
+        {/* Le rendu de chaque bloc est inchangé, enveloppé dans une fonction
+            appelée sur place ; « Je bloque ici » s'ajoute sous les exercices. */}
+        {blocks.map((block) => (
+        <Fragment key={block.id}>
+        {(() => {
           if (block.type === "text") {
             const c = block.content as { html?: string; markdown?: string };
             const html = c.html ?? mdToHtml(c.markdown ?? "");
@@ -415,12 +487,17 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
                       </div>
                     </div>
                   )}
-                  <BlocklyKodi
-                    config={kodiCfg as any}
-                    onSolved={done ? () => {} : markDone}
-                    savedXml={savedXml}
-                    onXmlChange={(xml) => saveGameState(block.id, xml)}
-                  />
+                  {/* Monté après la relecture de la progression : installé avant,
+                      l'atelier démarrait vide et n'affichait jamais le programme
+                      que l'enfant avait laissé. */}
+                  {hydrated ? (
+                    <BlocklyKodi
+                      config={kodiCfg as any}
+                      onSolved={done ? () => {} : markDone}
+                      savedXml={savedXml}
+                      onXmlChange={(xml) => saveGameState(block.id, xml)}
+                    />
+                  ) : <AtelierEnChargement />}
                 </div>
               );
             }
@@ -476,12 +553,15 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
                       ✅ Défi résolu ! +40 XP
                     </div>
                   )}
-                  <BlocklyRobot
-                    config={cfg as Parameters<typeof BlocklyRobot>[0]["config"]}
-                    onSolved={done ? () => {} : markDone}
-                    savedXml={gameStates[block.id] as string | undefined}
-                    onXmlChange={(xml) => saveGameState(block.id, xml)}
-                  />
+                  {hydrated ? (
+                    <BlocklyRobot
+                      config={cfg as Parameters<typeof BlocklyRobot>[0]["config"]}
+                      onSolved={done ? () => {} : markDone}
+                      savedXml={gameStates[block.id] as string | undefined}
+                      onXmlChange={(xml) => saveGameState(block.id, xml)}
+                      onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
+                    />
+                  ) : <AtelierEnChargement />}
                 </div>
               );
             }
@@ -495,12 +575,14 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
                       ✅ Défi musical résolu ! +40 XP
                     </div>
                   )}
-                  <BlocklyMusic
-                    config={cfg as Parameters<typeof BlocklyMusic>[0]["config"]}
-                    onSolved={done ? () => {} : markDone}
-                    savedXml={gameStates[block.id] as string | undefined}
-                    onXmlChange={(xml) => saveGameState(block.id, xml)}
-                  />
+                  {hydrated ? (
+                    <BlocklyMusic
+                      config={cfg as Parameters<typeof BlocklyMusic>[0]["config"]}
+                      onSolved={done ? () => {} : markDone}
+                      savedXml={gameStates[block.id] as string | undefined}
+                      onXmlChange={(xml) => saveGameState(block.id, xml)}
+                    />
+                  ) : <AtelierEnChargement />}
                 </div>
               );
             }
@@ -541,7 +623,20 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
           }
 
           return null;
-        })}
+        })()}
+        {estExercice(block) && (
+          <JeBloqueIci
+            cible={{ lessonId }}
+            blocId={block.id}
+            indice={indiceDuBloc(block.type, block.content)}
+            echecs={echecsDuBloc(block)}
+            question={questions[block.id] ?? null}
+            capturerTravail={() => travailDuBloc(block)}
+            apercu={readOnly}
+          />
+        )}
+        </Fragment>
+        ))}
       </div>
 
       {/* Finish button */}
