@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import PageHeader from "@/components/backoffice/PageHeader";
+import AlerteBoiteDirection from "@/components/backoffice/AlerteBoiteDirection";
 
 async function getStats() {
   const supabase = await createClient();
@@ -46,6 +47,8 @@ export default async function AdminDashboard() {
     <div>
       <PageHeader title="Tableau de bord" subtitle="Vue d'ensemble de la plateforme" />
       <div className="p-8 space-y-8">
+
+        <AlerteBoiteDirection href="/admin/messages" />
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {kpis.map((k) => (

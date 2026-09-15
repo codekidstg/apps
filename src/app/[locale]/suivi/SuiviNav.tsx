@@ -15,6 +15,8 @@ export type NavItem = {
   shortLabel: string;
   icon: string;
   href: string;
+  /** Une réponse de la direction que le parent n'a pas encore lue. */
+  badge?: number;
 };
 
 function useIsActive() {
@@ -44,7 +46,13 @@ export function SuiviSidebarNav({ items }: { items: NavItem[] }) {
             }`}
           >
             <span className="text-base">{n.icon}</span>
-            {n.label}
+            <span className="flex-1">{n.label}</span>
+            {!!n.badge && (
+              <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none bg-blue-500 text-white"
+                aria-label={`${n.badge} réponse${n.badge > 1 ? "s" : ""} non lue${n.badge > 1 ? "s" : ""}`}>
+                {n.badge}
+              </span>
+            )}
           </Link>
         );
       })}
@@ -68,7 +76,15 @@ export function SuiviBottomNav({ items }: { items: NavItem[] }) {
               active ? "text-blue-400" : "text-slate-500"
             }`}
           >
-            <span className="text-xl leading-none">{n.icon}</span>
+            <span className="relative text-xl leading-none">
+              {n.icon}
+              {!!n.badge && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-blue-500 text-white text-[9px] font-black leading-4 text-center"
+                  aria-label={`${n.badge} réponse${n.badge > 1 ? "s" : ""} non lue${n.badge > 1 ? "s" : ""}`}>
+                  {n.badge}
+                </span>
+              )}
+            </span>
             <span className="text-[10px] font-bold truncate max-w-full px-1">{n.shortLabel}</span>
           </Link>
         );

@@ -6,6 +6,7 @@ import { SuiviSidebarNav, SuiviBottomNav, type NavItem } from "./SuiviNav";
 import PushPermission from "@/components/PushPermission";
 import { getEffectiveNavPermissions } from "@/lib/permissions/access";
 import { PAGES_BY_ROLE } from "@/lib/permissions/registry";
+import { compterReponsesNonVues } from "@/lib/contact/parent";
 import { logout } from "@/app/[locale]/auth/actions";
 
 export default async function SuiviLayout({
@@ -33,7 +34,11 @@ export default async function SuiviLayout({
   // celui du prof et du manager. Les pages elles-mêmes appliquent déjà
   // requireParentPermission : un admin ou un manager qui visite /suivi voit
   // donc exactement les entrées auxquelles le parent a droit.
-  const allowedKeys = await getEffectiveNavPermissions(user.id, "parent");
+  const [allowedKeys, reponsesNonVues] = await Promise.all([
+    getEffectiveNavPermissions(user.id, "parent"),
+    // La pastille « Contact » : une réponse de la direction pas encore lue.
+    role === "parent" ? compterReponsesNonVues(user.id) : Promise.resolve(0),
+  ]);
   const items: NavItem[] = (PAGES_BY_ROLE["parent"] ?? [])
     .filter(p => allowedKeys.has(p.key))
     .map(p => ({
@@ -42,6 +47,7 @@ export default async function SuiviLayout({
       shortLabel: p.shortLabel ?? p.label,
       icon:       p.icon ?? "•",
       href:       `/${locale}${p.href}`,
+      ...(p.key === "parent.contact" && reponsesNonVues > 0 ? { badge: reponsesNonVues } : {}),
     }));
 
   const bottomKeys = new Set(

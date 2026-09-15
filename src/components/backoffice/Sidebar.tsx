@@ -23,6 +23,7 @@ const adminNav: NavItem[] = [
   { label: "Écoles",           href: "/admin/ecoles",       icon: "🏫", pageKey: "admin.ecoles" },
   { label: "Thèmes & Cours",   href: "/admin/themes",       icon: "📚", pageKey: "admin.themes" },
   { label: "Rapports de séance", href: "/admin/rapports",   icon: "📝", pageKey: "admin.rapports" },
+  { label: "Messages des parents", href: "/admin/messages", icon: "✉️", pageKey: "admin.messages" },
   {
     label: "Compta",           href: "/admin/compta",       icon: "💰", pageKey: "admin.compta",
     children: [
@@ -49,6 +50,7 @@ const managerNav: NavItem[] = [
   },
   { label: "Mes thèmes",      href: "/manager/themes",       icon: "📚", pageKey: "manager.themes" },
   { label: "Rapports de séance", href: "/manager/rapports",   icon: "📝", pageKey: "manager.rapports" },
+  { label: "Messages des parents", href: "/manager/messages", icon: "✉️", pageKey: "manager.messages" },
   { label: "Affectations",    href: "/manager/affectations",  icon: "📋", pageKey: "manager.affectations" },
   {
     label: "Compta",          href: "/manager/compta",       icon: "💰", pageKey: "manager.compta",
@@ -78,9 +80,9 @@ const roleLabel: Record<string, string> = {
   teacher: "Professeur",
 };
 
-type Props = { role: Role; displayName: string; hiddenKeys?: string[] };
+type Props = { role: Role; displayName: string; hiddenKeys?: string[]; badges?: Record<string, number> };
 
-export default function Sidebar({ role, displayName, hiddenKeys = [] }: Props) {
+export default function Sidebar({ role, displayName, hiddenKeys = [], badges = {} }: Props) {
   const pathname = usePathname();
   const hidden   = new Set(hiddenKeys);
   const rawNav   = role === "admin" ? adminNav : role === "manager" ? managerNav : teacherNav;
@@ -143,6 +145,10 @@ export default function Sidebar({ role, displayName, hiddenKeys = [] }: Props) {
           const active = isActive(item.href);
           const hasChildren = !!item.children?.length;
           const expanded = hasChildren && active;
+          // Une pastille rouge : c'est le nombre de choses qui attendent
+          // quelqu'un. Sans elle, un message de parent restait 43 jours sans
+          // que personne ne sache qu'il existait.
+          const enAttente = item.pageKey ? (badges[item.pageKey] ?? 0) : 0;
 
           return (
             <div key={item.href}>
@@ -158,6 +164,15 @@ export default function Sidebar({ role, displayName, hiddenKeys = [] }: Props) {
               >
                 <span className="text-base leading-none">{item.icon}</span>
                 <span className="flex-1">{item.label}</span>
+                {enAttente > 0 && (
+                  <span
+                    className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
+                    style={{ background: "#ef4444", color: "white" }}
+                    aria-label={`${enAttente} en attente`}
+                  >
+                    {enAttente}
+                  </span>
+                )}
                 {hasChildren && (
                   <span style={{ fontSize: 10, opacity: 0.6 }}>{expanded ? "▲" : "▼"}</span>
                 )}

@@ -2,6 +2,7 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getDashboardComptaKPIs } from "@/lib/compta/treasury";
 import { redirect } from "next/navigation";
 import PageHeader from "@/components/backoffice/PageHeader";
+import AlerteBoiteDirection from "@/components/backoffice/AlerteBoiteDirection";
 import Link from "next/link";
 import { AVANCEMENT, ENGAGEMENT } from "@/lib/rapports";
 
@@ -80,6 +81,8 @@ export default async function ManagerDashboard() {
     <div>
       <PageHeader title="Tableau de bord" subtitle="Vue d'ensemble de votre espace" />
       <div className="p-8 space-y-8">
+
+        <AlerteBoiteDirection href="/manager/messages" />
 
         {/* KPIs cliquables */}
         <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
