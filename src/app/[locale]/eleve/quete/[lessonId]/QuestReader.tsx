@@ -33,6 +33,7 @@ const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { s
 const PatternSelect = dynamic(() => import("@/components/eleve/PatternSelect"), { ssr: false });
 const PatternBuild  = dynamic(() => import("@/components/eleve/PatternBuild"), { ssr: false });
 const PlanBuilder   = dynamic(() => import("@/components/eleve/PlanBuilder"), { ssr: false });
+const DeviensOrdinateur = dynamic(() => import("@/components/eleve/DeviensOrdinateur"), { ssr: false });
 
 type Block = {
   id: string;
@@ -636,6 +637,14 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
               return <PlanBuilder key={block.id} blockId={block.id} config={cfg as any} done={done} onSolved={markDone}
                 onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
                 savedState={(gameStates[block.id] as string[]) ?? null}
+                onStateChange={(s) => saveGameState(block.id, s)} />;
+            }
+
+            // « Un appel devient une valeur » — le geste que rien ne montrait.
+            if (gameType === "deviens_ordinateur") {
+              return <DeviensOrdinateur key={block.id} blockId={block.id} config={cfg as any} done={done} onSolved={markDone}
+                onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
+                savedState={(gameStates[block.id] as number) ?? null}
                 onStateChange={(s) => saveGameState(block.id, s)} />;
             }
 

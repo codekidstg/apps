@@ -28,6 +28,7 @@ const BlocklyRobot = dynamic(() => import("@/components/eleve/BlocklyRobotLoader
 const PatternSelect = dynamic(() => import("@/components/eleve/PatternSelect"), { ssr: false });
 const PatternBuild  = dynamic(() => import("@/components/eleve/PatternBuild"), { ssr: false });
 const PlanBuilder   = dynamic(() => import("@/components/eleve/PlanBuilder"), { ssr: false });
+const DeviensOrdinateur = dynamic(() => import("@/components/eleve/DeviensOrdinateur"), { ssr: false });
 import { MemoryGame, AssociationGame, SortGame, BugHuntGame } from "@/components/eleve/jeux";
 
 /**
@@ -47,7 +48,7 @@ const estJeuPython = (b: { type: string; content: unknown }) =>
  * d'apprendre : les entraînements se rabattaient sur des versions papier.
  * Même véhicule que les jeux Python : blockly_challenge + game_type.
  */
-const JEUX_LECON = ["maze", "bug_hunt", "sort", "memory", "association", "pattern_select", "pattern_build", "plan_builder"];
+const JEUX_LECON = ["maze", "bug_hunt", "sort", "memory", "association", "pattern_select", "pattern_build", "plan_builder", "deviens_ordinateur"];
 const estJeuLecon = (b: { type: string; content: unknown }) =>
   b.type === "blockly_challenge" && JEUX_LECON.includes((b.content as any)?.game_type);
 
@@ -523,6 +524,11 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
               return <PlanBuilder key={block.id} blockId={block.id} config={cfg} done={fait} onSolved={resolu}
                 onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
                 savedState={(etat as string[]) ?? null} onStateChange={garder} />;
+            }
+            if (cfg.game_type === "deviens_ordinateur") {
+              return <DeviensOrdinateur key={block.id} blockId={block.id} config={cfg} done={fait} onSolved={resolu}
+                onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
+                savedState={(etat as number) ?? null} onStateChange={garder} />;
             }
             if (cfg.game_type === "sort") {
               return <SortGame key={block.id} blockId={block.id} title={cfg.title} description={cfg.description}
