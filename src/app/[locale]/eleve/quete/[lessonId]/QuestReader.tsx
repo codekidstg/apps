@@ -32,6 +32,7 @@ const PythonArcade = dynamic(() => import("@/components/eleve/PythonArcade"), { 
 const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { ssr: false });
 const PatternSelect = dynamic(() => import("@/components/eleve/PatternSelect"), { ssr: false });
 const PatternBuild  = dynamic(() => import("@/components/eleve/PatternBuild"), { ssr: false });
+const PlanBuilder   = dynamic(() => import("@/components/eleve/PlanBuilder"), { ssr: false });
 
 type Block = {
   id: string;
@@ -626,6 +627,15 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
               return <PatternBuild key={block.id} config={cfg as any} done={done} onSolved={markDone}
                 onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
                 savedState={(gameStates[block.id] as [number, number, number]) ?? null}
+                onStateChange={(s) => saveGameState(block.id, s)} />;
+            }
+
+            // Le plan écrit avant d'ouvrir l'atelier — et relu par le parent
+            // sur la page de réalisation.
+            if (gameType === "plan_builder") {
+              return <PlanBuilder key={block.id} blockId={block.id} config={cfg as any} done={done} onSolved={markDone}
+                onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
+                savedState={(gameStates[block.id] as string[]) ?? null}
                 onStateChange={(s) => saveGameState(block.id, s)} />;
             }
 

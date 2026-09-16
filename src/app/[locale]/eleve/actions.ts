@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processGamificationEvent } from "@/lib/gamification/process-event";
 import { checkThemeCompletion, issueCertificate } from "@/lib/certificates/generate";
+import { enregistrerRealisation } from "@/lib/realisations/enregistrer";
+import { prevenirParentsCertificat } from "@/lib/certificates/prevenir";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 import { accesLecon, accesEntrainement, MESSAGE_REFUS } from "@/lib/eleve/acces";
@@ -64,7 +66,7 @@ export async function completeLesson(lessonId: string, score: number, perfect: b
           const { data: existing } = await (admin.from("certificates") as any)
             .select("id").eq("student_id", studentId).eq("theme_id", chapter.theme_id).eq("cert_type", "theme").maybeSingle();
           if (!existing) {
-            await issueCertificate({
+            const emis = await issueCertificate({
               studentId,
               type:     "theme",
               themeId:  chapter.theme_id,
@@ -72,14 +74,30 @@ export async function completeLesson(lessonId: string, score: number, perfect: b
               totalXp:  result.xpGained ?? 0,
               validatedBy: user.id, // auto-validé par le système (prof devra confirmer)
             });
+
+            // Le certificat part déjà validé, donc téléchargeable aussitôt par
+            // le parent — mais rien ne le lui disait : la seule notification
+            // existante venait du bouton du professeur. Le moment le plus fort
+            // du parcours arrivait en silence.
+            if (emis && !("error" in emis)) {
+              const { data: theme } = await admin
+                .from("themes").select("title").eq("id", chapter.theme_id)
+                .single<{ title: string }>();
+              await prevenirParentsCertificat(studentId, theme?.title ?? null);
+            }
           }
         }
       }
     }
   } catch (_) { /* non bloquant */ }
 
+  // Les leçons qui contiennent un plan produisent une réalisation partageable :
+  // le plan écrit par l'enfant, son programme, et le dessin tracé. Rend `null`
+  // pour toutes les autres leçons, et n'empêche jamais de terminer la séance.
+  const realisation = await enregistrerRealisation(studentId, lessonId);
+
   revalidatePath("/eleve");
-  return { success: true, ...result };
+  return { success: true, ...result, realisation };
 }
 
 export async function solveBlockly(lessonId: string, blockId?: string) {

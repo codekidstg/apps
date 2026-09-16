@@ -18,6 +18,19 @@ export type ChallengeConfig = {
   steps?: string[];
   title?: string;
   available_blocks?: string[];
+  /**
+   * Le robot laisse une trace sur les cases parcourues.
+   *
+   * C'est ce qui fait passer la sortie du programme de « un score » à « un
+   * dessin » : l'enfant montre une image produite par son code, et prépare le
+   * thème « Mon dessin existe grâce à mon code ».
+   */
+  trail?: boolean;
+  /**
+   * La figure à obtenir. Quand elle est fournie, réussir ne suffit plus à
+   * atteindre l'étoile : la trace doit couvrir exactement ces cases.
+   */
+  target_trail?: { x: number; y: number }[];
 };
 
 export type Dir = "N" | "E" | "S" | "W";
@@ -196,6 +209,8 @@ export function drawScene(
   walkFrame: number,
   collected: Set<string>,
   doorsOpen: Set<string>,
+  /** Cases déjà parcourues, dessinées en trace quand `config.trail` est vrai. */
+  visited: Set<string> = new Set(),
 ) {
   const G = config.grid_size;
   const size = G * CELL;
@@ -225,6 +240,13 @@ export function drawScene(
         // Sand floor checkerboard
         ctx.fillStyle = (x + y) % 2 === 0 ? "#92400e" : "#78350f";
         ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+        // La trace du robot : c'est elle qui dessine.
+        if (config.trail && visited.has(`${x},${y}`)) {
+          ctx.fillStyle = "rgba(253,184,19,0.55)";
+          ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+          ctx.fillStyle = "rgba(253,184,19,0.9)";
+          ctx.fillRect(x * CELL + 3, y * CELL + 3, CELL - 6, CELL - 6);
+        }
         if (isGoal) {
           ctx.fillStyle = "rgba(16,185,129,0.35)";
           ctx.fillRect(x * CELL, y * CELL, CELL, CELL);

@@ -6,7 +6,10 @@ import { routing } from "./i18n/routing";
 const intlMiddleware = createIntlMiddleware(routing);
 
 // Routes accessibles sans connexion
-const PUBLIC_PATHS = ["/", "/connexion", "/inscription", "/test-maze", "/test-music", "/atelier"];
+// « /realisation » est la page qu'un parent ouvre depuis un lien, sans compte :
+// elle doit rester accessible sans connexion, comme l'atelier découverte. Ce
+// qu'elle expose est volontairement limité au prénom (voir migration 030).
+const PUBLIC_PATHS = ["/", "/connexion", "/inscription", "/test-maze", "/test-music", "/atelier", "/realisation"];
 
 // Routes réservées par rôle (préfixes)
 const ROLE_ROUTES: Record<string, string[]> = {

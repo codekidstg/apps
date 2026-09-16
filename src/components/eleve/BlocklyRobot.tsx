@@ -60,6 +60,8 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange, 
   const [showConfetti, setShowConfetti] = useState(false);
   const [collected, setCollected] = useState<Set<string>>(new Set());
   const [doorsOpen, setDoorsOpen] = useState<Set<string>>(new Set());
+  /** Les cases parcourues — la trace, quand le défi la demande. */
+  const [visited, setVisited] = useState<Set<string>>(new Set());
   const [hoveredTurn, setHoveredTurn] = useState<null | "L" | "R">(null);
 
   const G         = config.grid_size;
@@ -71,17 +73,17 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange, 
   // ── Draw whenever state changes ──
   const redraw = useCallback((
     px: number, py: number, d: Dir, rotDeg: number, wf: number,
-    coll: Set<string>, dOpen: Set<string>,
+    coll: Set<string>, dOpen: Set<string>, vus: Set<string>,
   ) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
-    drawScene(ctx, config, px, py, d, rotDeg, wf, coll, dOpen);
+    drawScene(ctx, config, px, py, d, rotDeg, wf, coll, dOpen, vus);
   }, [config]);
 
   useEffect(() => {
-    redraw(pos.x, pos.y, dir, DIR_ANGLE[dir], 0, collected, doorsOpen);
-  }, [pos, dir, collected, doorsOpen, redraw]);
+    redraw(pos.x, pos.y, dir, DIR_ANGLE[dir], 0, collected, doorsOpen, visited);
+  }, [pos, dir, collected, doorsOpen, visited, redraw]);
 
   // ── Blockly init ──
   useEffect(() => {
@@ -240,6 +242,10 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange, 
     let curAngle = DIR_ANGLE[cur.dir]; // visual rotation in degrees
     const coll  = new Set<string>();
     const dOpen = new Set<string>();
+    // La trace repart de zéro à chaque lancer : sinon deux essais successifs
+    // cumuleraient leurs chemins et la figure serait toujours fausse.
+    const vus = new Set<string>([`${cur.x},${cur.y}`]);
+    setVisited(new Set(vus));
 
     const smoothTurn = (side: "L" | "R", newDir: Dir): Promise<void> =>
       new Promise((resolve) => {
@@ -254,7 +260,7 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange, 
           const canvas = canvasRef.current;
           if (canvas) {
             const ctx = canvas.getContext("2d")!;
-            drawScene(ctx, config, cur.x, cur.y, newDir, angle, 0, coll, dOpen);
+            drawScene(ctx, config, cur.x, cur.y, newDir, angle, 0, coll, dOpen, vus);
           }
           if (t < 1) {
             animRef.current = requestAnimationFrame(frame);
@@ -283,7 +289,7 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange, 
           const canvas = canvasRef.current;
           if (canvas) {
             const ctx = canvas.getContext("2d")!;
-            drawScene(ctx, config, px, py, d, angle, wf, coll, dOpen);
+            drawScene(ctx, config, px, py, d, angle, wf, coll, dOpen, vus);
           }
           if (t < 1) {
             animRef.current = requestAnimationFrame(frame);
@@ -329,6 +335,8 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange, 
 
         await smoothMove(cur.x, cur.y, nx, ny, cur.dir);
         cur = { ...cur, x: nx, y: ny };
+        vus.add(`${nx},${ny}`);
+        setVisited(new Set(vus));
 
         // Les objets ne se ramassent plus en passant dessus : il faut poser un
         // bloc 🧲 Ramasser. Sinon le bloc ne servait à rien — et la consigne du
@@ -368,9 +376,34 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange, 
       return;
     }
 
+    /**
+     * Les défis « tracé » : arriver ne suffit pas, c'est la figure qui compte.
+     *
+     * Le message dit s'il manque des cases ou s'il y en a en trop, jamais
+     * lesquelles — sinon il donnerait le dessin, qui est tout l'exercice.
+     */
+    if (config.target_trail) {
+      const vise = new Set(config.target_trail.map((c) => `${c.x},${c.y}`));
+      const manquantes = [...vise].filter((c) => !vus.has(c)).length;
+      const enTrop     = [...vus].filter((c) => !vise.has(c)).length;
+      if (manquantes || enTrop) {
+        setStatus("fail");
+        setMsg(
+          manquantes && enTrop
+            ? `✏️ Ta trace ne correspond pas encore : ${manquantes} case(s) du dessin ne sont pas passées, et ${enTrop} case(s) en trop. Reprends ton plan.`
+            : manquantes
+              ? `✏️ Il manque ${manquantes} case(s) au dessin. Ton robot s'arrête trop tôt quelque part.`
+              : `✏️ Ta trace déborde de ${enTrop} case(s). Ton robot va trop loin quelque part.`,
+        );
+        return;
+      }
+    }
+
     if (cur.x === config.goal.x && cur.y === config.goal.y) {
       setStatus("success");
-      setMsg("🎉 Bravo Kirikou ! Tu as atteint la sortie !");
+      setMsg(config.target_trail
+        ? "🎨 Bravo ! Ton programme a dessiné la figure exacte."
+        : "🎉 Bravo Kirikou ! Tu as atteint la sortie !");
       setShowConfetti(true);
       setTimeout(() => { setShowConfetti(false); onSolved(); }, 2000);
     } else {
@@ -393,6 +426,7 @@ export default function BlocklyRobot({ config, onSolved, savedXml, onXmlChange, 
     setMsg("");
     setCollected(new Set());
     setDoorsOpen(new Set());
+    setVisited(new Set());
   };
 
   return (
