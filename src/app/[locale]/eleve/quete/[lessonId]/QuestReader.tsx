@@ -31,6 +31,7 @@ const PythonMaze   = dynamic(() => import("@/components/eleve/PythonMaze"), { ss
 const PythonArcade = dynamic(() => import("@/components/eleve/PythonArcade"), { ssr: false });
 const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { ssr: false });
 const PatternSelect = dynamic(() => import("@/components/eleve/PatternSelect"), { ssr: false });
+const PatternBuild  = dynamic(() => import("@/components/eleve/PatternBuild"), { ssr: false });
 
 type Block = {
   id: string;
@@ -238,6 +239,11 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
     const jeu = (b.content.game_type as string | undefined) ?? "maze";
     if (jeu === "maze" || b.type === "blockly") return programmeLisible(gameStates[b.id]);
     if (jeu === "sort" && Array.isArray(gameStates[b.id])) return (gameStates[b.id] as string[]).join("\n");
+    if (jeu === "pattern_build" && Array.isArray(gameStates[b.id])) {
+      const [d, f, nb] = gameStates[b.id] as [number, number, number];
+      const lignes = ((b.content.instructions as string[] | undefined) ?? []).slice(d, f + 1);
+      return `Répéter ${nb} fois :\n${lignes.map((l) => `   ${l}`).join("\n")}`;
+    }
     return null;
   }
 
@@ -611,6 +617,15 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
             if (gameType === "pattern_select") {
               return <PatternSelect key={block.id} config={cfg as any} done={done} onSolved={markDone}
                 savedState={(gameStates[block.id] as [number, number]) ?? null}
+                onStateChange={(s) => saveGameState(block.id, s)} />;
+            }
+
+            // Délimiter le motif ET régler le nombre de tours : chaque
+            // vérification ratée compte, pour que « Je bloque ici » se propose.
+            if (gameType === "pattern_build") {
+              return <PatternBuild key={block.id} config={cfg as any} done={done} onSolved={markDone}
+                onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
+                savedState={(gameStates[block.id] as [number, number, number]) ?? null}
                 onStateChange={(s) => saveGameState(block.id, s)} />;
             }
 

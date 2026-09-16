@@ -26,6 +26,7 @@ const PythonMaze   = dynamic(() => import("@/components/eleve/PythonMaze"), { ss
 const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { ssr: false });
 const BlocklyRobot = dynamic(() => import("@/components/eleve/BlocklyRobotLoader"), { ssr: false });
 const PatternSelect = dynamic(() => import("@/components/eleve/PatternSelect"), { ssr: false });
+const PatternBuild  = dynamic(() => import("@/components/eleve/PatternBuild"), { ssr: false });
 import { MemoryGame, AssociationGame, SortGame, BugHuntGame } from "@/components/eleve/jeux";
 
 /**
@@ -45,7 +46,7 @@ const estJeuPython = (b: { type: string; content: unknown }) =>
  * d'apprendre : les entraînements se rabattaient sur des versions papier.
  * Même véhicule que les jeux Python : blockly_challenge + game_type.
  */
-const JEUX_LECON = ["maze", "bug_hunt", "sort", "memory", "association", "pattern_select"];
+const JEUX_LECON = ["maze", "bug_hunt", "sort", "memory", "association", "pattern_select", "pattern_build"];
 const estJeuLecon = (b: { type: string; content: unknown }) =>
   b.type === "blockly_challenge" && JEUX_LECON.includes((b.content as any)?.game_type);
 
@@ -156,6 +157,11 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
     const jeu = (b.content as { game_type?: string }).game_type;
     if (jeu === "maze") return programmeLisible(gameStates[b.id]);
     if (jeu === "sort" && Array.isArray(gameStates[b.id])) return (gameStates[b.id] as string[]).join("\n");
+    if (jeu === "pattern_build" && Array.isArray(gameStates[b.id])) {
+      const [d, f, nb] = gameStates[b.id] as [number, number, number];
+      const lignes = (((b.content as any).instructions as string[] | undefined) ?? []).slice(d, f + 1);
+      return `Répéter ${nb} fois :\n${lignes.map((l) => `   ${l}`).join("\n")}`;
+    }
     return null;
   }
 
@@ -506,6 +512,11 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
             if (cfg.game_type === "pattern_select") {
               return <PatternSelect key={block.id} config={cfg} done={fait} onSolved={resolu}
                 savedState={(etat as [number, number]) ?? null} onStateChange={garder} />;
+            }
+            if (cfg.game_type === "pattern_build") {
+              return <PatternBuild key={block.id} config={cfg} done={fait} onSolved={resolu}
+                onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
+                savedState={(etat as [number, number, number]) ?? null} onStateChange={garder} />;
             }
             if (cfg.game_type === "sort") {
               return <SortGame key={block.id} blockId={block.id} title={cfg.title} description={cfg.description}

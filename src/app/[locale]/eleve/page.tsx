@@ -151,7 +151,7 @@ export default async function EleveDashboard({
     "Gauche ou droite ?": "Il y a un croisement devant moi. Comment je sais où aller ?",
     "Le débogage — Deviens détective du code": "J'ai suivi le chemin mais je me suis coincé. Trouve mon erreur.",
     "La répétition — Kirikou dit moins pour faire plus": "Il y a 40 lampes à allumer. Si tu m'apprends à répéter, je les allume toutes d'un coup.",
-    "La boucle qui fait tout": "Regarde — les routes s'éclairent. Tu m'as rendu mes jambes.",
+    "Trouver le motif": "Ce chemin fait avancer, descendre, avancer, descendre… Ce n'est plus « Avancer » qui revient, c'est tout un morceau. Apprends-moi à le repérer.",
     "Plan avant code": "Maintenant planifions ensemble le prochain quartier du village.",
   };
   const kodiMessage = nextLesson ? (KODI_BRIEFS[nextLesson.title] ?? undefined) : undefined;
