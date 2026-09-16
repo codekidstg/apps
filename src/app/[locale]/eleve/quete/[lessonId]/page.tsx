@@ -6,7 +6,8 @@ import QuestReader from "./QuestReader";
 import { questionsDuContenu } from "@/lib/questions/donnees";
 import { visiteurEleve, accesLecon, urlRefus } from "@/lib/eleve/acces";
 
-const EXPLORER_THEME1_ID = "8979e87c-058c-4003-95fd-1531c649bd1d";
+// (L'identifiant du thème 1 servait à la porte « thème narratif », supprimée :
+//  le bloc s'affiche maintenant pour toute leçon qui a des objectifs.)
 const EXPLORER_THEME2_ID = "b82126de-7df6-410a-8089-5c39330a035d";
 const EXPLORER_THEME3_ID = "9277a050-62d8-4920-80a1-9114ae315e63";
 const EXPLORER_THEME4_ID = "8cfcf715-b35b-446d-b5d7-a480952c3a2d";
@@ -312,9 +313,9 @@ export default async function QuestePage({ params }: { params: Promise<{ lessonI
 
   const { data: lesson } = await supabase
     .from("lessons")
-    .select("id, title, xp_reward, chapter_id, theme_id")
+    .select("id, title, xp_reward, chapter_id, theme_id, objectives")
     .eq("id", lessonId)
-    .single<{ id: string; title: string; xp_reward: number; chapter_id: string; theme_id: string | null }>();
+    .single<{ id: string; title: string; xp_reward: number; chapter_id: string; theme_id: string | null; objectives: string[] | null }>();
   if (!lesson) notFound();
 
   const { data: chapter } = await supabase
@@ -415,39 +416,55 @@ export default async function QuestePage({ params }: { params: Promise<{ lessonI
         </div>
       )}
 
-      {/* Brief de Kodi + objectifs — Thèmes 1 & 2 */}
+      {/* Brief de Kodi + « Ce que tu vas apprendre » — toutes les leçons */}
       {(() => {
         const themeId = chapter?.theme_id;
-        const isNarrativeTheme = themeId === EXPLORER_THEME1_ID || themeId === EXPLORER_THEME2_ID || themeId === EXPLORER_THEME3_ID || themeId === EXPLORER_THEME4_ID || themeId === EXPLORER_THEME5_ID;
         const brief = KODI_BRIEFS[lesson.title];
+
+        /**
+         * « Ce que tu vas apprendre » s'affiche pour TOUTE leçon qui a des
+         * objectifs — plus seulement pour les cinq thèmes Explorateur.
+         *
+         * La carte KODI_BRIEFS est écrite en dur et indexée par titre : elle
+         * couvre les 33 leçons Explorateur et aucune des 30 leçons Bâtisseur.
+         * Un ado ouvrait donc « Les listes » sans le moindre cadrage, quand un
+         * enfant de 9 ans était accueilli par Kodi et trois objectifs.
+         *
+         * La base devient la source : `lessons.objectives` est rempli pour les
+         * 63 leçons. La carte ne sert plus que de repli, et pour le message
+         * narratif de Kodi — qui reste propre à l'univers Explorateur.
+         */
+        const objectifs = lesson.objectives?.length ? lesson.objectives : brief?.objectifs ?? [];
         const accentColor = themeId === EXPLORER_THEME2_ID ? "#a78bfa"
           : themeId === EXPLORER_THEME3_ID ? "#3b82f6"
           : themeId === EXPLORER_THEME4_ID ? "#10b981"
           : themeId === EXPLORER_THEME5_ID ? "#ec4899"
           : "#d97706";
-        if (!isNarrativeTheme || !brief) return null;
+        if (!objectifs.length && !brief?.message) return null;
         return (
           <div className="mb-8 space-y-3">
-            {/* Message narratif de Kodi */}
-            <div className="rounded-2xl p-5 flex gap-4 items-start"
-              style={{ background: "#0f172a", border: `1px solid ${accentColor}40`, boxShadow: `0 0 20px ${accentColor}10` }}>
-              <div className="text-3xl flex-shrink-0 mt-0.5">🤖</div>
-              <div>
-                <div className="text-xs font-mono font-black uppercase tracking-widest mb-1.5" style={{ color: accentColor }}>
-                  Kodi te parle
+            {/* Message narratif de Kodi — seulement là où il en existe un. */}
+            {brief?.message && (
+              <div className="rounded-2xl p-5 flex gap-4 items-start"
+                style={{ background: "#0f172a", border: `1px solid ${accentColor}40`, boxShadow: `0 0 20px ${accentColor}10` }}>
+                <div className="text-3xl flex-shrink-0 mt-0.5">🤖</div>
+                <div>
+                  <div className="text-xs font-mono font-black uppercase tracking-widest mb-1.5" style={{ color: accentColor }}>
+                    Kodi te parle
+                  </div>
+                  <p className="text-sm leading-relaxed" style={{ color: "#cbd5e1" }}>
+                    {brief.message}
+                  </p>
                 </div>
-                <p className="text-sm leading-relaxed" style={{ color: "#cbd5e1" }}>
-                  {brief.message}
-                </p>
               </div>
-            </div>
+            )}
             {/* Objectifs de la leçon */}
             <div className="rounded-2xl px-5 py-4" style={{ background: "#0f172a", border: "1px solid #1e293b" }}>
               <div className="text-xs font-mono font-black uppercase tracking-widest mb-3" style={{ color: "#475569" }}>
                 🎯 Ce que tu vas apprendre
               </div>
               <ul className="space-y-2">
-                {brief.objectifs.map((obj, i) => (
+                {objectifs.map((obj, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-sm" style={{ color: "#94a3b8" }}>
                     <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-black mt-0.5"
                       style={{ background: `${accentColor}20`, color: accentColor }}>
