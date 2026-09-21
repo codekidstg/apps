@@ -16,7 +16,7 @@ import { completeLesson, solveBlockly, syncBlockProgress } from "../../actions";
 import { Fragment } from "react";
 import JeBloqueIci from "@/components/eleve/JeBloqueIci";
 import { indiceDuBloc } from "@/lib/questions/raisons";
-import { programmeLisible } from "@/lib/questions/programme";
+import { travailLisible } from "@/lib/questions/travail";
 import type { Question } from "@/lib/questions/donnees";
 import { showBadgeToast } from "@/components/eleve/BadgeToast";
 import type { BadgeId } from "@/lib/gamification/badges";
@@ -225,28 +225,12 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
 
   /** Ce que l'enfant a fait jusqu'ici, rendu lisible pour son mentor. */
   function travailDuBloc(b: Block): string | null {
-    if (b.type === "quiz") {
-      type QQ = { question?: string; choices?: string[] };
-      const raw = b.content as { questions?: QQ[] } & QQ;
-      const liste: QQ[] = raw.questions ?? [raw];
-      const lignes = liste.map((q, qi) => {
-        const choix = quizAnswers[`${b.id}-${qi}`];
-        if (choix == null) return null;
-        const juste = quizResults[`${b.id}-${qi}`];
-        return `${q.question ?? `Question ${qi + 1}`}\n→ ${q.choices?.[choix] ?? "?"}${juste === false ? " (faux)" : juste ? " (juste)" : ""}`;
-      }).filter(Boolean);
-      return lignes.length ? lignes.join("\n\n") : null;
-    }
-    if (b.type === "code_challenge") return codeValues[b.id] ?? null;
-    const jeu = (b.content.game_type as string | undefined) ?? "maze";
-    if (jeu === "maze" || jeu === "music" || b.type === "blockly") return programmeLisible(gameStates[b.id]);
-    if (jeu === "sort" && Array.isArray(gameStates[b.id])) return (gameStates[b.id] as string[]).join("\n");
-    if (jeu === "pattern_build" && Array.isArray(gameStates[b.id])) {
-      const [d, f, nb] = gameStates[b.id] as [number, number, number];
-      const lignes = ((b.content.instructions as string[] | undefined) ?? []).slice(d, f + 1);
-      return `Répéter ${nb} fois :\n${lignes.map((l) => `   ${l}`).join("\n")}`;
-    }
-    return null;
+    return travailLisible(b, {
+      quizAnswers,
+      quizResults,
+      code: b.type === "code_challenge" ? codeValues[b.id] ?? null : null,
+      jeu: gameStates[b.id],
+    });
   }
 
   function handleBlocklySolved(blockId: string) {

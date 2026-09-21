@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 
 /* Mélange déterministe basé sur l'id du bloc (stable entre re-renders) */
 function seededShuffle<T>(arr: T[], seed: string): T[] {
@@ -19,7 +19,7 @@ import JeBloqueIci from "@/components/eleve/JeBloqueIci";
 // Le chargeur est déjà client seul, et affiche « Chargement du studio musical… ».
 import BlocklyMusic from "@/components/eleve/BlocklyMusicLoader";
 import { indiceDuBloc } from "@/lib/questions/raisons";
-import { programmeLisible } from "@/lib/questions/programme";
+import { travailLisible } from "@/lib/questions/travail";
 import type { Question } from "@/lib/questions/donnees";
 
 const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), { ssr: false });
@@ -133,40 +133,25 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
     return echecs[b.id] ?? 0;
   }
 
+  // Le code tapé dans les défis et les jeux Python : lu seulement quand
+  // l'enfant appuie sur « Je bloque ici », il n'a pas besoin de redessiner
+  // l'entraînement à chaque frappe.
+  const codesTapes = useRef<Record<string, string>>({});
+  const garderCode = (blocId: string) => (code: string) => { codesTapes.current[blocId] = code; };
+
   /** Ce que l'enfant a fait jusqu'ici, rendu lisible pour son mentor. */
   function travailDuBloc(b: Block): string | null {
-    if (b.type === "quiz") {
-      type QQ = { question?: string; choices?: string[] };
-      const raw = b.content as { questions?: QQ[] } & QQ;
-      const liste: QQ[] = raw.questions ?? [raw];
-      const lignes = liste.map((q, qi) => {
-        const choix = quizAnswers[`${b.id}-${qi}`];
-        if (choix == null) return null;
-        const juste = quizResults[`${b.id}-${qi}`];
-        return `${q.question ?? `Question ${qi + 1}`}\n→ ${q.choices?.[choix] ?? "?"}${juste === false ? " (faux)" : juste ? " (juste)" : ""}`;
-      }).filter(Boolean);
-      return lignes.length ? lignes.join("\n\n") : null;
-    }
-    if (b.type === "fill_blank") {
-      type Phrase = { before?: string; after?: string; options?: string[] };
-      const phrases = (b.content as { sentences?: Phrase[] }).sentences ?? [];
-      const lignes = phrases.map((s, i) => {
-        const choix = fillAnswers[`${b.id}-${i}`];
-        if (choix == null) return null;
-        const rate = fillResults[`${b.id}-${i}`] === false;
-        return `${s.before ?? ""} [${s.options?.[choix] ?? "?"}] ${s.after ?? ""}`.trim() + (rate ? " (faux)" : "");
-      }).filter(Boolean);
-      return lignes.length ? lignes.join("\n") : null;
-    }
-    const jeu = (b.content as { game_type?: string }).game_type;
-    if (jeu === "maze" || jeu === "music") return programmeLisible(gameStates[b.id]);
-    if (jeu === "sort" && Array.isArray(gameStates[b.id])) return (gameStates[b.id] as string[]).join("\n");
-    if (jeu === "pattern_build" && Array.isArray(gameStates[b.id])) {
-      const [d, f, nb] = gameStates[b.id] as [number, number, number];
-      const lignes = (((b.content as any).instructions as string[] | undefined) ?? []).slice(d, f + 1);
-      return `Répéter ${nb} fois :\n${lignes.map((l) => `   ${l}`).join("\n")}`;
-    }
-    return null;
+    return travailLisible(b, {
+      quizAnswers,
+      quizResults,
+      fillAnswers,
+      fillResults,
+      matchPairs: matchPairs[b.id],
+      swipeResults,
+      dragResults,
+      code: codesTapes.current[b.id] ?? null,
+      jeu: gameStates[b.id],
+    });
   }
 
   const quizBlocks    = blocks.filter(b => b.type === "quiz");
@@ -494,6 +479,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                 config={block.content as any}
                 done={!!gameDone[block.id]}
                 onSolved={() => setGameDone(g => ({ ...g, [block.id]: true }))}
+                onCodeChange={garderCode(block.id)}
               />
             );
           }
@@ -591,6 +577,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                     expectedOutput={cfg.expected_output}
                     language={cfg.language ?? "python"}
                     onSuccess={() => { if (!completed) setCodeResults(prev => ({ ...prev, [block.id]: true })); }}
+                    onCodeChange={garderCode(block.id)}
                   />
                 </div>
               </div>
