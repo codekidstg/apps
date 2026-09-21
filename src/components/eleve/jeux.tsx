@@ -230,11 +230,15 @@ export function SortGame({ title, description, items, hint, done, onSolved, save
    * On ne la propose donc que pour du Python ; ailleurs, seul l'indice écrit
    * par l'auteur de l'exercice s'affiche, et à défaut le bouton disparaît.
    */
-  const estPython = items.some(item => /print\s*\(/.test(item));
-  const expectedOutput = items.map(item => {
-    const m = item.match(/print\(["'](.*)["']\)/);
-    return m ? m[1] : item;
-  }).join("\n");
+  // Seuls les print("…") d'un texte écrit en dur ont une sortie connue sans
+  // exécuter le programme. Les autres lignes étaient recopiées telles quelles
+  // dans « Sortie attendue » — si bien que l'aide affichait le programme
+  // entier, rangé dans le bon ordre : la réponse.
+  const sorties = items
+    .map(item => item.match(/print\(["'](.*)["']\)/)?.[1])
+    .filter((s): s is string => s !== undefined);
+  const estPython = sorties.length > 0;
+  const expectedOutput = sorties.join("\n");
   const aideDisponible = estPython || !!hint;
 
   function move(idx: number, dir: -1 | 1) {
@@ -267,7 +271,10 @@ export function SortGame({ title, description, items, hint, done, onSolved, save
         {order.map((item, idx) => (
           <div key={idx} className="flex items-center gap-2">
             <span className="text-xs w-5 text-right font-mono" style={{ color: "#334155" }}>{idx + 1}.</span>
-            <div className="flex-1 rounded-xl px-3 py-2 text-sm font-mono"
+            {/* whitespace-pre : sans lui, le HTML mange les espaces de tête, et
+                le décalage qui dit « ceci est DANS la boucle » disparaît. La
+                chasse au bug avait été corrigée ; le tri, jamais. */}
+            <div className="flex-1 rounded-xl px-3 py-2 text-sm font-mono whitespace-pre overflow-x-auto"
               style={{ background: "#0f172a", color: "#FDB813", border: "1px solid #1e293b" }}>{item}</div>
             <div className="flex flex-col gap-0.5">
               <button onClick={() => move(idx, -1)} className="text-xs leading-none hover:opacity-70" style={{ color: "#475569" }}>▲</button>
