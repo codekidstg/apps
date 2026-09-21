@@ -4,14 +4,15 @@
  *
  * Les seuils ont été fixés avec le fondateur :
  *   ⚪ démarre   — suivi commencé il y a moins de 14 jours
- *   🔴 bloqué    — 2 « Je bloque ici » en 14 jours sur une leçon pas finie,
- *                  ou aucune activité depuis 14 jours
+ *   🔴 bloqué    — « Je bloque ici » sur 2 exercices différents d'une leçon
+ *                  pas finie, en 14 jours ; ou aucune activité depuis 14 jours
  *   🟡 ralentit  — 2 leçons de retard sur ses séances, ou « distrait » aux
  *                  2 derniers rapports, ou inactif depuis 8 à 13 jours
  *   🟢 progresse — tout le reste
  *
  * Hypothèse validée : une séance vaut une leçon. Le retard est donc le nombre
- * de séances passées moins le nombre de leçons terminées.
+ * de séances passées moins le nombre de leçons terminées — séances comptées
+ * à partir de la création du compte (voir `seancesComptees`).
  *
  * Aucun accès à la base ici : la fonction est éprouvée par ses tests.
  */
@@ -38,7 +39,11 @@ export type FaitsEleve = {
   engagements: (string | null)[];
   /** Avancement noté aux rapports, du plus récent au plus ancien. */
   avancements: (string | null)[];
-  /** Nombre de « Je bloque ici » des 14 derniers jours, pour chaque leçon encore non terminée. */
+  /**
+   * Pour chaque leçon encore non terminée : le nombre d'exercices différents
+   * où il a appuyé sur « Je bloque ici » ces 14 derniers jours — des
+   * exercices, pas des messages (voir `exercicesAvecAide`).
+   */
   blocagesParLecon: number[];
 };
 
@@ -49,10 +54,10 @@ export function joursDepuis(date: Date, maintenant: Date = new Date()): number {
 
 export function statutEleve(f: FaitsEleve, maintenant: Date = new Date()): { statut: StatutEleve; raisons: string[] } {
   const blocages = Math.max(0, ...f.blocagesParLecon);
-  // Un enfant qui appelle à l'aide deux fois sur la même leçon est bloqué,
-  // même s'il vient de commencer : c'est justement là qu'il faut agir vite.
+  // Un enfant qui appelle à l'aide sur deux exercices de la même leçon est
+  // bloqué, même s'il vient de commencer : c'est là qu'il faut agir vite.
   if (blocages >= 2) {
-    return { statut: "bloque", raisons: [`${blocages} « Je bloque ici » en 14 jours sur une leçon pas finie`] };
+    return { statut: "bloque", raisons: [`« Je bloque ici » sur ${blocages} exercices d'une leçon pas finie, en 14 jours`] };
   }
 
   const depuisDebut = joursDepuis(f.debut, maintenant);

@@ -22,8 +22,11 @@ describe("statutEleve", () => {
     expect(statut({ debut: ilYa(5), derniereActivite: null, seancesPassees: 1, leconsTerminees: 0 })).toBe("demarre");
   });
 
-  it("deux appels à l'aide sur la même leçon bloquent, même au démarrage", () => {
-    expect(statut({ debut: ilYa(5), blocagesParLecon: [2] })).toBe("bloque");
+  it("l'aide demandée sur deux exercices d'une même leçon bloque, même au démarrage", () => {
+    expect(statutEleve(eleve({ debut: ilYa(5), blocagesParLecon: [2] }), MAINTENANT)).toEqual({
+      statut: "bloque", raisons: ["« Je bloque ici » sur 2 exercices d'une leçon pas finie, en 14 jours"],
+    });
+    // Un exercice dans chacune de deux leçons : pas le même blocage.
     expect(statut({ blocagesParLecon: [1, 1] })).toBe("progresse");
   });
 
