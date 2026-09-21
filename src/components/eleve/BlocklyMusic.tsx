@@ -4,13 +4,24 @@ import { useEffect, useRef, useState, useCallback } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Note = "Do" | "Re" | "Mi" | "Fa" | "Sol" | "La" | "Si";
+/** Les trois frappes du tambour du Griot. */
+type Percu = "Boum" | "Tac" | "Clap";
+/**
+ * Ce qu'un programme produit, temps par temps. Le silence en fait partie : il
+ * dure un temps entier et il se vérifie. Avant, il durait un demi-temps et
+ * n'était pas compté — « Boum Boum Clap » et « Boum Boum Clap · silence »
+ * passaient pour le même rythme.
+ */
+type Son = Note | Percu | "silence";
 
 type MusicConfig = {
   title?: string;
   instructions?: string;
   steps?: string[];
-  target_notes?: Note[];
+  /** Ce que l'enfant doit reproduire : notes, frappes et silences. */
+  target_notes?: Son[];
   free_mode?: boolean;
+  /** Composition libre : nombre minimum de sons. Les silences ne comptent pas. */
   min_notes?: number;
   available_blocks?: string[];
   max_blocks?: number;
@@ -37,8 +48,25 @@ const NOTE_COLOR: Record<Note, string> = {
   Do: "#ef4444", Re: "#f97316", Mi: "#eab308",
   Fa: "#22c55e", Sol: "#3b82f6", La: "#8b5cf6", Si: "#ec4899",
 };
+const PERCUS: Percu[] = ["Boum", "Tac", "Clap"];
+const PERCU_EMOJI: Record<Percu, string> = { Boum: "🥁", Tac: "✋", Clap: "👏" };
+const PERCU_COLOR: Record<Percu, string> = { Boum: "#b45309", Tac: "#0d9488", Clap: "#db2777" };
+
+const estNote  = (s: Son | null): s is Note  => !!s && (NOTES as string[]).includes(s);
+const estPercu = (s: Son | null): s is Percu => !!s && (PERCUS as string[]).includes(s);
+
+/** La pastille d'un son, quel qu'il soit. */
+function pastille(s: Son): { texte: string; couleur: string } {
+  if (s === "silence") return { texte: "⏸", couleur: "#334155" };
+  if (estPercu(s)) return { texte: `${PERCU_EMOJI[s]} ${s}`, couleur: PERCU_COLOR[s] };
+  return { texte: NOTE_LABEL[s], couleur: NOTE_COLOR[s] };
+}
+/** Le son dans une phrase : « Ré », « Boum », « un silence ». */
+const nomSon = (s: Son) => (s === "silence" ? "un silence" : estNote(s) ? NOTE_LABEL[s] : s);
+
 const ALL_MUSIC_BLOCKS = [
   { id: "music_play_note",     label: "🎵 Jouer une note", color: "#3b82f6" },
+  { id: "music_drum",          label: "🥁 Tambour",        color: "#b45309" },
   { id: "music_pause",         label: "⏸ Silence",         color: "#64748b" },
   { id: "controls_repeat_ext", label: "🔁 Répéter",        color: "#059669", badge: "Clé !" },
 ];
@@ -79,6 +107,79 @@ function playSound(freq: number, durationMs: number, ctx: AudioContext) {
     master.gain.exponentialRampToValueAtTime(0.18, t + 0.08);
     master.gain.setValueAtTime(0.18, t + dur * 0.65);
     master.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  } catch (_) {}
+}
+
+// Bruit blanc, fabriqué une seule fois : la matière du Tac et du Clap.
+let _bruit: AudioBuffer | null = null;
+function bruit(ctx: AudioContext): AudioBuffer {
+  if (!_bruit || _bruit.sampleRate !== ctx.sampleRate) {
+    const n = Math.floor(ctx.sampleRate * 0.25);
+    _bruit = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = _bruit.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return _bruit;
+}
+
+/**
+ * Les trois frappes, fabriquées par le navigateur : aucun fichier son à
+ * télécharger, ce qui compte quand les données mobiles coûtent cher.
+ *   Boum — la paume au centre : une note grave qui plonge.
+ *   Tac  — les doigts au bord : un claquement court et sec.
+ *   Clap — les mains : trois bouffées de souffle très rapprochées.
+ */
+function playPercu(p: Percu, ctx: AudioContext) {
+  try {
+    const t = ctx.currentTime;
+
+    if (p === "Boum") {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(150, t);
+      osc.frequency.exponentialRampToValueAtTime(55, t + 0.28);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.95, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(t); osc.stop(t + 0.42);
+      return;
+    }
+
+    if (p === "Tac") {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(420, t);
+      osc.frequency.exponentialRampToValueAtTime(300, t + 0.07);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.6, t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(t); osc.stop(t + 0.15);
+
+      // Un souffle très bref : le claquement des doigts sur le bord.
+      const src = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), gb = ctx.createGain();
+      src.buffer = bruit(ctx);
+      hp.type = "highpass"; hp.frequency.value = 2500;
+      gb.gain.setValueAtTime(0.25, t);
+      gb.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      src.connect(hp); hp.connect(gb); gb.connect(ctx.destination);
+      src.start(t); src.stop(t + 0.06);
+      return;
+    }
+
+    // Clap : trois bouffées, la dernière traîne un peu.
+    [0, 0.011, 0.023].forEach((decalage, i) => {
+      const src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+      src.buffer = bruit(ctx);
+      bp.type = "bandpass"; bp.frequency.value = 1400; bp.Q.value = 0.9;
+      const debut = t + decalage, duree = i === 2 ? 0.18 : 0.02;
+      g.gain.setValueAtTime(0.0001, debut);
+      g.gain.exponentialRampToValueAtTime(0.7, debut + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.001, debut + duree);
+      src.connect(bp); bp.connect(g); g.connect(ctx.destination);
+      src.start(debut); src.stop(debut + duree + 0.01);
+    });
   } catch (_) {}
 }
 
@@ -129,9 +230,38 @@ function Piano({ activeNote }: { activeNote: Note | null }) {
   );
 }
 
+// ── Tambours visual ───────────────────────────────────────────────────────────
+function Tambours({ actif }: { actif: Percu | null }) {
+  return (
+    <div className="flex items-end justify-center gap-5 select-none">
+      {PERCUS.map((p) => {
+        const on = actif === p;
+        const taille = p === "Boum" ? 92 : 72;
+        return (
+          <div key={p} className="flex flex-col items-center gap-1.5">
+            <div style={{
+              width: taille, height: taille, borderRadius: "50%",
+              background: on ? PERCU_COLOR[p] : "radial-gradient(circle at 40% 35%, #e7d3b0, #b08a5a)",
+              border: `4px solid ${on ? PERCU_COLOR[p] : "#6b4f2c"}`,
+              boxShadow: on ? `0 0 28px ${PERCU_COLOR[p]}cc` : "inset 0 -6px 0 rgba(0,0,0,.18), 0 3px 8px rgba(0,0,0,.5)",
+              transform: on ? "scale(0.94)" : "scale(1)",
+              transition: "all 70ms ease",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: Math.round(taille * 0.38),
+            }}>
+              {PERCU_EMOJI[p]}
+            </div>
+            <span className="text-[11px] font-black" style={{ color: on ? PERCU_COLOR[p] : "#94a3b8" }}>{p}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Interpreter — walks Blockly block tree directly (no eval/new Function) ────
 function buildInterpreter(
-  playFn:  (note: Note) => Promise<void>,
+  playFn:  (son: Note | Percu) => Promise<void>,
   pauseFn: () => Promise<void>,
 ) {
   async function runBlock(block: any): Promise<void> {
@@ -140,6 +270,11 @@ function buildInterpreter(
       case "music_play_note": {
         const note = (block.getFieldValue("NOTE") || "Do") as Note;
         await playFn(note);
+        break;
+      }
+      case "music_drum": {
+        const frappe = (block.getFieldValue("PERCU") || "Boum") as Percu;
+        await playFn(frappe);
         break;
       }
       case "music_pause":
@@ -183,14 +318,22 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
   const [status, setStatus]               = useState<"idle" | "running" | "success" | "fail">("idle");
   const [msg, setMsg]                     = useState("");
   const [blockCount, setBlockCount]       = useState(0);
-  const [activeNote, setActiveNote]       = useState<Note | null>(null);
-  const [playedHistory, setPlayedHistory] = useState<Note[]>([]);
+  const [actif, setActif]                 = useState<Note | Percu | null>(null);
+  const [playedHistory, setPlayedHistory] = useState<Son[]>([]);
   const [showConfetti, setShowConfetti]   = useState(false);
 
   const tempo     = config.tempo ?? 420;
   const maxB      = config.max_blocks;
   const avail     = config.available_blocks;
   const overLimit = maxB !== undefined && blockCount > maxB;
+
+  // Ce que l'on montre : le piano, les tambours, ou les deux.
+  const cible       = config.target_notes;
+  const blocsDispo  = avail ?? ["music_play_note", "controls_repeat_ext"];
+  const avecTambour = blocsDispo.includes("music_drum") || !!cible?.some((s) => estPercu(s));
+  const avecPiano   = blocsDispo.includes("music_play_note") || !!cible?.some((s) => estNote(s)) || !avecTambour;
+  /** La cible contient des frappes ou des silences : on parle en temps, pas en notes. */
+  const rythme      = !!cible?.some((s) => !estNote(s));
 
   // ── Blockly init ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -234,6 +377,22 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         javascriptGenerator.forBlock["music_play_note"] = () => "";
         javascriptGenerator.forBlock["music_pause"]     = () => "";
       }
+      // Garde à part : le registre de Blockly survit d'une page à l'autre, et
+      // le bloc tambour doit exister même si les autres étaient déjà là.
+      if (!Blocks["music_drum"]) {
+        const FD = (Blockly as any).FieldDropdown;
+        Blocks["music_drum"] = {
+          init(this: any) {
+            this.appendDummyInput()
+              .appendField("🥁 Frappe")
+              .appendField(new FD([["Boum","Boum"],["Tac","Tac"],["Clap","Clap"]]), "PERCU");
+            this.setPreviousStatement(true, null);
+            this.setNextStatement(true, null);
+            this.setColour(25);
+          },
+        };
+        javascriptGenerator.forBlock["music_drum"] = () => "";
+      }
 
       const darkTheme = (Blockly as any).Theme.defineTheme("music_dark", {
         base: (Blockly as any).Themes?.Classic,
@@ -252,6 +411,10 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
       const toolbox: unknown[] = [];
       if (available.includes("music_play_note"))
         toolbox.push({ kind: "block", type: "music_play_note" });
+      if (available.includes("music_drum"))
+        // Trois blocs tout prêts plutôt qu'un menu à dérouler : sur un écran
+        // tactile, glisser « Boum » est plus simple que d'ouvrir une liste.
+        for (const p of PERCUS) toolbox.push({ kind: "block", type: "music_drum", fields: { PERCU: p } });
       if (available.includes("music_pause"))
         toolbox.push({ kind: "block", type: "music_pause" });
       if (available.includes("controls_repeat_ext"))
@@ -326,83 +489,140 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
       setMsg("");
       setPlayedHistory([]);
 
-      const played: Note[] = [];
+      const played: Son[] = [];
 
-      const _play = async (note: Note) => {
-        played.push(note);
+      const _play = async (son: Note | Percu) => {
+        played.push(son);
         setPlayedHistory([...played]);
-        setActiveNote(note);
-        playSound(NOTE_FREQ[note], tempo * 0.9, ctx);
+        setActif(son);
+        if (estPercu(son)) playPercu(son, ctx);
+        else playSound(NOTE_FREQ[son], tempo * 0.9, ctx);
         await new Promise(r => setTimeout(r, tempo));
-        setActiveNote(null);
+        setActif(null);
         await new Promise(r => setTimeout(r, 20));
       };
 
+      // Un silence est un temps entier — aussi long qu'un son — et il se compte.
       const _pause = async () => {
-        setActiveNote(null);
-        await new Promise(r => setTimeout(r, Math.round(tempo * 0.5)));
+        played.push("silence");
+        setPlayedHistory([...played]);
+        setActif(null);
+        await new Promise(r => setTimeout(r, tempo + 20));
       };
 
       try {
         await buildInterpreter(_play, _pause)(ws);
       } catch (e: any) {
-        setActiveNote(null);
+        setActif(null);
         setStatus("fail");
         if (e?.message?.startsWith("EMPTY_LOOP:")) {
           const n = e.message.split(":")[1];
-          setMsg(`⚠️ Ta boucle ×${n} est vide ! Glisse un bloc 🎵 Jouer DANS l'espace vert de la boucle.`);
+          setMsg(`⚠️ Ta boucle ×${n} est vide ! Glisse un son DANS l'espace vert de la boucle.`);
         } else {
           setMsg("Erreur dans ton programme 😬");
         }
         return;
       }
 
-      setActiveNote(null);
+      setActif(null);
       if (testMode) { setStatus("idle"); return; }
 
-      // ── Validation ──
-      if (config.free_mode) {
-        const minN = config.min_notes ?? 1;
-        if (played.length >= minN) {
-          setStatus("success"); setMsg("🎉 Superbe mélodie ! Tu es compositeur !");
-          setShowConfetti(true);
-          setTimeout(() => { setShowConfetti(false); onSolved(); }, 2200);
-        } else {
-          setStatus("fail");
-          setMsg(`🎵 Encore ${minN - played.length} note(s) — laisse-toi aller !`);
-        }
-        return;
-      }
-
-      if (config.target_notes) {
-        const target = config.target_notes;
-        if (played.length !== target.length) {
-          const diff = played.length - target.length;
-          setStatus("fail");
-          setMsg(`🎵 Il faut exactement ${target.length} notes — tu en as joué ${played.length} (${diff > 0 ? "+" + diff : diff}).`);
-          return;
-        }
-        const bad = played.findIndex((n, i) => n !== target[i]);
-        if (bad !== -1) {
-          setStatus("fail");
-          setMsg(`❌ Note ${bad + 1} incorrecte — tu as joué ${NOTE_LABEL[played[bad]]} mais il fallait ${NOTE_LABEL[target[bad]]}.`);
-          return;
-        }
-        setStatus("success"); setMsg("🎉 Parfait ! Mélodie reproduite à la note près !");
+      // La limite de blocs n'était qu'affichée : un enfant qui recopiait seize
+      // blocs dans un défi « six au plus » était félicité quand même. On compte
+      // au moment du verdict, sur le programme tel qu'il est — et on lui dit
+      // d'abord ce qu'il a réussi, avant ce qui manque.
+      const poses = ws.getAllBlocks(false).filter((b: any) => !b.isShadow()).length;
+      const limite = config.max_blocks;
+      const tropDeBlocs = limite !== undefined && poses > limite;
+      const refuserPourBlocs = (reussi: string) => {
+        setStatus("fail");
+        setMsg(`${reussi} Mais tu as posé ${poses} blocs, et il en faut ${limite} au plus. Une boucle peut jouer tout ça à ta place 🔁`);
+      };
+      const bravo = (texte: string) => {
+        setStatus("success"); setMsg(texte);
         setShowConfetti(true);
         setTimeout(() => { setShowConfetti(false); onSolved(); }, 2200);
+      };
+
+      const attendu = config.target_notes;
+      const enTemps = !!attendu?.some((s) => !estNote(s));
+
+      if (config.free_mode) {
+        const minN = config.min_notes ?? 1;
+        const sons = played.filter((s) => s !== "silence").length;
+        if (sons < minN) {
+          setStatus("fail");
+          setMsg(`🎵 Encore ${minN - sons} son${minN - sons > 1 ? "s" : ""} — laisse-toi aller !`);
+          return;
+        }
+        if (tropDeBlocs) { refuserPourBlocs(`🎵 Joli, ${sons} sons !`); return; }
+        bravo("🎉 Superbe ! Tu es compositeur !");
         return;
       }
 
-      setStatus("success"); setMsg("🎉 Mélodie jouée !");
-      setShowConfetti(true);
-      setTimeout(() => { setShowConfetti(false); onSolved(); }, 2200);
+      if (attendu) {
+        if (played.length !== attendu.length) {
+          const diff = played.length - attendu.length;
+          const ecart = diff > 0 ? `+${diff}` : `${diff}`;
+          setStatus("fail");
+          setMsg(enTemps
+            ? `🥁 Il faut ${attendu.length} temps, silences compris — ton rythme en fait ${played.length} (${ecart}).`
+            : `🎵 Il faut exactement ${attendu.length} notes — tu en as joué ${played.length} (${ecart}).`);
+          return;
+        }
+        const bad = played.findIndex((s, i) => s !== attendu[i]);
+        if (bad !== -1) {
+          setStatus("fail");
+          setMsg(enTemps
+            ? `❌ Temps ${bad + 1} : tu as joué ${nomSon(played[bad])}, mais il fallait ${nomSon(attendu[bad])}.`
+            : `❌ Note ${bad + 1} incorrecte — tu as joué ${nomSon(played[bad])} mais il fallait ${nomSon(attendu[bad])}.`);
+          return;
+        }
+        if (tropDeBlocs) {
+          refuserPourBlocs(enTemps ? "🎵 C'est exactement le bon rythme !" : "🎵 C'est exactement la bonne mélodie !");
+          return;
+        }
+        bravo(enTemps ? "🎉 Parfait ! Le rythme exact, temps par temps !" : "🎉 Parfait ! Mélodie reproduite à la note près !");
+        return;
+      }
+
+      if (tropDeBlocs) { refuserPourBlocs("🎵 Ça joue !"); return; }
+      bravo("🎉 Mélodie jouée !");
     })();
   }, [config, onSolved, tempo]);
 
+  // ── Écouter le modèle ─────────────────────────────────────────────────────────
+  // On ne reproduit pas une musique qu'on n'a jamais entendue : l'enfant écoute
+  // la cible avant d'écrire, autant de fois qu'il veut. Rien n'est validé ici.
+  const ecouterModele = useCallback(() => {
+    const modele = config.target_notes;
+    if (!modele?.length) return;
+    const ctx = getAudioCtx();
+    const resumeP = ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
+
+    (async () => {
+      await resumeP;
+      setStatus("running"); setMsg(""); setPlayedHistory([]);
+      for (const s of modele) {
+        if (s === "silence") {
+          setActif(null);
+          await new Promise(r => setTimeout(r, tempo + 20));
+          continue;
+        }
+        setActif(s);
+        if (estPercu(s)) playPercu(s, ctx);
+        else playSound(NOTE_FREQ[s], tempo * 0.9, ctx);
+        await new Promise(r => setTimeout(r, tempo));
+        setActif(null);
+        await new Promise(r => setTimeout(r, 20));
+      }
+      setStatus("idle");
+    })();
+  }, [config, tempo]);
+
   const reset = () => {
     setStatus("idle"); setMsg("");
-    setActiveNote(null); setPlayedHistory([]);
+    setActif(null); setPlayedHistory([]);
   };
 
   return (
@@ -423,7 +643,7 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
 
       {/* Header */}
       <div className="bg-slate-800 border-b border-slate-700 px-4 py-2.5 flex items-center justify-between">
-        <span className="font-black text-amber-400 text-sm">🎹 {config.title ?? "Composition musicale"}</span>
+        <span className="font-black text-amber-400 text-sm">{avecPiano ? "🎹" : "🥁"} {config.title ?? "Composition musicale"}</span>
         {maxB !== undefined && (
           <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${overLimit ? "bg-red-900 text-red-300" : "bg-slate-700 text-slate-300"}`}>
             {blockCount}/{maxB} blocs{overLimit ? " ⚠️" : ""}
@@ -464,17 +684,22 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
             </div>
           )}
 
-          {/* Target melody */}
-          {config.target_notes && (
+          {/* Target */}
+          {cible && (
             <div className="shrink-0">
-              <div className="text-xs font-bold text-slate-400 mb-1.5">🎼 Mélodie à reproduire :</div>
+              <div className="text-xs font-bold text-slate-400 mb-1.5">
+                {rythme ? "🥁 Rythme à reproduire :" : "🎼 Mélodie à reproduire :"}
+              </div>
               <div className="flex flex-wrap gap-1">
-                {config.target_notes.map((note, i) => (
-                  <span key={i} className="text-xs font-black px-2 py-0.5 rounded-lg text-white shadow"
-                    style={{ background: NOTE_COLOR[note] }}>
-                    {NOTE_LABEL[note]}
-                  </span>
-                ))}
+                {cible.map((s, i) => {
+                  const p = pastille(s);
+                  return (
+                    <span key={i} className="text-xs font-black px-2 py-0.5 rounded-lg text-white shadow"
+                      style={{ background: p.couleur }}>
+                      {p.texte}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -482,14 +707,19 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
           {/* Played history */}
           {playedHistory.length > 0 && (
             <div className="shrink-0">
-              <div className="text-xs font-bold text-slate-400 mb-1">🎶 Notes jouées :</div>
+              <div className="text-xs font-bold text-slate-400 mb-1">
+                {avecTambour ? "🎶 Ton programme a joué :" : "🎶 Notes jouées :"}
+              </div>
               <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-                {playedHistory.map((note, i) => (
-                  <span key={i} className="text-[10px] font-black px-1.5 py-0.5 rounded text-white"
-                    style={{ background: NOTE_COLOR[note] }}>
-                    {NOTE_LABEL[note]}
-                  </span>
-                ))}
+                {playedHistory.map((s, i) => {
+                  const p = pastille(s);
+                  return (
+                    <span key={i} className="text-[10px] font-black px-1.5 py-0.5 rounded text-white"
+                      style={{ background: p.couleur }}>
+                      {p.texte}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -506,8 +736,15 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
       {/* ── Piano + Buttons (full width) ── */}
       <div className="border-t border-slate-700 bg-slate-950 py-5 px-4 flex flex-col items-center gap-4"
         style={{ position: "relative", zIndex: 20 }}>
-        <Piano activeNote={activeNote} />
-        <div className="flex gap-3">
+        {avecPiano && <Piano activeNote={estNote(actif) ? actif : null} />}
+        {avecTambour && <Tambours actif={estPercu(actif) ? actif : null} />}
+        <div className="flex flex-wrap justify-center gap-3">
+          {cible && (
+            <button onClick={ecouterModele} disabled={status === "running"}
+              className="px-5 py-2.5 bg-indigo-700 hover:bg-indigo-600 disabled:opacity-40 text-white font-bold rounded-xl text-sm transition-colors shadow">
+              🔊 Écouter le modèle
+            </button>
+          )}
           <button onClick={() => run(true)} disabled={status === "running"}
             className="px-5 py-2.5 bg-slate-600 hover:bg-slate-500 disabled:opacity-40 text-white font-bold rounded-xl text-sm transition-colors shadow">
             👁 Tester

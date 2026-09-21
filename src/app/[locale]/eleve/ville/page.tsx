@@ -23,6 +23,13 @@ const KODI_BRIEFS: Record<string, string> = {
   "La répétition — Kirikou dit moins pour faire plus": "Il y a 40 lampes à allumer. Si tu m'apprends à répéter, je les allume toutes d'un coup.",
   "Trouver le motif": "Ce chemin fait avancer, descendre, avancer, descendre… Ce n'est plus « Avancer » qui revient, c'est tout un morceau. Apprends-moi à le repérer.",
   "Plan avant code": "Maintenant planifions ensemble le prochain quartier du village.",
+  // Thème 2 — Case du Griot
+  "Le tambour qui répète": "Le Griot m'a appris un rythme, mais je ne sais le jouer qu'une fois. Fais-le tourner avec ta boucle !",
+  "La boucle dans la boucle": "Le motif du Griot se répète déjà… et il le répète encore. Une boucle dans une boucle !",
+  "Mon refrain a un nom": "Le refrain revient entre chaque couplet. Et si on lui donnait un nom ?",
+  "Le rythme à paramètre": "Le même rythme, sur une autre note à chaque fois : un seul bloc, avec un réglage.",
+  "Le plan du compositeur": "Avant la veillée, on prépare le morceau. Fais le plan avec moi !",
+  "🏆 La veillée du Griot — mon morceau, de A à Z": "Ce soir, c'est la veillée. À toi de composer le morceau, seul !",
 };
 
 export default async function VillePage() {

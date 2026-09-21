@@ -14,7 +14,8 @@ const LIBELLES: Record<string, string> = {
   robot_turn_left:  "Tourner à gauche",
   robot_turn_right: "Tourner à droite",
   robot_pick:       "Ramasser",
-  music_pause:      "Pause",
+  // Le mot que l'enfant lit sur son bloc, pas un autre.
+  music_pause:      "Silence",
 };
 
 export function programmeLisible(xml: unknown): string | null {
@@ -48,6 +49,9 @@ export function programmeLisible(xml: unknown): string | null {
       } else if (type === "music_play_note") {
         const note = enfants(bloc, "field")[0]?.textContent;
         lignes.push(`${retrait}Jouer ${note ?? "une note"}`);
+      } else if (type === "music_drum") {
+        const frappe = enfants(bloc, "field")[0]?.textContent;
+        lignes.push(`${retrait}${frappe ?? "Frappe"}`);
       } else {
         lignes.push(`${retrait}${LIBELLES[type] ?? type}`);
       }

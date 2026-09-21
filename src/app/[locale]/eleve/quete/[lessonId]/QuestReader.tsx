@@ -239,7 +239,7 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
     }
     if (b.type === "code_challenge") return codeValues[b.id] ?? null;
     const jeu = (b.content.game_type as string | undefined) ?? "maze";
-    if (jeu === "maze" || b.type === "blockly") return programmeLisible(gameStates[b.id]);
+    if (jeu === "maze" || jeu === "music" || b.type === "blockly") return programmeLisible(gameStates[b.id]);
     if (jeu === "sort" && Array.isArray(gameStates[b.id])) return (gameStates[b.id] as string[]).join("\n");
     if (jeu === "pattern_build" && Array.isArray(gameStates[b.id])) {
       const [d, f, nb] = gameStates[b.id] as [number, number, number];

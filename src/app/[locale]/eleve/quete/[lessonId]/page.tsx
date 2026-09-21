@@ -13,7 +13,8 @@ const EXPLORER_THEME3_ID = "9277a050-62d8-4920-80a1-9114ae315e63";
 const EXPLORER_THEME4_ID = "8cfcf715-b35b-446d-b5d7-a480952c3a2d";
 const EXPLORER_THEME5_ID = "7c497d11-0cbf-4cb3-9f6f-43721b63e418";
 
-type KodiBrief = { message: string; objectifs: string[] };
+/** `objectifs` ne sert que de secours : ceux écrits en base (lessons.objectives) passent devant. */
+type KodiBrief = { message: string; objectifs?: string[] };
 
 const KODI_BRIEFS: Record<string, KodiBrief> = {
   // ── Thème 1 — Routes du Village ──────────────────────────────────────────
@@ -92,7 +93,7 @@ const KODI_BRIEFS: Record<string, KodiBrief> = {
     ],
   },
   "if / else — ton programme choisit": {
-    message: "Tu connais déjà les conditions depuis le labyrinthe et le Griot. En Python, ça s'écrit juste différemment — avec ':' et des espaces. Mais attention : Python est strict sur la mise en page. Une erreur d'indentation et tout plante !",
+    message: "Tu connais déjà les conditions depuis le labyrinthe de Kirikou. En Python, ça s'écrit juste différemment — avec ':' et des espaces. Mais attention : Python est strict sur la mise en page. Une erreur d'indentation et tout plante !",
     objectifs: [
       "Écrire une condition if / else en Python avec la bonne indentation",
       "Comprendre que l'indentation (les espaces) structure le code Python",
@@ -107,8 +108,8 @@ const KODI_BRIEFS: Record<string, KodiBrief> = {
       "Utiliser print() comme outil de débogage pour tracer la valeur des variables",
     ],
   },
-  "Ma première boucle for — tu reconnais novembre !": {
-    message: "Les 30 jours de novembre, les 12 mois de l'année — Python les connaît tous par cœur grâce à for et range(). Montre-moi comment faire répéter une action un nombre précis de fois !",
+  "Ma première boucle for — tu reconnais le tambour !": {
+    message: "Tu te souviens du tambour du Griot ? « Répéter 4 fois : Boum, Boum, Clap. » En Python, la même idée s'écrit avec for et range(). Montre-moi comment faire répéter une action un nombre précis de fois !",
     objectifs: [
       "Écrire une boucle for avec range(N) pour répéter N fois",
       "Utiliser la variable de boucle (i) à l'intérieur du bloc",
@@ -241,53 +242,26 @@ const KODI_BRIEFS: Record<string, KodiBrief> = {
   },
 
   // ── Thème 2 — Case du Griot ───────────────────────────────────────────────
+  // Les objectifs de ces séances sont en base (lessons.objectives) : ici,
+  // seulement la voix de Kodi. Les anciens objectifs promettaient des
+  // conditions et des instruments que ni le contenu ni l'outil n'offraient.
   "Le tambour qui répète": {
-    message: "Le Griot m'a dit que chaque rythme de tambour est une séquence — Boom-Boom-Clap, encore et encore. Apprends-moi à coder ce pattern pour réveiller la Case !",
-    objectifs: [
-      "Reconnaître qu'une séquence est un ensemble d'instructions dans un ordre précis",
-      "Créer un pattern rythmique avec des blocs de sons",
-      "Comprendre que changer l'ordre change complètement le résultat",
-    ],
+    message: "Le Griot m'a appris un rythme — Boum, Boum, Clap — mais je ne sais le jouer qu'une fois. Toi, tu connais la boucle : fais-le tourner toute la veillée !",
+  },
+  "La boucle dans la boucle": {
+    message: "Le Griot joue un motif qui se répète déjà… et il répète encore tout le motif. Aide-moi à mettre une boucle dans une boucle !",
+  },
+  "Mon refrain a un nom": {
+    message: "Le refrain du Griot revient entre chaque couplet. Une boucle ne sait pas faire ça… et si on donnait un nom au refrain ?",
   },
   "Le rythme à paramètre": {
-    message: "Le Griot veut le même rythme, mais parfois fort, parfois doux, parfois rapide. Un seul bloc, mais avec des réglages différents — c'est ça, un paramètre ! Souviens-toi bien de ce concept : dans quelques thèmes, tu écriras des fonctions Python avec exactement la même idée.",
-    objectifs: [
-      "Comprendre ce qu'est un paramètre (une valeur qu'on peut changer sans réécrire le bloc)",
-      "Modifier la vitesse, le volume ou la note d'un même bloc musical via un paramètre",
-      "Faire le lien entre 'paramètre de bloc' en Blockly et ce que sera 'def fonction(paramètre)' en Python",
-    ],
+    message: "Le Griot veut le même rythme, mais sur une autre note à chaque couplet. Un seul bloc, avec un réglage — c'est ça, un paramètre ! Souviens-t'en : en Python, tu écriras des fonctions avec exactement la même idée.",
   },
-  "Quand le Griot choisit": {
-    message: "Le Griot dit : si c'est une fête, joue un rythme rapide — sinon, joue un rythme lent. Apprends-moi à choisir la bonne musique selon la situation !",
-    objectifs: [
-      "Réutiliser la condition (si… alors… sinon…) dans un nouveau contexte musical",
-      "Brancher deux rythmes différents selon une condition",
-      "Comprendre que les conditions permettent à un programme de s'adapter",
-    ],
+  "Le plan du compositeur": {
+    message: "Avant la veillée, le Griot prépare son morceau : l'intro, les couplets, le refrain, le final. Fais le plan avec moi — la prochaine fois, tu composeras seul !",
   },
-  "La boucle musicale": {
-    message: "La musique africaine répète des patterns pendant toute la nuit. Aide-moi à coder une boucle musicale qui tourne jusqu'à ce que la fête soit terminée !",
-    objectifs: [
-      "Appliquer la boucle « répéter N fois » à un contexte musical",
-      "Combiner une boucle avec des patterns rhythmiques variés",
-      "Distinguer une boucle finie (N fois) d'une boucle infinie",
-    ],
-  },
-  "Mon concert de code": {
-    message: "La Case du Griot vibre ! Maintenant combine tout — séquence, paramètres, conditions, boucles — pour créer ton propre concert. Je jouerai avec toi !",
-    objectifs: [
-      "Combiner séquences, paramètres, conditions et boucles dans un seul programme",
-      "Concevoir un mini-concert de 8 mesures avec plusieurs instruments",
-      "Tester et ajuster son programme pour obtenir le résultat voulu",
-    ],
-  },
-  "Ma première vraie chanson": {
-    message: "Amavi… j'entends de nouveau ! La Case du Griot est rallumée. Crée une chanson complète pour célébrer — c'est ton œuvre, ton code, ta musique !",
-    objectifs: [
-      "Créer un programme musical complet de A à Z de façon autonome",
-      "Choisir ses propres sons, rythmes et structures",
-      "Présenter et expliquer ses choix de code à voix haute (pensée computationnelle)",
-    ],
+  "🏆 La veillée du Griot — mon morceau, de A à Z": {
+    message: "Ce soir, c'est la veillée. Le Griot te confie son morceau : ton plan, ton refrain, ton tambour réglé, ta boucle dans la boucle. À toi de jouer, compositeur !",
   },
 };
 

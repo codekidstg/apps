@@ -16,6 +16,8 @@ import dynamic from "next/dynamic";
 import { completeTraining } from "../../actions";
 import { Fragment } from "react";
 import JeBloqueIci from "@/components/eleve/JeBloqueIci";
+// Le chargeur est déjà client seul, et affiche « Chargement du studio musical… ».
+import BlocklyMusic from "@/components/eleve/BlocklyMusicLoader";
 import { indiceDuBloc } from "@/lib/questions/raisons";
 import { programmeLisible } from "@/lib/questions/programme";
 import type { Question } from "@/lib/questions/donnees";
@@ -48,7 +50,7 @@ const estJeuPython = (b: { type: string; content: unknown }) =>
  * d'apprendre : les entraînements se rabattaient sur des versions papier.
  * Même véhicule que les jeux Python : blockly_challenge + game_type.
  */
-const JEUX_LECON = ["maze", "bug_hunt", "sort", "memory", "association", "pattern_select", "pattern_build", "plan_builder", "deviens_ordinateur"];
+const JEUX_LECON = ["maze", "bug_hunt", "sort", "memory", "association", "pattern_select", "pattern_build", "plan_builder", "deviens_ordinateur", "music"];
 const estJeuLecon = (b: { type: string; content: unknown }) =>
   b.type === "blockly_challenge" && JEUX_LECON.includes((b.content as any)?.game_type);
 
@@ -157,7 +159,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
       return lignes.length ? lignes.join("\n") : null;
     }
     const jeu = (b.content as { game_type?: string }).game_type;
-    if (jeu === "maze") return programmeLisible(gameStates[b.id]);
+    if (jeu === "maze" || jeu === "music") return programmeLisible(gameStates[b.id]);
     if (jeu === "sort" && Array.isArray(gameStates[b.id])) return (gameStates[b.id] as string[]).join("\n");
     if (jeu === "pattern_build" && Array.isArray(gameStates[b.id])) {
       const [d, f, nb] = gameStates[b.id] as [number, number, number];
@@ -514,6 +516,12 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
             if (cfg.game_type === "pattern_select") {
               return <PatternSelect key={block.id} config={cfg} done={fait} onSolved={resolu}
                 savedState={(etat as [number, number]) ?? null} onStateChange={garder} />;
+            }
+            if (cfg.game_type === "music") {
+              // Le programme est gardé, comme au labyrinthe : c'est lui que le
+              // mentor lit quand l'enfant appuie sur « Je bloque ici ».
+              return <BlocklyMusic key={block.id} config={cfg} onSolved={resolu}
+                savedXml={etat as string | undefined} onXmlChange={garder} />;
             }
             if (cfg.game_type === "pattern_build") {
               return <PatternBuild key={block.id} config={cfg} done={fait} onSolved={resolu}
