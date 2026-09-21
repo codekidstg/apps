@@ -39,6 +39,9 @@ export type Parcours = {
   /** Thème de la prochaine leçon non terminée — jamais vide tant qu'il reste du programme. */
   themeCourant: string | null;
   prochaineLecon: string | null;
+  /** Les identifiants de cette leçon et de son thème — pour y mener, pas seulement la nommer. */
+  prochaineLeconId: string | null;
+  prochaineLeconThemeId: string | null;
   /** Rang de ce thème dans le niveau de l'élève, et nombre de thèmes du niveau. */
   rangTheme: number | null;
   themesDuNiveau: number;
@@ -110,6 +113,8 @@ export function calculerParcours(
   return {
     themeCourant: themeCourant?.title ?? null,
     prochaineLecon: prochain?.lecon.title ?? null,
+    prochaineLeconId: prochain?.lecon.id ?? null,
+    prochaineLeconThemeId: prochain?.theme.id ?? null,
     // Un thème d'un autre niveau que celui de l'élève n'a pas de rang ici.
     rangTheme: rang > 0 ? rang : null,
     themesDuNiveau: themesNiveau.length,
@@ -124,7 +129,8 @@ export function calculerParcours(
 }
 
 export const PARCOURS_VIDE: Parcours = {
-  themeCourant: null, prochaineLecon: null, rangTheme: null, themesDuNiveau: 0,
+  themeCourant: null, prochaineLecon: null, prochaineLeconId: null, prochaineLeconThemeId: null,
+  rangTheme: null, themesDuNiveau: 0,
   faites: 0, total: 0, faitesParcours: 0, totalParcours: 0, horsParcours: 0,
   termine: false, aucunThemeActive: true,
 };
