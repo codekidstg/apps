@@ -7,6 +7,7 @@ import PushPermission from "@/components/PushPermission";
 import { getEffectiveNavPermissions } from "@/lib/permissions/access";
 import { PAGES_BY_ROLE } from "@/lib/permissions/registry";
 import { compterReponsesNonVues } from "@/lib/contact/parent";
+import { noterActiviteParent } from "@/lib/parents/activite";
 import { logout } from "@/app/[locale]/auth/actions";
 
 export default async function SuiviLayout({
@@ -38,6 +39,9 @@ export default async function SuiviLayout({
     getEffectiveNavPermissions(user.id, "parent"),
     // La pastille « Contact » : une réponse de la direction pas encore lue.
     role === "parent" ? compterReponsesNonVues(user.id) : Promise.resolve(0),
+    // La visite du parent, au plus une par heure. Un admin ou un manager qui
+    // regarde l'espace parent n'est pas un parent : il n'est pas compté.
+    role === "parent" ? noterActiviteParent(user.id, "visite") : Promise.resolve(),
   ]);
   const items: NavItem[] = (PAGES_BY_ROLE["parent"] ?? [])
     .filter(p => allowedKeys.has(p.key))

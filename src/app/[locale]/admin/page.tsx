@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import PageHeader from "@/components/backoffice/PageHeader";
 import AlerteBoiteDirection from "@/components/backoffice/AlerteBoiteDirection";
 import ProchainesSeances from "@/components/backoffice/ProchainesSeances";
+import AlerteParents from "@/components/backoffice/AlerteParents";
 
 async function getStats() {
   const supabase = await createClient();
@@ -50,6 +51,7 @@ export default async function AdminDashboard() {
       <div className="p-8 space-y-8">
 
         <AlerteBoiteDirection href="/admin/messages" />
+        <AlerteParents espace="admin" />
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {kpis.map((k) => (

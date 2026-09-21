@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import CertificatePDF from "@/lib/certificates/CertificatePDF";
+import { noterActiviteParent } from "@/lib/parents/activite";
 import React, { type JSXElementConstructor, type ReactElement } from "react";
 
 export async function GET(
@@ -32,6 +33,9 @@ export async function GET(
   if (!cert.validated_at && !isStaff) {
     return NextResponse.json({ error: "Certificat non encore validé" }, { status: 403 });
   }
+
+  // Le parent qui ouvre le diplôme de son enfant : le moment fort du parcours.
+  if (role === "parent") await noterActiviteParent(user.id, "certificat", certId);
 
   // Données élève
   const { data: student } = await (admin.from("students") as any)

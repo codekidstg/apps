@@ -7,6 +7,7 @@ import Link from "next/link";
 import { AVANCEMENT, ENGAGEMENT } from "@/lib/rapports";
 import { getSeancesAVenir } from "@/lib/planning/seances-a-venir";
 import { ListeSeances } from "@/components/backoffice/ProchainesSeances";
+import AlerteParents from "@/components/backoffice/AlerteParents";
 
 export default async function ManagerDashboard() {
   const supabase = await createClient();
@@ -55,6 +56,7 @@ export default async function ManagerDashboard() {
       <div className="p-8 space-y-8">
 
         <AlerteBoiteDirection href="/manager/messages" />
+        <AlerteParents espace="manager" />
 
         {/* KPIs cliquables */}
         <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
