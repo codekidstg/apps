@@ -4,13 +4,15 @@ import { useActionState, useState } from "react";
 import { repondreQuestion, reglerEnSeance, type ResultatSimple } from "@/lib/questions/actions";
 import { REPONSES_RAPIDES, LIBELLE_RAISON } from "@/lib/questions/raisons";
 import type { QuestionAvecEleve } from "@/lib/questions/donnees";
+import type { FicheExercice as Fiche } from "@/lib/questions/corrige";
 import ContexteQuestion from "./ContexteQuestion";
+import FicheExercice from "./FicheExercice";
 
 /**
  * Une question d'élève, telle que son mentor la traite.
  *
- * Ce qui la rend plus utile qu'un message : la consigne que l'enfant avait
- * sous les yeux et ce qu'il avait fait, côte à côte avec sa question. Le
+ * Ce qui la rend plus utile qu'un message : ce que l'enfant avait fait, côte
+ * à côte avec sa question, et l'exercice complet avec sa réponse attendue. Le
  * mentor répond « ton Ramasser est une case trop tôt », pas « tu peux m'en
  * dire plus ? ».
  */
@@ -25,8 +27,17 @@ const ETATS = {
 
 const INITIAL: ResultatSimple = {};
 
-export default function CarteQuestion({ question: q, libelles }: { question: QuestionAvecEleve; libelles: LibellesQuestion }) {
+export default function CarteQuestion({ question: q, libelles, fiche = null }: {
+  question: QuestionAvecEleve;
+  libelles: LibellesQuestion;
+  /** L'exercice tel qu'il est aujourd'hui, avec sa réponse — null s'il a été réécrit depuis. */
+  fiche?: Fiche | null;
+}) {
   const [texte, setTexte] = useState("");
+  // Une explication de l'exercice, versée à la suite de ce qui est déjà écrit :
+  // le mentor la relit et l'ajuste avant d'envoyer.
+  const reprendre = (explication: string) =>
+    setTexte((t) => (t.trim() ? `${t.trimEnd()}\n\n${explication}` : explication));
   const [etatReponse, actionReponse, reponseEnCours] = useActionState(repondreQuestion, INITIAL);
   const [etatReglage, actionReglage, reglageEnCours] = useActionState(reglerEnSeance, INITIAL);
 
@@ -64,7 +75,24 @@ export default function CarteQuestion({ question: q, libelles }: { question: Que
           </blockquote>
         )}
 
-        <ContexteQuestion contexte={q.contexte} />
+        <ContexteQuestion contexte={q.contexte} sansConsigne={!!fiche} />
+
+        {fiche ? (
+          // Ouverte d'office tant que l'enfant attend : c'est là que le mentor
+          // trouve de quoi répondre.
+          <details open={ouverte} className="rounded-xl border border-slate-200 bg-white">
+            <summary className="px-3 py-2 text-xs font-black cursor-pointer select-none" style={{ color: "#1B2D5E" }}>
+              📘 L&apos;exercice et sa réponse
+            </summary>
+            <div className="px-3 pb-3">
+              <FicheExercice fiche={fiche} onReprendre={ouverte ? reprendre : undefined} />
+            </div>
+          </details>
+        ) : (
+          <p className="text-[11px] font-bold" style={{ color: "#94A3B8" }}>
+            Cet exercice a été modifié depuis la question : seule sa consigne d&apos;alors reste visible.
+          </p>
+        )}
 
         {ouverte && (
           <>

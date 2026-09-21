@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { enFils } from "./fils";
+import { enFils, parEnfant } from "./fils";
 import type { Question } from "./donnees";
 
 const question = (p: Partial<Question> & Pick<Question, "id" | "poseeLe">): Question => ({
@@ -44,5 +44,26 @@ describe("enFils", () => {
       }),
     ]);
     expect(fils.map((f) => f.derniere.id)).toEqual(["en-retard", "repondue-hier", "recente"]);
+  });
+});
+
+describe("parEnfant", () => {
+  const repondue = (p: Partial<Question> & Pick<Question, "id" | "poseeLe">) => question({
+    ...p, etat: "repondue", reponse: { texte: "ok", parNom: "Jean", le: p.poseeLe, vueLe: null },
+  });
+
+  it("une ligne par enfant, avec ses échanges, ce qui attend et ce qui dépasse le délai", () => {
+    const enfants = parEnfant(enFils([
+      question({ id: "r1", poseeLe: "2026-09-20T17:02:00Z", eleveId: "ryshawn", blocId: "a" }),
+      question({ id: "r2", poseeLe: "2026-09-20T17:19:00Z", eleveId: "ryshawn", blocId: "b" }),
+      question({ id: "k1", poseeLe: "2026-09-19T21:40:00Z", eleveId: "kenneth", blocId: "c", enRetard: true }),
+      repondue({ id: "s1", poseeLe: "2026-09-21T09:00:00Z", eleveId: "samuel", blocId: "d" }),
+    ]));
+    expect(enfants.map((e) => [e.eleveId, e.fils.length, e.enAttente, e.enRetard])).toEqual([
+      ["kenneth", 1, 1, 1],   // au-delà du délai : en tête
+      ["ryshawn", 2, 2, 0],   // attend une réponse
+      ["samuel", 1, 0, 0],    // tout est traité, même si c'est le plus récent
+    ]);
+    expect(enfants[1].derniereActivite).toBe("2026-09-20T17:19:00Z");
   });
 });

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { chargerQuestionsMentor, DELAI_QUESTION_HEURES, type QuestionAvecEleve } from "@/lib/questions/donnees";
 import { dateEtHeure, ilYa } from "@/lib/planning/dates";
 import CarteQuestion, { type LibellesQuestion } from "@/components/backoffice/CarteQuestion";
+import { fichesDesQuestions } from "@/lib/questions/fiches";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,9 @@ export default async function QuestionsElevesPage() {
   if (!user) redirect("/fr/connexion");
 
   const { aTraiter, traitees } = await chargerQuestionsMentor(user.id);
+  // L'exercice de chaque question, avec sa réponse : de quoi répondre sans
+  // rouvrir la leçon.
+  const fiches = await fichesDesQuestions([...aTraiter, ...traitees]);
   const maintenant = Date.now();
   const enRetard = aTraiter.filter((q) => q.enRetard).length;
 
@@ -52,14 +56,14 @@ export default async function QuestionsElevesPage() {
             Aucune question en attente.
           </div>
         ) : (
-          aTraiter.map((q) => <CarteQuestion key={q.id} question={q} libelles={libellesDe(q, maintenant)} />)
+          aTraiter.map((q) => <CarteQuestion key={q.id} question={q} libelles={libellesDe(q, maintenant)} fiche={fiches[q.blocId] ?? null} />)
         )}
       </section>
 
       {traitees.length > 0 && (
         <section className="space-y-3">
           <h2 className="font-black text-sm" style={{ color: "#1B2D5E" }}>Récemment traitées</h2>
-          {traitees.map((q) => <CarteQuestion key={q.id} question={q} libelles={libellesDe(q, maintenant)} />)}
+          {traitees.map((q) => <CarteQuestion key={q.id} question={q} libelles={libellesDe(q, maintenant)} fiche={fiches[q.blocId] ?? null} />)}
         </section>
       )}
     </div>

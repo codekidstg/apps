@@ -44,3 +44,37 @@ export function enFils<Q extends Question>(questions: Q[]): Fil<Q>[] {
   // Ceux qui attendent au-delà du délai d'abord, puis les plus récemment actifs.
   return fils.sort((a, b) => Number(b.enRetard) - Number(a.enRetard) || temps(b.derniereActivite) - temps(a.derniereActivite));
 }
+
+export type Enfant<Q extends Question> = {
+  eleveId: string;
+  /** Dans l'ordre de `enFils` : ce qui attend au-delà du délai d'abord. */
+  fils: Fil<Q>[];
+  enAttente: number;
+  enRetard: number;
+  derniereActivite: string;
+};
+
+/**
+ * Les fils regroupés par enfant, pour que la page de la direction reste
+ * courte : une ligne par enfant, qu'on déplie.
+ *
+ * En tête, les enfants dont une question attend au-delà du délai, puis ceux
+ * qui attendent une réponse, puis les autres, du plus récent au plus ancien.
+ */
+export function parEnfant<Q extends Question>(fils: Fil<Q>[]): Enfant<Q>[] {
+  const groupes = new Map<string, Fil<Q>[]>();
+  for (const f of fils) groupes.set(f.derniere.eleveId, [...(groupes.get(f.derniere.eleveId) ?? []), f]);
+
+  return [...groupes.entries()]
+    .map(([eleveId, liste]): Enfant<Q> => ({
+      eleveId,
+      fils: liste,
+      enAttente: liste.filter((f) => f.etat === "en_attente").length,
+      enRetard: liste.filter((f) => f.enRetard).length,
+      derniereActivite: liste.map((f) => f.derniereActivite).reduce((a, b) => (temps(b) > temps(a) ? b : a)),
+    }))
+    .sort((a, b) =>
+      Number(b.enRetard > 0) - Number(a.enRetard > 0)
+      || Number(b.enAttente > 0) - Number(a.enAttente > 0)
+      || temps(b.derniereActivite) - temps(a.derniereActivite));
+}

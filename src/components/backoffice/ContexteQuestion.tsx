@@ -5,9 +5,13 @@ import type { Contexte } from "@/lib/questions/donnees";
  * à côte. Figés au moment de la question : la leçon a pu être réécrite depuis.
  *
  * Partagé par la carte du mentor et les fils de la direction.
+ *
+ * `sansConsigne` : quand la fiche complète de l'exercice s'affiche à côté, la
+ * consigne figée ferait doublon ; seul reste ce que l'élève avait fait.
  */
-export default function ContexteQuestion({ contexte }: { contexte: Contexte }) {
-  const { bloc, travail, essais } = contexte;
+export default function ContexteQuestion({ contexte, sansConsigne = false }: { contexte: Contexte; sansConsigne?: boolean }) {
+  const { travail, essais } = contexte;
+  const bloc = sansConsigne ? null : contexte.bloc;
   if (!bloc?.consigne && !travail) return null;
 
   return (
