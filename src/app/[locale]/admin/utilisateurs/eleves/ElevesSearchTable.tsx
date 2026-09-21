@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import LevelSelect from "./LevelSelect";
 import type { Parcours } from "@/lib/progression";
+import { STATUT_ELEVE, type StatutEleve } from "@/lib/backoffice/statut-eleve";
 
 const LEVELS = [
   { num: 1, name: "Explorateur 🌱", color: "#10B981" },
@@ -21,16 +22,22 @@ type StudentRow = {
   level_num: number;
   parcours: Parcours;
   parents: string[];
+  statut: StatutEleve;
+  raisons: string[];
 };
+
+const STATUTS = Object.entries(STATUT_ELEVE) as [StatutEleve, (typeof STATUT_ELEVE)[StatutEleve]][];
 
 export default function ElevesSearchTable({ students, basePath = "/admin/utilisateurs/eleves" }: { students: StudentRow[]; basePath?: string }) {
   const [q, setQ] = useState("");
   const [levelFilter, setLevelFilter] = useState(0);
+  const [statutFilter, setStatutFilter] = useState<StatutEleve | null>(null);
 
   const filtered = useMemo(() => {
     const lower = q.toLowerCase().trim();
     return students.filter((s) => {
       if (levelFilter && s.level_num !== levelFilter) return false;
+      if (statutFilter && s.statut !== statutFilter) return false;
       if (!lower) return true;
       return (
         s.name.toLowerCase().includes(lower) ||
@@ -39,7 +46,13 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
         s.parents.some((p) => p.toLowerCase().includes(lower))
       );
     });
-  }, [q, levelFilter, students]);
+  }, [q, levelFilter, statutFilter, students]);
+
+  const parStatut = useMemo(() => {
+    const n: Partial<Record<StatutEleve, number>> = {};
+    for (const s of students) n[s.statut] = (n[s.statut] ?? 0) + 1;
+    return n;
+  }, [students]);
 
   return (
     <div className="space-y-4">
@@ -67,26 +80,43 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
             </button>
           ))}
         </div>
-        {(q || levelFilter > 0) && (
+        {(q || levelFilter > 0 || statutFilter) && (
           <span className="text-xs text-gray-400 font-medium">
             {filtered.length} résultat{filtered.length > 1 ? "s" : ""}
           </span>
         )}
       </div>
 
-      <div className="overflow-hidden border border-gray-200 rounded-2xl bg-white shadow-sm">
+      {/* Les statuts d'évolution, du plus urgent au plus tranquille. */}
+      <div className="flex gap-1.5 flex-wrap">
+        <button onClick={() => setStatutFilter(null)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-black transition-colors ${statutFilter === null ? "bg-brand-navy text-white" : "bg-white border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+          Tous les statuts
+        </button>
+        {STATUTS.map(([cle, s]) => (
+          <button key={cle} onClick={() => setStatutFilter(statutFilter === cle ? null : cle)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-black border transition-colors ${statutFilter === cle ? s.classes : "bg-white border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+            {s.pastille} {s.label} <span className="opacity-60">{parStatut[cle] ?? 0}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* overflow-x-auto et non overflow-hidden : avec la colonne « Évolution »,
+          la table dépasse sur un écran étroit, et la colonne des parents était
+          coupée au lieu de défiler. */}
+      <div className="overflow-x-auto border border-gray-200 rounded-2xl bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              {["Élève", "Niveau", "Progression", "Thème en cours", "Parent(s)"].map((h) => (
+              {["Élève", "Évolution", "Niveau", "Progression", "Thème en cours", "Parent(s)"].map((h) => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-black text-gray-400 uppercase tracking-widest">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filtered.length === 0 ? (
-              <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-400 font-bold">
-                Aucun élève pour « {q || LEVELS.find(l => l.num === levelFilter)?.name} »
+              <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400 font-bold">
+                Aucun élève pour ce filtre
               </td></tr>
             ) : filtered.map((s) => {
               const lvl = LEVELS.find((l) => l.num === s.level_num) ?? LEVELS[0];
@@ -105,6 +135,13 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
                         <div className="text-xs text-gray-400 font-mono">{s.email}</div>
                       </div>
                     </Link>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-block text-[11px] font-black px-2 py-0.5 rounded-full border ${STATUT_ELEVE[s.statut].classes}`}
+                      title={s.raisons.join(" · ") || undefined}>
+                      {STATUT_ELEVE[s.statut].pastille} {STATUT_ELEVE[s.statut].label}
+                    </span>
+                    {s.raisons[0] && <div className="text-[11px] text-gray-400 mt-1 max-w-40">{s.raisons[0]}</div>}
                   </td>
                   <td className="px-4 py-3">
                     <LevelSelect studentId={s.id} currentLevel={s.level_num} levels={LEVELS} />

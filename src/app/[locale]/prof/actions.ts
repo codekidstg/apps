@@ -37,11 +37,22 @@ export async function submitSessionReport(formData: FormData) {
   const help_methods     = formData.getAll("help_methods") as string[];
   const next_session_note = formData.get("next_session_note") as string | null;
 
+  // Le formulaire n'envoie pas l'élève : on le retrouve par la séance. Sans
+  // cela, aucun rapport n'était rattaché à un enfant — les 12 premiers ont
+  // tous un student_id vide.
+  let eleve = student_id || null;
+  if (!eleve && session_id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: seance } = await (supabase.from("teacher_sessions") as any)
+      .select("student_id").eq("id", session_id).maybeSingle();
+    eleve = seance?.student_id ?? null;
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from("session_reports") as any).insert({
     session_id:       session_id || null,
     teacher_id:       user.id,
-    student_id:       student_id || null,
+    student_id:       eleve,
     occurrence_date:  occurrence_date || null,
     advancement,
     engagement,

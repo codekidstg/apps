@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { chargerParcours, PARCOURS_VIDE, type Parcours } from "@/lib/progression";
 import { slugFromNum } from "@/lib/levels";
+import { chargerEvolutions } from "./evolution";
+import type { StatutEleve } from "./statut-eleve";
 
 /**
  * Données de l'écran « Élèves », partagées par /admin et /manager.
@@ -20,6 +22,9 @@ export type EleveRow = {
   level_num: number;
   parcours: Parcours;
   parents: string[];
+  /** Le statut d'évolution, et ce qui l'explique. */
+  statut: StatutEleve;
+  raisons: string[];
 };
 
 export async function chargerEleves(): Promise<EleveRow[]> {
@@ -37,13 +42,14 @@ export async function chargerEleves(): Promise<EleveRow[]> {
 
   // `level` (slug) est la colonne que lit l'espace élève ; `level_num` n'est
   // qu'un doublon d'affichage. On suit la première, avec repli sur la seconde.
-  const [parcours, { data: liens, error: erreurLiens }] = await Promise.all([
+  const [parcours, { data: liens, error: erreurLiens }, evolutions] = await Promise.all([
     chargerParcours(admin, (students ?? []).map((s: any) => ({
       id: s.id,
       niveau: s.level ?? slugFromNum(s.level_num),
     }))),
     (admin.from("parent_children") as any)
       .select("student_id, parent_id, profiles!parent_id(display_name)"),
+    chargerEvolutions((students ?? []).map((s: any) => s.id)),
   ]);
   if (erreurLiens) console.error("[eleves] parent_children :", erreurLiens.message);
 
@@ -64,6 +70,8 @@ export async function chargerEleves(): Promise<EleveRow[]> {
     level_num: s.level_num ?? 1,
     parcours: parcours.get(s.id) ?? PARCOURS_VIDE,
     parents: parentsParEleve.get(s.id) ?? [],
+    statut: evolutions.get(s.id)?.statut ?? "demarre",
+    raisons: evolutions.get(s.id)?.raisons ?? [],
   }));
 }
 

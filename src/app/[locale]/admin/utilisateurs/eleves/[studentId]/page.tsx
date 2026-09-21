@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import StudentProfileForm from "./StudentProfileForm";
 import { chargerParcoursEleve } from "@/lib/backoffice/eleves";
+import EvolutionEleve from "@/components/backoffice/EvolutionEleve";
 
 const LEVELS = [
   { num: 1, name: "Explorateur 🌱", color: "#10B981" },
@@ -92,6 +93,8 @@ export default async function StudentDetailPage({
           )}
         </div>
       </div>
+
+      <EvolutionEleve studentId={studentId} />
 
       {/* Formulaire fiche */}
       <StudentProfileForm
