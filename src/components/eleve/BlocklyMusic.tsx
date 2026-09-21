@@ -13,6 +13,8 @@ type Percu = "Boum" | "Tac" | "Clap";
  * passaient pour le même rythme.
  */
 type Son = Note | Percu | "silence";
+/** Un programme écrit en abrégé : un son, ou une boucle et ce qu'elle contient. */
+type Element = Son | { rep: number; corps: Element[] };
 
 type MusicConfig = {
   title?: string;
@@ -26,6 +28,15 @@ type MusicConfig = {
   available_blocks?: string[];
   max_blocks?: number;
   tempo?: number;
+  /**
+   * Un programme déjà posé au départ : l'enfant le transforme ou le répare
+   * au lieu de repartir de zéro. Son propre travail, s'il existe, passe devant.
+   */
+  depart?: Element[];
+  /** Exige une boucle rangée dans une autre, chacune d'au moins deux tours. */
+  boucle_imbriquee?: boolean;
+  /** L'indice propre à ce défi quand le rythme est juste mais trop long. */
+  indice_limite?: string;
 };
 
 type Props = {
@@ -63,6 +74,41 @@ function pastille(s: Son): { texte: string; couleur: string } {
 }
 /** Le son dans une phrase : « Ré », « Boum », « un silence ». */
 const nomSon = (s: Son) => (s === "silence" ? "un silence" : estNote(s) ? NOTE_LABEL[s] : s);
+
+/** Le programme abrégé, traduit dans le XML que Blockly sait recharger. */
+function versXml(prog: Element[]): string {
+  const chaine = (liste: Element[]): string => {
+    if (!liste.length) return "";
+    const [tete, ...reste] = liste;
+    const suite = reste.length ? `<next>${chaine(reste)}</next>` : "";
+    if (typeof tete === "object") {
+      return `<block type="controls_repeat_ext"><value name="TIMES"><block type="math_number"><field name="NUM">${tete.rep}</field></block></value>`
+        + `<statement name="DO">${chaine(tete.corps)}</statement>${suite}</block>`;
+    }
+    if (tete === "silence") return `<block type="music_pause">${suite}</block>`;
+    if (estPercu(tete)) return `<block type="music_drum"><field name="PERCU">${tete}</field>${suite}</block>`;
+    return `<block type="music_play_note"><field name="NOTE">${tete}</field>${suite}</block>`;
+  };
+  return `<xml xmlns="https://developers.google.com/blockly/xml">${chaine(prog).replace("<block ", '<block x="24" y="24" ')}</xml>`;
+}
+
+/** Le nombre de tours d'un bloc Répéter, lu dans sa case. */
+function toursDe(boucle: any): number {
+  const n = boucle.getInputTargetBlock?.("TIMES");
+  return n ? parseInt(n.getFieldValue("NUM") ?? "1", 10) || 1 : 1;
+}
+
+/** Une boucle rangée dans une autre, chacune d'au moins deux tours ? */
+function aUneBoucleImbriquee(ws: any): boolean {
+  const boucles = ws.getAllBlocks(false).filter((b: any) => b.type === "controls_repeat_ext");
+  return boucles.some((b: any) => {
+    if (toursDe(b) < 2) return false;
+    for (let p = b.getSurroundParent?.(); p; p = p.getSurroundParent?.()) {
+      if (p.type === "controls_repeat_ext" && toursDe(p) >= 2) return true;
+    }
+    return false;
+  });
+}
 
 const ALL_MUSIC_BLOCKS = [
   { id: "music_play_note",     label: "🎵 Jouer une note", color: "#3b82f6" },
@@ -263,21 +309,28 @@ function Tambours({ actif }: { actif: Percu | null }) {
 function buildInterpreter(
   playFn:  (son: Note | Percu) => Promise<void>,
   pauseFn: () => Promise<void>,
+  // Le bloc qui joue s'allume dans le programme : l'enfant voit la petite
+  // boucle faire ses tours, puis la grande remonter. Sans cela, une boucle
+  // dans une boucle ne s'entend qu'en bloc, sans qu'on sache qui joue quoi.
+  allume: (id: string | null) => void = () => {},
 ) {
   async function runBlock(block: any): Promise<void> {
     if (!block) return;
     switch (block.type) {
       case "music_play_note": {
         const note = (block.getFieldValue("NOTE") || "Do") as Note;
+        allume(block.id);
         await playFn(note);
         break;
       }
       case "music_drum": {
         const frappe = (block.getFieldValue("PERCU") || "Boum") as Percu;
+        allume(block.id);
         await playFn(frappe);
         break;
       }
       case "music_pause":
+        allume(block.id);
         await pauseFn();
         break;
       case "controls_repeat_ext": {
@@ -442,10 +495,11 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
 
       if (!mounted) { ws.dispose(); return; } // cleanup ran while injecting
 
-      // Restore saved XML if any
-      if (savedXml) {
+      // Le travail de l'enfant d'abord ; à défaut, le programme de départ du défi.
+      const aCharger = savedXml || (config.depart?.length ? versXml(config.depart) : null);
+      if (aCharger) {
         try {
-          const dom = (Blockly as any).utils.xml.textToDom(savedXml);
+          const dom = (Blockly as any).utils.xml.textToDom(aCharger);
           (Blockly as any).Xml.domToWorkspace(dom, ws);
         } catch (_) {}
       }
@@ -510,9 +564,12 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         await new Promise(r => setTimeout(r, tempo + 20));
       };
 
+      const allume = (id: string | null) => { try { ws.highlightBlock(id); } catch (_) { /* rendu sans surbrillance */ } };
+
       try {
-        await buildInterpreter(_play, _pause)(ws);
+        await buildInterpreter(_play, _pause, allume)(ws);
       } catch (e: any) {
+        allume(null);
         setActif(null);
         setStatus("fail");
         if (e?.message?.startsWith("EMPTY_LOOP:")) {
@@ -524,6 +581,7 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         return;
       }
 
+      allume(null);
       setActif(null);
       if (testMode) { setStatus("idle"); return; }
 
@@ -536,7 +594,17 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
       const tropDeBlocs = limite !== undefined && poses > limite;
       const refuserPourBlocs = (reussi: string) => {
         setStatus("fail");
-        setMsg(`${reussi} Mais tu as posé ${poses} blocs, et il en faut ${limite} au plus. Une boucle peut jouer tout ça à ta place 🔁`);
+        // « Une boucle peut le faire à ta place » ne dit rien à un enfant qui a
+        // déjà une boucle : chaque défi peut donner son propre indice.
+        const indice = config.indice_limite ?? "Une boucle peut jouer tout ça à ta place 🔁";
+        setMsg(`${reussi} Mais tu as posé ${poses} blocs, et il en faut ${limite} au plus. ${indice}`);
+      };
+      // Une seule boucle de 64 tours atteindrait n'importe quel nombre de sons :
+      // quand le défi porte sur la boucle dans la boucle, on la vérifie.
+      const manqueImbrication = !!config.boucle_imbriquee && !aUneBoucleImbriquee(ws);
+      const refuserPourImbrication = (reussi: string) => {
+        setStatus("fail");
+        setMsg(`${reussi} Mais il manque une boucle rangée DANS une autre boucle — chacune d'au moins 2 tours. 🔁`);
       };
       const bravo = (texte: string) => {
         setStatus("success"); setMsg(texte);
@@ -556,6 +624,7 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
           return;
         }
         if (tropDeBlocs) { refuserPourBlocs(`🎵 Joli, ${sons} sons !`); return; }
+        if (manqueImbrication) { refuserPourImbrication(`🎵 Joli, ${sons} sons !`); return; }
         bravo("🎉 Superbe ! Tu es compositeur !");
         return;
       }
@@ -566,7 +635,7 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
           const ecart = diff > 0 ? `+${diff}` : `${diff}`;
           setStatus("fail");
           setMsg(enTemps
-            ? `🥁 Il faut ${attendu.length} temps, silences compris — ton rythme en fait ${played.length} (${ecart}).`
+            ? `🥁 Il faut ${attendu.length} temps${attendu.includes("silence") ? ", silences compris" : ""} — ton rythme en fait ${played.length} (${ecart}).`
             : `🎵 Il faut exactement ${attendu.length} notes — tu en as joué ${played.length} (${ecart}).`);
           return;
         }
@@ -578,15 +647,15 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
             : `❌ Note ${bad + 1} incorrecte — tu as joué ${nomSon(played[bad])} mais il fallait ${nomSon(attendu[bad])}.`);
           return;
         }
-        if (tropDeBlocs) {
-          refuserPourBlocs(enTemps ? "🎵 C'est exactement le bon rythme !" : "🎵 C'est exactement la bonne mélodie !");
-          return;
-        }
+        const juste = enTemps ? "🎵 C'est exactement le bon rythme !" : "🎵 C'est exactement la bonne mélodie !";
+        if (tropDeBlocs) { refuserPourBlocs(juste); return; }
+        if (manqueImbrication) { refuserPourImbrication(juste); return; }
         bravo(enTemps ? "🎉 Parfait ! Le rythme exact, temps par temps !" : "🎉 Parfait ! Mélodie reproduite à la note près !");
         return;
       }
 
       if (tropDeBlocs) { refuserPourBlocs("🎵 Ça joue !"); return; }
+      if (manqueImbrication) { refuserPourImbrication("🎵 Ça joue !"); return; }
       bravo("🎉 Mélodie jouée !");
     })();
   }, [config, onSolved, tempo]);
