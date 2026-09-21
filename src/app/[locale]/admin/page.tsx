@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import PageHeader from "@/components/backoffice/PageHeader";
 import AlerteBoiteDirection from "@/components/backoffice/AlerteBoiteDirection";
+import ProchainesSeances from "@/components/backoffice/ProchainesSeances";
 
 async function getStats() {
   const supabase = await createClient();
@@ -58,6 +59,8 @@ export default async function AdminDashboard() {
             </div>
           ))}
         </div>
+
+        <ProchainesSeances espace="admin" />
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl border border-cream-border p-6">

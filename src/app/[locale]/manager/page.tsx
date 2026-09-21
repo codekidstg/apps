@@ -5,32 +5,8 @@ import PageHeader from "@/components/backoffice/PageHeader";
 import AlerteBoiteDirection from "@/components/backoffice/AlerteBoiteDirection";
 import Link from "next/link";
 import { AVANCEMENT, ENGAGEMENT } from "@/lib/rapports";
-
-const WEEKDAY_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
-
-function buildUpcomingSessions(sessions: any[], days = 7) {
-  const now   = new Date();
-  const limit = new Date(now); limit.setDate(now.getDate() + days);
-  const out: { title: string; at: Date; teacherName: string; studentName: string | null }[] = [];
-
-  for (const s of sessions) {
-    const teacherName: string   = s.profiles?.display_name ?? "Prof";
-    const studentName: string | null = s.students?.profiles?.display_name ?? null;
-
-    if (s.session_type === "recurring") {
-      const [h, m] = (s.start_time as string).split(":").map(Number);
-      const cursor = new Date(now);
-      cursor.setHours(h, m, 0, 0);
-      const daysUntil = (s.weekday - cursor.getDay() + 7) % 7;
-      cursor.setDate(cursor.getDate() + (daysUntil === 0 && cursor > now ? 0 : daysUntil === 0 ? 7 : daysUntil));
-      if (cursor <= limit) out.push({ title: s.title, at: new Date(cursor), teacherName, studentName });
-    } else if (s.session_type === "once" && s.scheduled_at) {
-      const at = new Date(s.scheduled_at);
-      if (at >= now && at <= limit) out.push({ title: s.title, at, teacherName, studentName });
-    }
-  }
-  return out.sort((a, b) => a.at.getTime() - b.at.getTime());
-}
+import { getSeancesAVenir } from "@/lib/planning/seances-a-venir";
+import { ListeSeances } from "@/components/backoffice/ProchainesSeances";
 
 export default async function ManagerDashboard() {
   const supabase = await createClient();
@@ -44,14 +20,12 @@ export default async function ManagerDashboard() {
 
   const [
     { data: profiles },
-    { data: allSessions },
+    seances,
     { data: reports },
     { mentorToPay, parentPending },
   ] = await Promise.all([
     (admin.from("profiles") as any).select("role"),
-    (admin.from("teacher_sessions") as any)
-      .select("*, profiles!teacher_id(display_name), students(id, profiles!profile_id(display_name))")
-      .order("weekday").order("start_time").order("scheduled_at"),
+    getSeancesAVenir(),
     // `title` et `status` n'existent pas dans session_reports : la requête
     // était rejetée en bloc et l'encadré affichait « Aucun rapport. » depuis
     // toujours. Les colonnes réelles sont celles-ci.
@@ -66,13 +40,11 @@ export default async function ManagerDashboard() {
     (a, p) => ({ ...a, [p.role]: (a[p.role] ?? 0) + 1 }), {}
   );
 
-  const upcoming = buildUpcomingSessions(allSessions ?? []);
-
   const kpis = [
     { label: "Élèves",         value: byRole.student  ?? 0, icon: "🎓", color: "#10b981", href: "/manager/utilisateurs/eleves" },
     { label: "Professeurs",    value: byRole.teacher  ?? 0, icon: "👩‍🏫", color: "#a78bfa", href: "/manager/utilisateurs/professeurs" },
     { label: "Parents",        value: byRole.parent   ?? 0, icon: "👨‍👩‍👦", color: "#60a5fa", href: "/manager/utilisateurs/parents" },
-    { label: "Sessions / 7j",  value: upcoming.length,       icon: "📅", color: "#FDB813", href: `/manager/compta/mentors?month=${month}&year=${year}` },
+    { label: "Sessions / 7j",  value: seances.length,        icon: "📅", color: "#FDB813", href: `/manager/compta/mentors?month=${month}&year=${year}` },
     { label: "À payer mentors",    value: mentorToPay,   icon: "💰", color: "#f97316", href: "/manager/compta/mentors" },
     { label: "En attente parents", value: parentPending, icon: "💳", color: "#ef4444", href: "/manager/compta/parents" },
   ];
@@ -100,35 +72,8 @@ export default async function ManagerDashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
-          {/* Prochaines sessions 7j */}
-          <div className="bg-white rounded-2xl border border-cream-border overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-cream-border">
-              <h2 className="font-display font-black text-base text-ink">📅 Sessions — 7 prochains jours</h2>
-              <Link href="/manager/utilisateurs/professeurs" className="text-xs font-extrabold text-brand-orange hover:underline">Voir profs →</Link>
-            </div>
-            {upcoming.length === 0 ? (
-              <div className="px-6 py-8 text-center text-ink-muted font-bold text-sm">Aucune session prévue.</div>
-            ) : (
-              <div className="divide-y divide-cream-border">
-                {upcoming.slice(0, 5).map((occ, i) => (
-                  <div key={i} className="flex items-center gap-4 px-5 py-3">
-                    <div className="w-10 text-center shrink-0">
-                      <div className="text-[10px] font-black text-gray-400 uppercase">{WEEKDAY_SHORT[occ.at.getDay()]}</div>
-                      <div className="text-lg font-black text-ink leading-none">{occ.at.getDate()}</div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-ink text-sm truncate">{occ.title}</div>
-                      <div className="text-xs text-ink-muted flex items-center gap-2 mt-0.5">
-                        <span>👩‍🏫 {occ.teacherName}</span>
-                        <span>· {occ.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
-                        {occ.studentName && <span>· 👦 {occ.studentName}</span>}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Prochaines séances — même encadré que chez l'admin */}
+          <ListeSeances seances={seances.slice(0, 5)} total={seances.length} espace="manager" />
 
           {/* Validations récentes (rapports de séance) */}
           <div className="bg-white rounded-2xl border border-cream-border overflow-hidden">
