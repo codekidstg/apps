@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type Role } from "@/lib/supabase/types";
-import { logout } from "@/app/[locale]/auth/actions";
+import BoutonDeconnexion from "@/components/BoutonDeconnexion";
 import Logo from "@/components/Logo";
 
 type SubItem = { label: string; href: string; pageKey?: string };
@@ -114,21 +114,12 @@ export default function Sidebar({ role, displayName, hiddenKeys = [], badges = {
 
   return (
     <aside className="w-60 shrink-0 flex flex-col h-full" style={{ background: "#1B2D5E" }}>
-      {/* Logo + logout */}
-      <div className="px-4 pt-4 pb-3 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+      {/* Logo + déconnexion */}
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between gap-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
         <Link href={homeHref}>
           <Logo size={90} variant="white" />
         </Link>
-        <form action={logout}>
-          <button
-            type="submit"
-            title="Déconnexion"
-            className="text-xs font-bold px-2 py-1.5 rounded-lg transition-colors hover:text-white"
-            style={{ color: "rgba(255,255,255,0.35)", background: "rgba(255,255,255,0.06)" }}
-          >
-            ⎋ Exit
-          </button>
-        </form>
+        <BoutonDeconnexion />
       </div>
 
       {/* Identité */}

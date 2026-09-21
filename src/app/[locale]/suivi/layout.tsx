@@ -8,7 +8,7 @@ import { getEffectiveNavPermissions } from "@/lib/permissions/access";
 import { PAGES_BY_ROLE } from "@/lib/permissions/registry";
 import { compterReponsesNonVues } from "@/lib/contact/parent";
 import { noterActiviteParent } from "@/lib/parents/activite";
-import { logout } from "@/app/[locale]/auth/actions";
+import BoutonDeconnexion from "@/components/BoutonDeconnexion";
 
 export default async function SuiviLayout({
   children,
@@ -64,25 +64,19 @@ export default async function SuiviLayout({
       {/* Sidebar — desktop only */}
       <aside className="hidden md:flex w-56 shrink-0 bg-[#0a1020] border-r border-slate-800 flex-col">
         <div className="px-3 py-4 border-b border-slate-800 flex flex-col items-start gap-1">
-          <Link href={`/${locale}/suivi`}>
-            <Logo size={80} variant="white" />
-          </Link>
+          {/* En haut, à côté du logo, comme dans les autres espaces : tout en
+              bas de la barre, en gris sur noir, on ne le voyait pas. */}
+          <div className="w-full flex items-center justify-between gap-2">
+            <Link href={`/${locale}/suivi`}>
+              <Logo size={80} variant="white" />
+            </Link>
+            <BoutonDeconnexion />
+          </div>
           <div className="text-xs font-mono text-slate-600 uppercase tracking-widest">Espace Parent</div>
           <div className="text-xs font-bold text-slate-400 truncate">{profile?.display_name ?? "Parent"}</div>
         </div>
 
         <SuiviSidebarNav items={items} />
-
-        <div className="p-4 border-t border-slate-800">
-          {/* Server action partagée avec le back-office. Le formulaire postait
-              vers /auth/deconnexion, une route qui n'a jamais existé : le
-              parent tombait sur un 404 sans être déconnecté. */}
-          <form action={logout}>
-            <button className="w-full text-xs font-bold text-slate-600 hover:text-slate-400 transition-colors">
-              Déconnexion
-            </button>
-          </form>
-        </div>
       </aside>
 
       {/* Mobile header */}
@@ -90,22 +84,16 @@ export default async function SuiviLayout({
         <Link href={`/${locale}/suivi`}>
           <Logo size={64} variant="white" />
         </Link>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Le nom se raccourcit avant le bouton : sur un petit téléphone,
+              « Se déconnecter » doit rester lisible en entier. */}
+          <div className="text-right min-w-0">
             <div className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">Espace Parent</div>
             <div className="text-xs font-bold text-slate-400 truncate max-w-[110px]">{profile?.display_name ?? "Parent"}</div>
           </div>
           {/* La barre latérale est masquée sur téléphone : sans ce bouton, un
               parent sur mobile n'avait aucun moyen de se déconnecter. */}
-          <form action={logout}>
-            <button
-              type="submit"
-              aria-label="Déconnexion"
-              className="w-9 h-9 shrink-0 rounded-xl border border-slate-700 text-slate-400 flex items-center justify-center text-base active:bg-slate-800 transition-colors"
-            >
-              ⏻
-            </button>
-          </form>
+          <BoutonDeconnexion />
         </div>
       </div>
 

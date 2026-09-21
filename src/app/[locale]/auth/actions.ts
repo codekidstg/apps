@@ -125,5 +125,7 @@ export async function login(formData: FormData) {
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/connexion");
+  // La page de connexion le confirme : sur un ordinateur partagé, à la maison
+  // ou à l'école, on doit savoir qu'on est bien sorti.
+  redirect("/connexion?deconnecte=1");
 }

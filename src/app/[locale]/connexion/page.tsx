@@ -112,6 +112,8 @@ export default function ConnexionPage() {
   const searchParams = useSearchParams();
   const error         = searchParams.get("error");
   const redirectParam = searchParams.get("redirect");
+  // Arrivé ici par « Se déconnecter ».
+  const deconnecte    = searchParams.get("deconnecte") === "1";
   const params        = useParams();
   const locale        = (params?.locale as string) ?? "fr";
 
@@ -147,6 +149,12 @@ export default function ConnexionPage() {
               {error === "Invalid login credentials"
                 ? "Email ou mot de passe incorrect."
                 : error}
+            </div>
+          )}
+
+          {deconnecte && !error && (
+            <div role="status" className="bg-emerald-50 text-emerald-800 text-sm font-bold rounded-xl px-4 py-3 mb-6">
+              Déconnexion réussie. À bientôt !
             </div>
           )}
 

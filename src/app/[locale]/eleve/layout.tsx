@@ -9,7 +9,7 @@ import Logo from "@/components/Logo";
 import BadgeToast from "@/components/eleve/BadgeToast";
 import SwRegistrar from "@/components/eleve/SwRegistrar";
 import OfflineBanner from "@/components/eleve/OfflineBanner";
-import { logout } from "@/app/[locale]/auth/actions";
+import BoutonDeconnexion from "@/components/BoutonDeconnexion";
 
 type StudentData = {
   display_name: string;
@@ -83,23 +83,16 @@ export default async function EleveLayout({ children, params }: { children: Reac
       {/* Sidebar */}
       <aside className="w-64 shrink-0 flex flex-col" style={{ background: "#0f172a", borderRight: "1px solid #1e293b" }}>
         {/* Logo */}
-        <div className="px-3 pt-4 pb-3 flex items-center justify-between" style={{ borderBottom: "1px solid #1e293b" }}>
-          <div className="flex flex-col items-start gap-0.5">
+        <div className="px-3 pt-4 pb-3 flex flex-col items-start gap-0.5" style={{ borderBottom: "1px solid #1e293b" }}>
+          {/* Le bouton à côté du logo, et le nom de l'espace dessous : à côté
+              du bouton, il passait sur deux lignes. */}
+          <div className="w-full flex items-center justify-between gap-2">
             <Link href={`/${locale}/eleve`}>
               <Logo size={90} variant="white" />
             </Link>
-            <div className="text-xs font-mono tracking-widest uppercase ml-1" style={{ color: "#334155" }}>◈ Espace Élève</div>
+            <BoutonDeconnexion />
           </div>
-          <form action={logout}>
-            <button
-              type="submit"
-              title="Déconnexion"
-              className="text-xs font-bold px-2 py-1.5 rounded-lg transition-colors hover:bg-slate-800 hover:text-white"
-              style={{ color: "#475569" }}
-            >
-              ⎋ Exit
-            </button>
-          </form>
+          <div className="text-xs font-mono tracking-widest uppercase ml-1" style={{ color: "#334155" }}>◈ Espace Élève</div>
         </div>
 
         {/* Avatar + nom */}
