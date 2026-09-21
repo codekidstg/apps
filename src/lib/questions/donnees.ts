@@ -265,3 +265,91 @@ export async function chargerQuestionsEnfants(parentId: string): Promise<Questio
   const maintenant = Date.now();
   return lignes.map((l) => ({ ...versQuestion(l, noms, maintenant), eleveNom: enfants.get(l.student_id) ?? "Votre enfant" }));
 }
+
+// ── Direction ───────────────────────────────────────────────────────────────
+
+/** Une question telle que la direction la lit : avec l'élève, et son mentor attitré. */
+export type QuestionDirection = QuestionAvecEleve & { mentorNom: string | null };
+
+/** Au-delà, la page de la direction ne remonte pas plus loin. */
+export const LIMITE_DIRECTION = 300;
+
+/**
+ * Toutes les questions, pour l'admin et le manager — en lecture seule : c'est
+ * le mentor qui répond. `eleveId` restreint à un élève (lien depuis sa fiche).
+ *
+ * Le mentor affiché est celui de la fiche élève (`students.teacher_id`) : c'est
+ * lui, et lui seul, qui voit ces questions dans son espace. Un élève sans
+ * mentor attitré pose donc des questions que personne ne lit — la page le dit.
+ */
+export async function chargerQuestionsDirection(eleveId?: string): Promise<{
+  questions: QuestionDirection[];
+  eleveNom: string | null;
+  erreur: string | null;
+  /** L'instant du chargement : les délais de la page se comptent tous depuis lui. */
+  maintenant: number;
+}> {
+  const maintenant = Date.now();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  let requete = admin.from("student_questions").select("*");
+  if (eleveId) requete = requete.eq("student_id", eleveId);
+  const { data, error } = await requete.order("created_at", { ascending: false }).limit(LIMITE_DIRECTION);
+  if (error) {
+    console.error("[questions] direction :", error.message);
+    return { questions: [], eleveNom: null, erreur: error.message, maintenant };
+  }
+  const lignes = (data ?? []) as Ligne[];
+
+  type FicheEleve = { id: string; teacher_id: string | null; profiles: { display_name: string | null } | null };
+  const idsEleves = [...new Set([...lignes.map((l) => l.student_id), ...(eleveId ? [eleveId] : [])])];
+  const { data: eleves, error: eEleves } = idsEleves.length
+    ? await admin.from("students").select("id, teacher_id, profiles!profile_id(display_name)").in("id", idsEleves)
+    : { data: [], error: null };
+  if (eEleves) console.error("[questions] élèves (direction) :", eEleves.message);
+  const fiches = new Map<string, { nom: string; mentor: string | null }>(
+    ((eleves ?? []) as FicheEleve[]).map((s) => [s.id, { nom: s.profiles?.display_name ?? "Élève", mentor: s.teacher_id ?? null }]),
+  );
+
+  // Les noms du personnel : ceux qui ont répondu ou clos, et les mentors attitrés.
+  const personnel = [...new Set([
+    ...lignes.flatMap((l) => [l.replied_by, l.closed_by]),
+    ...[...fiches.values()].map((f) => f.mentor),
+  ].filter(Boolean))] as string[];
+  const { data: profils, error: eProfils } = personnel.length
+    ? await admin.from("profiles").select("id, display_name").in("id", personnel)
+    : { data: [], error: null };
+  if (eProfils) console.error("[questions] personnel (direction) :", eProfils.message);
+  const noms = new Map<string, string>(((profils ?? []) as { id: string; display_name: string | null }[]).map((p) => [p.id, p.display_name ?? "Mentor"]));
+
+  return {
+    maintenant,
+    questions: lignes.map((l) => {
+      const fiche = fiches.get(l.student_id);
+      return {
+        ...versQuestion(l, noms, maintenant),
+        eleveNom: fiche?.nom ?? "Élève",
+        mentorNom: fiche?.mentor ? noms.get(fiche.mentor) ?? "Mentor" : null,
+      };
+    }),
+    eleveNom: eleveId ? fiches.get(eleveId)?.nom ?? null : null,
+    erreur: null,
+  };
+}
+
+/** Les questions restées sans réponse au-delà du délai promis : la pastille du menu de la direction. */
+export async function compterQuestionsEnRetard(): Promise<number> {
+  const admin = createAdminClient();
+  const limite = new Date(Date.now() - DELAI_QUESTION_HEURES * 3_600_000).toISOString();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count, error } = await (admin.from("student_questions") as any)
+    .select("id", { count: "exact", head: true })
+    .is("replied_at", null)
+    .is("closed_at", null)
+    .lt("created_at", limite);
+  if (error) {
+    console.error("[questions] compteur direction :", error.message);
+    return 0;
+  }
+  return count ?? 0;
+}

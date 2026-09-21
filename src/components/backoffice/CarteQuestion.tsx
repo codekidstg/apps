@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { repondreQuestion, reglerEnSeance, type ResultatSimple } from "@/lib/questions/actions";
 import { REPONSES_RAPIDES, LIBELLE_RAISON } from "@/lib/questions/raisons";
 import type { QuestionAvecEleve } from "@/lib/questions/donnees";
+import ContexteQuestion from "./ContexteQuestion";
 
 /**
  * Une question d'élève, telle que son mentor la traite.
@@ -31,7 +32,7 @@ export default function CarteQuestion({ question: q, libelles }: { question: Que
 
   const etat = ETATS[q.etat];
   const ouverte = q.etat === "en_attente";
-  const { contenu, bloc, travail, essais } = q.contexte;
+  const { contenu, bloc } = q.contexte;
 
   return (
     <article className={`bg-white rounded-2xl border overflow-hidden ${q.enRetard ? "border-red-200" : "border-slate-200"}`}>
@@ -63,24 +64,7 @@ export default function CarteQuestion({ question: q, libelles }: { question: Que
           </blockquote>
         )}
 
-        {(bloc?.consigne || travail) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {bloc?.consigne && (
-              <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-                <div className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: "#94A3B8" }}>La consigne</div>
-                <p className="text-xs whitespace-pre-wrap leading-relaxed" style={{ color: "#334155" }}>{bloc.consigne}</p>
-              </div>
-            )}
-            {travail && (
-              <div className="rounded-xl bg-slate-900 p-3">
-                <div className="text-[10px] font-black uppercase tracking-widest mb-1 text-slate-400">
-                  Ce que l&apos;élève avait fait{essais ? ` · ${essais} essai${essais > 1 ? "s" : ""} raté${essais > 1 ? "s" : ""}` : ""}
-                </div>
-                <pre className="text-xs whitespace-pre-wrap leading-relaxed text-amber-300 font-mono">{travail}</pre>
-              </div>
-            )}
-          </div>
-        )}
+        <ContexteQuestion contexte={q.contexte} />
 
         {ouverte && (
           <>

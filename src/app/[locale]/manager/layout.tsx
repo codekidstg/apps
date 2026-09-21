@@ -4,6 +4,7 @@ import BackofficeShell from "@/components/backoffice/Shell";
 import { getEffectiveNavPermissions } from "@/lib/permissions/access";
 import { PAGES_BY_ROLE } from "@/lib/permissions/registry";
 import { compterBoiteDirection } from "@/lib/contact/boite";
+import { compterQuestionsEnRetard } from "@/lib/questions/donnees";
 import type { Role } from "@/lib/supabase/types";
 
 export default async function ManagerLayout({ children }: { children: React.ReactNode }) {
@@ -19,9 +20,10 @@ export default async function ManagerLayout({ children }: { children: React.Reac
 
   const role = profile?.role ?? "manager";
 
-  const [allowedKeys, messages] = await Promise.all([
+  const [allowedKeys, messages, questionsEnRetard] = await Promise.all([
     getEffectiveNavPermissions(user.id, role),
     compterBoiteDirection(),
+    compterQuestionsEnRetard(),
   ]);
   const allKeys     = (PAGES_BY_ROLE[role] ?? []).map(p => p.key);
   const hiddenKeys  = allKeys.filter(k => !allowedKeys.has(k));
@@ -31,7 +33,7 @@ export default async function ManagerLayout({ children }: { children: React.Reac
       role={role}
       displayName={profile?.display_name ?? "Manager"}
       hiddenKeys={hiddenKeys}
-      badges={{ [`${role}.messages`]: messages.aTraiter }}
+      badges={{ [`${role}.messages`]: messages.aTraiter, [`${role}.questions`]: questionsEnRetard }}
     >
       {children}
     </BackofficeShell>

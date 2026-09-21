@@ -94,7 +94,7 @@ export default async function StudentDetailPage({
         </div>
       </div>
 
-      <EvolutionEleve studentId={studentId} />
+      <EvolutionEleve studentId={studentId} espace="admin" />
 
       {/* Formulaire fiche */}
       <StudentProfileForm

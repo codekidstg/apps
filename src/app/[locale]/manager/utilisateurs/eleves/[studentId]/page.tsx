@@ -89,7 +89,7 @@ export default async function ManagerStudentDetailPage({
         </div>
       </div>
 
-      <EvolutionEleve studentId={studentId} />
+      <EvolutionEleve studentId={studentId} espace="manager" />
 
       <StudentProfileForm
         studentId={studentId}

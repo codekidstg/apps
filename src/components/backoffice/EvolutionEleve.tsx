@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { chargerEvolutions, type Evolution, type QuestionVue } from "@/lib/backoffice/evolution";
 import { STATUT_ELEVE } from "@/lib/backoffice/statut-eleve";
 import { AVANCEMENT, ENGAGEMENT } from "@/lib/rapports";
@@ -34,7 +35,7 @@ function SuiteQuestion({ q }: { q: QuestionVue }) {
   );
 }
 
-export function CarteEvolution({ ev }: { ev: Evolution }) {
+export function CarteEvolution({ ev, lienQuestions }: { ev: Evolution; lienQuestions?: string }) {
   const statut = STATUT_ELEVE[ev.statut];
   const p = ev.parcours;
   const retard = ev.seancesPassees > 0 ? Math.max(0, ev.seancesPassees - ev.leconsTerminees) : null;
@@ -145,6 +146,11 @@ export function CarteEvolution({ ev }: { ev: Evolution }) {
               ))}
             </ul>
           )}
+          {lienQuestions && ev.questions.liste.length > 0 && (
+            <Link href={lienQuestions} className="inline-block text-xs font-black text-brand-orange hover:underline">
+              Tous ses échanges avec son mentor →
+            </Link>
+          )}
           {ev.entrainements && (
             <div className="text-gray-500">
               Entraînements : {ev.entrainements.faits} fait{s(ev.entrainements.faits)}
@@ -216,8 +222,8 @@ export function CarteEvolution({ ev }: { ev: Evolution }) {
 }
 
 /** La section qui va chercher elle-même ses données : une fiche n'a qu'à la poser. */
-export default async function EvolutionEleve({ studentId }: { studentId: string }) {
+export default async function EvolutionEleve({ studentId, espace }: { studentId: string; espace: "admin" | "manager" }) {
   const ev = (await chargerEvolutions([studentId], true)).get(studentId);
   if (!ev) return null;
-  return <CarteEvolution ev={ev} />;
+  return <CarteEvolution ev={ev} lienQuestions={`/${espace}/questions?eleve=${studentId}`} />;
 }
