@@ -1,36 +1,33 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { chargerQuestionsMentor, DELAI_QUESTION_HEURES, type QuestionAvecEleve } from "@/lib/questions/donnees";
-import { dateEtHeure, ilYa } from "@/lib/planning/dates";
-import CarteQuestion, { type LibellesQuestion } from "@/components/backoffice/CarteQuestion";
+import { chargerQuestionsMentor, DELAI_QUESTION_HEURES } from "@/lib/questions/donnees";
+import { enFils, parEnfant, lireFiltre, filtrerFils, compterFils } from "@/lib/questions/fils";
 import { fichesDesQuestions } from "@/lib/questions/fiches";
+import EchangesParEnfant, { Filtres } from "@/components/backoffice/EchangesParEnfant";
+import ReponseMentor from "@/components/backoffice/ReponseMentor";
 
 export const dynamic = "force-dynamic";
 
 /**
  * « Questions des élèves » — ce que les élèves du mentor lui ont demandé
- * depuis leurs exercices. Les dates arrivent formatées par le serveur.
+ * depuis leurs exercices. La même page que celle de la direction : une ligne
+ * par enfant, une ligne par échange ; sous chaque échange qui attend, l'exercice
+ * avec sa réponse et de quoi répondre.
  */
-function libellesDe(q: QuestionAvecEleve, maintenant: number): LibellesQuestion {
-  return {
-    posee: dateEtHeure(q.poseeLe),
-    depuis: ilYa(q.poseeLe, maintenant),
-    reponse: q.reponse ? dateEtHeure(q.reponse.le) : null,
-    reglee: q.reglee ? dateEtHeure(q.reglee.le) : null,
-  };
-}
-
-export default async function QuestionsElevesPage() {
+export default async function QuestionsElevesPage({ searchParams }: { searchParams: Promise<{ filtre?: string }> }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
 
-  const { aTraiter, traitees } = await chargerQuestionsMentor(user.id);
+  const { filtre } = await searchParams;
+  const { questions, erreur, maintenant } = await chargerQuestionsMentor(user.id);
+  const fils = enFils(questions);
   // L'exercice de chaque question, avec sa réponse : de quoi répondre sans
   // rouvrir la leçon.
-  const fiches = await fichesDesQuestions([...aTraiter, ...traitees]);
-  const maintenant = Date.now();
-  const enRetard = aTraiter.filter((q) => q.enRetard).length;
+  const fiches = await fichesDesQuestions(questions);
+  const actif = lireFiltre(filtre);
+  const enfants = parEnfant(filtrerFils(fils, actif));
+  const compte = compterFils(fils);
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -41,30 +38,28 @@ export default async function QuestionsElevesPage() {
         </p>
       </div>
 
-      <section className="space-y-3">
-        <h2 className="font-black text-sm flex flex-wrap items-center gap-2" style={{ color: "#1B2D5E" }}>
-          À traiter
-          <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-slate-100" style={{ color: "#64748B" }}>{aTraiter.length}</span>
-          {enRetard > 0 && (
-            <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-              {enRetard} au-delà de {DELAI_QUESTION_HEURES} h
-            </span>
-          )}
-        </h2>
-        {aTraiter.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 px-5 py-8 text-center text-sm font-bold" style={{ color: "#94A3B8" }}>
-            Aucune question en attente.
-          </div>
-        ) : (
-          aTraiter.map((q) => <CarteQuestion key={q.id} question={q} libelles={libellesDe(q, maintenant)} fiche={fiches[q.blocId] ?? null} />)
-        )}
-      </section>
+      {erreur && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">
+          Les questions n&apos;ont pas pu être chargées : {erreur}
+        </div>
+      )}
 
-      {traitees.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="font-black text-sm" style={{ color: "#1B2D5E" }}>Récemment traitées</h2>
-          {traitees.map((q) => <CarteQuestion key={q.id} question={q} libelles={libellesDe(q, maintenant)} fiche={fiches[q.blocId] ?? null} />)}
-        </section>
+      <Filtres base="/prof/questions" actif={actif} compte={compte} />
+      {compte.retard > 0 && (
+        <p className="text-xs font-black text-red-700">
+          {compte.retard} échange{compte.retard > 1 ? "s attendent" : " attend"} une réponse depuis plus de {DELAI_QUESTION_HEURES} h.
+        </p>
+      )}
+
+      {enfants.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 px-5 py-8 text-center text-sm font-bold" style={{ color: "#94A3B8" }}>
+          {actif === "tous" ? "Aucune question pour l'instant." : "Rien dans ce filtre."}
+        </div>
+      ) : (
+        <EchangesParEnfant enfants={enfants} fiches={fiches} maintenant={maintenant} ouvert={false} afficherMentor={false}
+          repondre={(fil, fiche, choixEleve) => (
+            <ReponseMentor questionId={fil.derniere.id} fiche={fiche} choixEleve={choixEleve} />
+          )} />
       )}
     </div>
   );

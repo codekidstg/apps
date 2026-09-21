@@ -188,40 +188,6 @@ async function elevesDuMentor(admin: any, teacherId: string): Promise<Map<string
   return new Map(((data ?? []) as any[]).map((s) => [s.id as string, s.profiles?.display_name ?? "Élève"]));
 }
 
-export async function chargerQuestionsMentor(teacherId: string): Promise<{
-  aTraiter: QuestionAvecEleve[];
-  traitees: QuestionAvecEleve[];
-}> {
-  const admin = createAdminClient();
-  const eleves = await elevesDuMentor(admin, teacherId);
-  if (!eleves.size) return { aTraiter: [], traitees: [] };
-
-  const { data, error } = await (admin.from("student_questions") as any)
-    .select("*")
-    .in("student_id", [...eleves.keys()])
-    .order("created_at", { ascending: true });
-  if (error) {
-    console.error("[questions] mentor :", error.message);
-    return { aTraiter: [], traitees: [] };
-  }
-  const lignes = (data ?? []) as Ligne[];
-  const noms = await nomsDuPersonnel(admin, lignes);
-  const maintenant = Date.now();
-  const questions = lignes.map((l) => ({ ...versQuestion(l, noms, maintenant), eleveNom: eleves.get(l.student_id) ?? "Élève" }));
-
-  // Les retards d'abord, puis la plus ancienne : premier arrivé, premier servi.
-  const aTraiter = questions
-    .filter((q) => q.etat === "en_attente")
-    .sort((a, b) => Number(b.enRetard) - Number(a.enRetard) || a.poseeLe.localeCompare(b.poseeLe));
-  const dateTraitement = (q: Question) => q.reponse?.le ?? q.reglee?.le ?? q.poseeLe;
-  const traitees = questions
-    .filter((q) => q.etat !== "en_attente")
-    .sort((a, b) => dateTraitement(b).localeCompare(dateTraitement(a)))
-    .slice(0, 20);
-
-  return { aTraiter, traitees };
-}
-
 export async function compterQuestionsMentor(teacherId: string): Promise<number> {
   const admin = createAdminClient();
   const eleves = await elevesDuMentor(admin, teacherId);
@@ -266,47 +232,64 @@ export async function chargerQuestionsEnfants(parentId: string): Promise<Questio
   return lignes.map((l) => ({ ...versQuestion(l, noms, maintenant), eleveNom: enfants.get(l.student_id) ?? "Votre enfant" }));
 }
 
-// ── Direction ───────────────────────────────────────────────────────────────
+// ── Direction et mentor : les échanges, enfant par enfant ────────────────────
 
-/** Une question telle que la direction la lit : avec l'élève, et son mentor attitré. */
+/** Une question telle que la direction et le mentor la lisent : avec l'élève, et son mentor attitré. */
 export type QuestionDirection = QuestionAvecEleve & { mentorNom: string | null };
 
-/** Au-delà, la page de la direction ne remonte pas plus loin. */
+/** Au-delà, les pages ne remontent pas plus loin. */
 export const LIMITE_DIRECTION = 300;
 
+type Echanges = {
+  questions: QuestionDirection[];
+  /** Le nom de chaque élève demandé, même sans question. */
+  nomsEleves: Map<string, string>;
+  erreur: string | null;
+  /** L'instant du chargement : les délais de la page se comptent tous depuis lui. */
+  maintenant: number;
+};
+
 /**
- * Toutes les questions, pour l'admin et le manager — en lecture seule : c'est
+ * Toutes les questions pour l'admin et le manager, en lecture seule : c'est
  * le mentor qui répond. `eleveId` restreint à un élève (lien depuis sa fiche).
  *
  * Le mentor affiché est celui de la fiche élève (`students.teacher_id`) : c'est
  * lui, et lui seul, qui voit ces questions dans son espace. Un élève sans
  * mentor attitré pose donc des questions que personne ne lit — la page le dit.
  */
-export async function chargerQuestionsDirection(eleveId?: string): Promise<{
-  questions: QuestionDirection[];
-  eleveNom: string | null;
-  erreur: string | null;
-  /** L'instant du chargement : les délais de la page se comptent tous depuis lui. */
-  maintenant: number;
-}> {
+export async function chargerQuestionsDirection(eleveId?: string): Promise<Omit<Echanges, "nomsEleves"> & { eleveNom: string | null }> {
+  const { nomsEleves, ...echanges } = await chargerEchanges(eleveId ? [eleveId] : undefined);
+  return { ...echanges, eleveNom: eleveId ? nomsEleves.get(eleveId) ?? null : null };
+}
+
+/** Les questions des élèves d'un mentor : la même page que la direction, où lui répond. */
+export async function chargerQuestionsMentor(teacherId: string): Promise<Omit<Echanges, "nomsEleves">> {
+  const eleves = await elevesDuMentor(createAdminClient(), teacherId);
+  if (!eleves.size) return { questions: [], erreur: null, maintenant: Date.now() };
+  const { questions, erreur, maintenant } = await chargerEchanges([...eleves.keys()]);
+  return { questions, erreur, maintenant };
+}
+
+/** Les questions de ces élèves, ou de tous, avec les noms des élèves et du personnel. */
+async function chargerEchanges(eleveIds?: string[]): Promise<Echanges> {
   const maintenant = Date.now();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
   let requete = admin.from("student_questions").select("*");
-  if (eleveId) requete = requete.eq("student_id", eleveId);
+  if (eleveIds) requete = requete.in("student_id", eleveIds);
   const { data, error } = await requete.order("created_at", { ascending: false }).limit(LIMITE_DIRECTION);
   if (error) {
-    console.error("[questions] direction :", error.message);
-    return { questions: [], eleveNom: null, erreur: error.message, maintenant };
+    console.error("[questions] échanges :", error.message);
+    return { questions: [], nomsEleves: new Map(), erreur: error.message, maintenant };
   }
   const lignes = (data ?? []) as Ligne[];
 
   type FicheEleve = { id: string; teacher_id: string | null; profiles: { display_name: string | null } | null };
-  const idsEleves = [...new Set([...lignes.map((l) => l.student_id), ...(eleveId ? [eleveId] : [])])];
+  const idsEleves = [...new Set([...lignes.map((l) => l.student_id), ...(eleveIds ?? [])])];
   const { data: eleves, error: eEleves } = idsEleves.length
     ? await admin.from("students").select("id, teacher_id, profiles!profile_id(display_name)").in("id", idsEleves)
     : { data: [], error: null };
-  if (eEleves) console.error("[questions] élèves (direction) :", eEleves.message);
+  if (eEleves) console.error("[questions] élèves (échanges) :", eEleves.message);
   const fiches = new Map<string, { nom: string; mentor: string | null }>(
     ((eleves ?? []) as FicheEleve[]).map((s) => [s.id, { nom: s.profiles?.display_name ?? "Élève", mentor: s.teacher_id ?? null }]),
   );
@@ -319,7 +302,7 @@ export async function chargerQuestionsDirection(eleveId?: string): Promise<{
   const { data: profils, error: eProfils } = personnel.length
     ? await admin.from("profiles").select("id, display_name").in("id", personnel)
     : { data: [], error: null };
-  if (eProfils) console.error("[questions] personnel (direction) :", eProfils.message);
+  if (eProfils) console.error("[questions] personnel (échanges) :", eProfils.message);
   const noms = new Map<string, string>(((profils ?? []) as { id: string; display_name: string | null }[]).map((p) => [p.id, p.display_name ?? "Mentor"]));
 
   return {
@@ -332,7 +315,7 @@ export async function chargerQuestionsDirection(eleveId?: string): Promise<{
         mentorNom: fiche?.mentor ? noms.get(fiche.mentor) ?? "Mentor" : null,
       };
     }),
-    eleveNom: eleveId ? fiches.get(eleveId)?.nom ?? null : null,
+    nomsEleves: new Map([...fiches.entries()].map(([id, f]) => [id, f.nom])),
     erreur: null,
   };
 }

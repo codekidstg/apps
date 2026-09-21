@@ -2,11 +2,12 @@ import type { FicheExercice as Fiche, Partie, TypeCase } from "@/lib/questions/c
 
 /**
  * La fiche d'un exercice : ce que l'enfant a devant lui, et la réponse
- * attendue, en vert. Réservée au mentor et à la direction.
+ * attendue, en vert. Réservée au mentor et à la direction. Pour un quiz, les
+ * choix de l'enfant y sont marqués (❌ à côté du ✅).
  *
- * Sans état : elle sert la carte du mentor (dans le navigateur, avec
- * `onReprendre`, qui verse une explication dans sa réponse) comme la page de
- * la direction (rendue par le serveur, en lecture seule).
+ * Sans état : elle sert la réponse du mentor (ReponseMentor, dans le
+ * navigateur, avec `onReprendre`, qui verse une explication dans sa réponse)
+ * comme les échanges en lecture seule (rendus par le serveur).
  */
 
 const CASE: Record<TypeCase, { fond: string; signe: string; nom: string }> = {
@@ -72,7 +73,14 @@ function Grille({ p }: { p: Extract<Partie, { genre: "grille" }> }) {
   );
 }
 
-function PartieVue({ p, onReprendre }: { p: Partie; onReprendre?: (texte: string) => void }) {
+function PartieVue({ p, onReprendre, eleve, avecEleve }: {
+  p: Partie;
+  onReprendre?: (texte: string) => void;
+  /** Le choix de l'enfant à cette question, s'il l'a donné. */
+  eleve?: number;
+  /** Les choix de l'enfant sont connus : une question sans choix n'a pas encore reçu de réponse. */
+  avecEleve: boolean;
+}) {
   const reponse = "role" in p && p.role === "reponse";
   switch (p.genre) {
     case "texte":
@@ -108,12 +116,18 @@ function PartieVue({ p, onReprendre }: { p: Partie; onReprendre?: (texte: string
         <div>
           <p className="text-xs font-bold text-slate-800 whitespace-pre-wrap">{p.question}</p>
           <ul className="mt-1 space-y-0.5">
-            {p.choix.map((c, i) => (
-              <li key={i} className={`text-xs px-2 py-0.5 rounded ${i === p.bonne ? "bg-emerald-50 text-emerald-800 font-black" : "text-slate-500"}`}>
-                {i === p.bonne ? "✅" : "▫️"} {c}
-              </li>
-            ))}
+            {p.choix.map((c, i) => {
+              const bonne = i === p.bonne, choisie = i === eleve;
+              return (
+                <li key={i} className={`text-xs px-2 py-0.5 rounded ${
+                  bonne ? "bg-emerald-50 text-emerald-800 font-black" : choisie ? "bg-red-50 text-red-800 font-black" : "text-slate-500"}`}>
+                  {bonne ? "✅" : choisie ? "❌" : "▫️"} {c}
+                  {choisie && <span className="font-bold text-slate-500"> · 👦 sa réponse</span>}
+                </li>
+              );
+            })}
           </ul>
+          {avecEleve && eleve === undefined && <p className="text-[11px] font-bold text-slate-400 mt-0.5">👦 pas encore de réponse</p>}
           {p.explication && (
             <div className="mt-1">
               <p className="text-xs italic text-slate-600">💡 {p.explication}</p>
@@ -132,12 +146,19 @@ function PartieVue({ p, onReprendre }: { p: Partie; onReprendre?: (texte: string
   }
 }
 
-export default function FicheExercice({ fiche, onReprendre }: { fiche: Fiche; onReprendre?: (texte: string) => void }) {
+export default function FicheExercice({ fiche, onReprendre, reponsesEleve }: {
+  fiche: Fiche;
+  onReprendre?: (texte: string) => void;
+  /** Les choix de l'enfant, par rang de question dans `fiche.parties` (voir reponses-eleve.ts). */
+  reponsesEleve?: Record<number, number> | null;
+}) {
   return (
     <div className="space-y-3">
       <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{fiche.nom}</div>
       {fiche.note && <p className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">{fiche.note}</p>}
-      {fiche.parties.map((p, i) => <PartieVue key={i} p={p} onReprendre={onReprendre} />)}
+      {fiche.parties.map((p, i) => (
+        <PartieVue key={i} p={p} onReprendre={onReprendre} eleve={reponsesEleve?.[i]} avecEleve={!!reponsesEleve} />
+      ))}
     </div>
   );
 }

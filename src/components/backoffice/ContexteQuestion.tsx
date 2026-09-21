@@ -4,7 +4,7 @@ import type { Contexte } from "@/lib/questions/donnees";
  * La consigne que l'enfant avait sous les yeux, et ce qu'il avait fait — côte
  * à côte. Figés au moment de la question : la leçon a pu être réécrite depuis.
  *
- * Partagé par la carte du mentor et les fils de la direction.
+ * Affiché sous chaque échange, chez le mentor comme chez la direction.
  *
  * `sansConsigne` : quand la fiche complète de l'exercice s'affiche à côté, la
  * consigne figée ferait doublon ; seul reste ce que l'élève avait fait.

@@ -45,6 +45,18 @@ export function enFils<Q extends Question>(questions: Q[]): Fil<Q>[] {
   return fils.sort((a, b) => Number(b.enRetard) - Number(a.enRetard) || temps(b.derniereActivite) - temps(a.derniereActivite));
 }
 
+/** Les filtres des pages d'échanges, lus dans l'adresse : « tous » par défaut. */
+export type FiltreEchanges = "tous" | "attente" | "retard";
+export const lireFiltre = (v: string | undefined): FiltreEchanges => (v === "attente" || v === "retard" ? v : "tous");
+const garde = (f: FiltreEchanges) => <Q extends Question>(x: Fil<Q>) =>
+  f === "tous" || (f === "attente" ? x.etat === "en_attente" : x.enRetard);
+export const filtrerFils = <Q extends Question>(fils: Fil<Q>[], f: FiltreEchanges) => fils.filter(garde(f));
+export const compterFils = <Q extends Question>(fils: Fil<Q>[]): Record<FiltreEchanges, number> => ({
+  tous: fils.length,
+  attente: fils.filter(garde("attente")).length,
+  retard: fils.filter(garde("retard")).length,
+});
+
 export type Enfant<Q extends Question> = {
   eleveId: string;
   /** Dans l'ordre de `enFils` : ce qui attend au-delà du délai d'abord. */

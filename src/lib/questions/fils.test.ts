@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { enFils, parEnfant } from "./fils";
+import { enFils, parEnfant, lireFiltre, filtrerFils, compterFils } from "./fils";
 import type { Question } from "./donnees";
 
 const question = (p: Partial<Question> & Pick<Question, "id" | "poseeLe">): Question => ({
@@ -65,5 +65,21 @@ describe("parEnfant", () => {
       ["samuel", 1, 0, 0],    // tout est traité, même si c'est le plus récent
     ]);
     expect(enfants[1].derniereActivite).toBe("2026-09-20T17:19:00Z");
+  });
+});
+
+describe("filtres des échanges", () => {
+  it("lit le filtre de l'adresse, compte et filtre les échanges", () => {
+    expect(lireFiltre("attente")).toBe("attente");
+    expect(lireFiltre("n'importe quoi")).toBe("tous");
+    expect(lireFiltre(undefined)).toBe("tous");
+    const fils = enFils([
+      question({ id: "a", poseeLe: "2026-09-16T10:00:00Z", blocId: "x", enRetard: true }),
+      question({ id: "b", poseeLe: "2026-09-20T10:00:00Z", blocId: "y" }),
+      question({ id: "c", poseeLe: "2026-09-19T10:00:00Z", blocId: "z", etat: "reglee",
+        reglee: { note: null, parNom: "Jean", le: "2026-09-19T12:00:00Z" } }),
+    ]);
+    expect(compterFils(fils)).toEqual({ tous: 3, attente: 2, retard: 1 });
+    expect(filtrerFils(fils, "retard").map((f) => f.derniere.id)).toEqual(["a"]);
   });
 });
