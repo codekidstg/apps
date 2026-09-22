@@ -23,6 +23,7 @@ const adminNav: NavItem[] = [
   { label: "Écoles",           href: "/admin/ecoles",       icon: "🏫", pageKey: "admin.ecoles" },
   { label: "Thèmes & Cours",   href: "/admin/themes",       icon: "📚", pageKey: "admin.themes" },
   { label: "Rapports de séance", href: "/admin/rapports",   icon: "📝", pageKey: "admin.rapports" },
+  { label: "Suivi des mentors", href: "/admin/mentors",     icon: "🧑‍🏫", pageKey: "admin.mentors" },
   { label: "Questions des élèves", href: "/admin/questions", icon: "🙋", pageKey: "admin.questions" },
   { label: "Messages des parents", href: "/admin/messages", icon: "✉️", pageKey: "admin.messages" },
   {
@@ -51,6 +52,7 @@ const managerNav: NavItem[] = [
   },
   { label: "Mes thèmes",      href: "/manager/themes",       icon: "📚", pageKey: "manager.themes" },
   { label: "Rapports de séance", href: "/manager/rapports",   icon: "📝", pageKey: "manager.rapports" },
+  { label: "Suivi des mentors", href: "/manager/mentors",     icon: "🧑‍🏫", pageKey: "manager.mentors" },
   { label: "Questions des élèves", href: "/manager/questions", icon: "🙋", pageKey: "manager.questions" },
   { label: "Messages des parents", href: "/manager/messages", icon: "✉️", pageKey: "manager.messages" },
   { label: "Affectations",    href: "/manager/affectations",  icon: "📋", pageKey: "manager.affectations" },
