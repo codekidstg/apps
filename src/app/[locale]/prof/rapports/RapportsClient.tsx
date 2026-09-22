@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { NON_TENUE } from "@/lib/rapports-libelles";
 import dynamic from "next/dynamic";
 
 const SessionReportForm = dynamic(() => import("@/components/prof/SessionReportForm"), { ssr: false });
@@ -30,6 +31,9 @@ const PAGE_SIZE = 10;
 
 type Report = {
   id: string;
+  /** false : la séance n'a pas eu lieu — `raison_non_tenue` dit pourquoi. */
+  tenue?: boolean;
+  raison_non_tenue?: string | null;
   advancement: string;
   engagement: string;
   difficulty_notes: string | null;
@@ -154,7 +158,15 @@ function ItemRow({ item, onFill, onView }: {
         </div>
       </div>
 
-      {item.report ? (
+      {item.report?.tenue === false ? (
+        <span
+          title={NON_TENUE[item.report.raison_non_tenue ?? ""]?.label ?? "Séance non tenue"}
+          className="shrink-0 text-xs font-black px-3 py-1.5 rounded-xl"
+          style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" }}
+        >
+          🚫 Non tenue
+        </span>
+      ) : item.report ? (
         <button
           onClick={() => onView(item.report!)}
           className="shrink-0 text-xs font-black px-3 py-1.5 rounded-xl transition-opacity hover:opacity-80"

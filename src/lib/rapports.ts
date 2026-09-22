@@ -1,38 +1,14 @@
 import { createAdminClient } from "@/lib/supabase/server";
 
 /**
- * Rapports de séance — libellés et chargement, partagés par les trois espaces.
- *
- * Les correspondances vivaient uniquement dans RapportsClient.tsx, côté prof.
- * Les recopier pour l'admin aurait produit une divergence de plus : le tableau
- * de bord manager en est déjà un exemple, il dessine des étoiles pour un champ
- * qui contient du texte.
+ * Rapports de séance — le chargement, partagé par les trois espaces. Les
+ * libellés sont à côté (rapports-libelles.ts), lisibles aussi par le
+ * navigateur, et ré-exportés ici pour les écrans serveur.
  *
  * Seul le mentor qui a fait la séance rédige. Admin et manager consultent.
  */
 
-export const AVANCEMENT: Record<string, { icon: string; label: string; color: string }> = {
-  completed: { icon: "✅", label: "A terminé la séance prévue",               color: "#10b981" },
-  partial:   { icon: "⏩", label: "A avancé mais pas fini",                   color: "#f59e0b" },
-  reviewed:  { icon: "🔁", label: "A revu / consolidé une séance précédente", color: "#6366f1" },
-  blocked:   { icon: "⚠️", label: "N'a pas pu avancer (blocage)",             color: "#ef4444" },
-};
-
-export const ENGAGEMENT: Record<string, { icon: string; label: string }> = {
-  motivated:  { icon: "🚀", label: "Très motivé, curieux" },
-  focused:    { icon: "😊", label: "Bien concentré" },
-  distracted: { icon: "😐", label: "Distrait mais participait" },
-  disengaged: { icon: "😔", label: "Démotivé ou difficile à engager" },
-};
-
-export const AIDES: Record<string, string> = {
-  example:       "Réexplication avec un exemple concret",
-  drawing:       "Dessin / schéma au tableau",
-  unplugged:     "« Joue le rôle de la machine » (débranché)",
-  encouragement: "Encouragement / patience",
-  simplified:    "Simplifié l'exercice",
-  other:         "Autre",
-};
+export { AVANCEMENT, ENGAGEMENT, AIDES, NON_TENUE } from "./rapports-libelles";
 
 export type Occurrence = {
   cle: string;              // session_id|YYYY-MM-DD
@@ -48,6 +24,9 @@ export type Occurrence = {
 export type Rapport = {
   id: string;
   reported_at: string;
+  /** false : la séance n'a pas eu lieu — `raison_non_tenue` dit pourquoi. */
+  tenue: boolean;
+  raison_non_tenue: string | null;
   advancement: string | null;
   engagement: string | null;
   help_methods: string[] | null;
@@ -114,6 +93,8 @@ export async function getRapportsData(): Promise<{
   occurrences: Occurrence[];
   faits: number;
   manquants: number;
+  /** Déclarées non tenues : ni un compte rendu fait, ni un compte rendu manquant. */
+  nonTenues: number;
 }> {
   const admin = createAdminClient();
 
@@ -122,7 +103,7 @@ export async function getRapportsData(): Promise<{
       .select("*, profiles!teacher_id(display_name), students(id, profiles!profile_id(display_name))")
       .order("scheduled_at", { ascending: false }),
     (admin.from("session_reports") as any)
-      .select("id, session_id, occurrence_date, reported_at, advancement, engagement, help_methods, difficulty_notes, next_session_note")
+      .select("id, session_id, occurrence_date, reported_at, tenue, raison_non_tenue, advancement, engagement, help_methods, difficulty_notes, next_session_note")
       .order("reported_at", { ascending: false }),
   ]);
 
@@ -143,9 +124,11 @@ export async function getRapportsData(): Promise<{
     rapport: parCle.get(`${o.sessionId}|${o.date}`) ?? null,
   }));
 
+  const tenues = occurrences.filter(o => o.rapport?.tenue !== false);
   return {
     occurrences,
-    faits:     occurrences.filter(o => o.rapport).length,
-    manquants: occurrences.filter(o => !o.rapport).length,
+    faits:     tenues.filter(o => o.rapport).length,
+    manquants: tenues.filter(o => !o.rapport).length,
+    nonTenues: occurrences.length - tenues.length,
   };
 }

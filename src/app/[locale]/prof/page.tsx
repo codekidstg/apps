@@ -109,7 +109,7 @@ export default async function ProfDashboard() {
       .select("id, name, level, students(id)")
       .eq("teacher_id", user.id),
     (admin.from("session_reports") as any)
-      .select("id, session_id, occurrence_date, advancement, reported_at")
+      .select("id, session_id, occurrence_date, tenue, raison_non_tenue, advancement, reported_at")
       .eq("teacher_id", user.id)
       .order("reported_at", { ascending: false })
       .limit(200),
@@ -309,7 +309,9 @@ export default async function ProfDashboard() {
           ) : (
             <div className="divide-y" style={{ borderColor: "#F1F5F9" }}>
               {lastReports.map((r: any) => {
-                const adv = ADVANCEMENT_COLORS[r.advancement] ?? ADVANCEMENT_COLORS.partial;
+                const adv = r.tenue === false
+                  ? { bg: "#f1f5f9", color: "#475569", label: "🚫 Non tenue" }
+                  : ADVANCEMENT_COLORS[r.advancement] ?? ADVANCEMENT_COLORS.partial;
                 const date = r.occurrence_date
                   ? new Date(r.occurrence_date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
                   : new Date(r.reported_at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });

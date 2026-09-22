@@ -55,7 +55,7 @@ export default async function RapportsPage() {
       .eq("teacher_id", user.id)
       .order("weekday").order("start_time").order("scheduled_at"),
     (admin.from("session_reports") as any)
-      .select("id, session_id, occurrence_date, reported_at, advancement, engagement, difficulty_notes, help_methods, next_session_note")
+      .select("id, session_id, occurrence_date, reported_at, tenue, raison_non_tenue, advancement, engagement, difficulty_notes, help_methods, next_session_note")
       .eq("teacher_id", user.id)
       .order("reported_at", { ascending: false }),
   ]);

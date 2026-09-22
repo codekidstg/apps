@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { NON_TENUE } from "@/lib/rapports";
 
 export async function logLessonAccess(lessonId: string, themeId: string) {
   const supabase = await createClient();
@@ -37,6 +38,13 @@ export async function submitSessionReport(formData: FormData) {
   const help_methods     = formData.getAll("help_methods") as string[];
   const next_session_note = formData.get("next_session_note") as string | null;
 
+  // Une séance qui n'a pas eu lieu se déclare aussi : elle ne laisse ni
+  // avancement ni engagement, seulement sa raison.
+  const tenue  = formData.get("tenue") !== "0";
+  const raison = (formData.get("raison_non_tenue") as string | null) ?? null;
+  if (!tenue && !(raison && raison in NON_TENUE)) return { error: "Dites pourquoi la séance n'a pas eu lieu." };
+  if (tenue && (!advancement || !engagement)) return { error: "Il manque l'avancement ou l'engagement de l'élève." };
+
   // Le formulaire n'envoie pas l'élève : on le retrouve par la séance. Sans
   // cela, aucun rapport n'était rattaché à un enfant — les 12 premiers ont
   // tous un student_id vide.
@@ -54,11 +62,13 @@ export async function submitSessionReport(formData: FormData) {
     teacher_id:       user.id,
     student_id:       eleve,
     occurrence_date:  occurrence_date || null,
-    advancement,
-    engagement,
+    tenue,
+    raison_non_tenue: tenue ? null : raison,
+    advancement:      tenue ? advancement : null,
+    engagement:       tenue ? engagement : null,
     difficulty_notes: difficulty_notes || null,
-    help_methods,
-    next_session_note: next_session_note || null,
+    help_methods:     tenue ? help_methods : [],
+    next_session_note: tenue ? (next_session_note || null) : null,
   });
 
   if (error) return { error: error.message };

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { chargerEvolutions, type Evolution, type QuestionVue } from "@/lib/backoffice/evolution";
 import { STATUT_ELEVE } from "@/lib/backoffice/statut-eleve";
-import { AVANCEMENT, ENGAGEMENT } from "@/lib/rapports";
+import { AVANCEMENT, ENGAGEMENT, NON_TENUE } from "@/lib/rapports";
 
 /**
  * La section « Évolution » de la fiche élève — pour l'admin comme pour le
@@ -90,6 +90,12 @@ export function CarteEvolution({ ev, lienQuestions }: { ev: Evolution; lienQuest
               </span>
             )}
           </div>
+          {ev.seancesNonTenues.length > 0 && (
+            <div className="text-xs text-gray-500">
+              🚫 {ev.seancesNonTenues.length} séance{s(ev.seancesNonTenues.length)} non tenue{s(ev.seancesNonTenues.length)} :{" "}
+              {ev.seancesNonTenues.map((n) => `${dateCourte(n.date)} (${NON_TENUE[n.raison]?.label.toLowerCase() ?? "raison non dite"})`).join(", ")}
+            </div>
+          )}
           {ev.seancesAvantCompte > 0 && (
             <div className="text-xs text-gray-400">
               {/* Sans apostrophe : un `&apos;` dans ce texte faisait perdre à

@@ -1,5 +1,5 @@
 import PageHeader from "@/components/backoffice/PageHeader";
-import { getRapportsData, AVANCEMENT, ENGAGEMENT, AIDES, type Occurrence } from "@/lib/rapports";
+import { getRapportsData, AVANCEMENT, ENGAGEMENT, AIDES, NON_TENUE, type Occurrence } from "@/lib/rapports";
 
 /**
  * Écran « Rapports de séance », en lecture seule.
@@ -26,8 +26,10 @@ function Ligne({ o }: { o: Occurrence }) {
   const en = r?.engagement  ? ENGAGEMENT[r.engagement]  : null;
   const aides = (r?.help_methods ?? []).map(k => AIDES[k] ?? k);
 
+  const nonTenue = r && r.tenue === false ? NON_TENUE[r.raison_non_tenue ?? ""] ?? null : null;
+
   return (
-    <div className={`px-5 sm:px-6 py-4 ${r ? "" : "bg-amber-50/60"}`}>
+    <div className={`px-5 sm:px-6 py-4 ${!r ? "bg-amber-50/60" : r.tenue === false ? "bg-slate-50" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           <div className="font-black text-ink text-sm">{o.titre}</div>
@@ -38,13 +40,24 @@ function Ligne({ o }: { o: Occurrence }) {
           </div>
         </div>
         <span className={`text-[11px] font-black px-2.5 py-1 rounded-full whitespace-nowrap ${
-          r ? "bg-emerald-100 text-emerald-700" : "bg-amber-200 text-amber-900"
+          !r ? "bg-amber-200 text-amber-900" : r.tenue === false ? "bg-slate-200 text-slate-700" : "bg-emerald-100 text-emerald-700"
         }`}>
-          {r ? "✓ Compte rendu fait" : "⏳ Compte rendu manquant"}
+          {!r ? "⏳ Compte rendu manquant" : r.tenue === false ? "🚫 Séance non tenue" : "✓ Compte rendu fait"}
         </span>
       </div>
 
-      {r && (
+      {nonTenue && (
+        <div className="mt-3 space-y-2.5">
+          <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700">
+            {nonTenue.icon} {nonTenue.label}
+          </span>
+          {r?.difficulty_notes && (
+            <p className="text-sm text-ink whitespace-pre-wrap leading-relaxed">{r.difficulty_notes}</p>
+          )}
+        </div>
+      )}
+
+      {r && r.tenue !== false && (
         <div className="mt-3 space-y-2.5">
           <div className="flex flex-wrap gap-2">
             {av && (
@@ -90,7 +103,7 @@ function Ligne({ o }: { o: Occurrence }) {
 }
 
 export default async function RapportsPage() {
-  const { occurrences, faits, manquants } = await getRapportsData();
+  const { occurrences, faits, manquants, nonTenues } = await getRapportsData();
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -99,7 +112,7 @@ export default async function RapportsPage() {
         subtitle="Ce que les mentors ont écrit après chaque séance — et ce qui manque"
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-cream-border p-5">
           <div className="text-2xl font-black text-emerald-600">{faits}</div>
           <div className="text-xs font-bold text-gray-400 mt-1">Comptes rendus faits</div>
@@ -107,6 +120,10 @@ export default async function RapportsPage() {
         <div className="bg-white rounded-2xl border border-cream-border p-5">
           <div className={`text-2xl font-black ${manquants > 0 ? "text-amber-600" : "text-gray-300"}`}>{manquants}</div>
           <div className="text-xs font-bold text-gray-400 mt-1">Manquants</div>
+        </div>
+        <div className="bg-white rounded-2xl border border-cream-border p-5">
+          <div className={`text-2xl font-black ${nonTenues > 0 ? "text-slate-600" : "text-gray-300"}`}>{nonTenues}</div>
+          <div className="text-xs font-bold text-gray-400 mt-1">Séances non tenues</div>
         </div>
       </div>
 

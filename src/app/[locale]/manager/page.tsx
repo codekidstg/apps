@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import PageHeader from "@/components/backoffice/PageHeader";
 import AlerteBoiteDirection from "@/components/backoffice/AlerteBoiteDirection";
 import Link from "next/link";
-import { AVANCEMENT, ENGAGEMENT } from "@/lib/rapports";
+import { AVANCEMENT, ENGAGEMENT, NON_TENUE } from "@/lib/rapports";
 import { getSeancesAVenir } from "@/lib/planning/seances-a-venir";
 import { ListeSeances } from "@/components/backoffice/ProchainesSeances";
 import AlerteParents from "@/components/backoffice/AlerteParents";
@@ -31,7 +31,7 @@ export default async function ManagerDashboard() {
     // était rejetée en bloc et l'encadré affichait « Aucun rapport. » depuis
     // toujours. Les colonnes réelles sont celles-ci.
     (admin.from("session_reports") as any)
-      .select("id, occurrence_date, reported_at, teacher_id, profiles!teacher_id(display_name), advancement, engagement")
+      .select("id, occurrence_date, reported_at, teacher_id, profiles!teacher_id(display_name), tenue, raison_non_tenue, advancement, engagement")
       .order("reported_at", { ascending: false })
       .limit(6),
     getDashboardComptaKPIs(month, year),
@@ -99,7 +99,9 @@ export default async function ManagerDashboard() {
                     <div key={r.id} className="flex items-center gap-4 px-5 py-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-ink text-sm truncate">
-                          {av ? `${av.icon} ${av.label}` : "Rapport de séance"}
+                          {r.tenue === false
+                            ? `🚫 Séance non tenue — ${NON_TENUE[r.raison_non_tenue ?? ""]?.label ?? "raison non dite"}`
+                            : av ? `${av.icon} ${av.label}` : "Rapport de séance"}
                         </div>
                         <div className="text-xs text-ink-muted mt-0.5 flex items-center gap-2">
                           <span>👩‍🏫 {r.profiles?.display_name ?? "Prof"}</span>

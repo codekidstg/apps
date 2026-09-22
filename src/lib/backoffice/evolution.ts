@@ -51,6 +51,8 @@ export type Evolution = {
   seancesAvantCompte: number;
   /** La plus récente des séances comptées, et si son mentor en a fait le rapport. */
   derniereSeance: { date: string; aUnRapport: boolean } | null;
+  /** Les séances que le mentor a déclarées non tenues, les plus récentes d'abord. */
+  seancesNonTenues: { date: string; raison: string }[];
   leconsTerminees: number;
   /**
    * La prochaine leçon de son parcours, et où il en est — fiche seulement.
@@ -88,7 +90,7 @@ export async function chargerEvolutions(ids: string[], detail = false, maintenan
     admin.from("students").select("id, level, level_num, last_activity, streak_days, created_at").in("id", ids),
     admin.from("lesson_progress").select(`student_id, lesson_id, status, completed_at${detail ? ", block_progress" : ""}`).in("student_id", ids),
     admin.from("teacher_sessions").select("id, title, session_type, weekday, start_time, scheduled_at, active_from, active_until, created_at, student_id").in("student_id", ids),
-    admin.from("session_reports").select("student_id, session_id, occurrence_date, reported_at, engagement, advancement, next_session_note").in("student_id", ids),
+    admin.from("session_reports").select("student_id, session_id, occurrence_date, reported_at, tenue, raison_non_tenue, engagement, advancement, next_session_note").in("student_id", ids),
     admin.from("student_questions")
       .select(`student_id, lesson_id, block_id, created_at, replied_at, closed_at${detail ? ", reason, message, context, reply, replied_by, closed_by, closed_note" : ""}`)
       .in("student_id", ids),
@@ -107,7 +109,7 @@ export async function chargerEvolutions(ids: string[], detail = false, maintenan
   // les rattache donc par leur séance, qui, elle, connaît l'élève.
   const eleveDeSeance = new Map(((seances.data ?? []) as Ligne[]).map((s) => [s.id, s.student_id]));
   const parSeance = eleveDeSeance.size
-    ? await admin.from("session_reports").select("student_id, session_id, occurrence_date, reported_at, engagement, advancement, next_session_note")
+    ? await admin.from("session_reports").select("student_id, session_id, occurrence_date, reported_at, tenue, raison_non_tenue, engagement, advancement, next_session_note")
         .in("session_id", [...eleveDeSeance.keys()]).order("occurrence_date", { ascending: false })
     : { data: [] };
   if (parSeance.error) console.error("[evolution] rapports par séance :", parSeance.error.message);
@@ -164,7 +166,13 @@ export async function chargerEvolutions(ids: string[], detail = false, maintenan
     // Séances passées : les récurrentes déroulées semaine par semaine. Pour le
     // rythme, seules comptent celles qui suivent la création du compte.
     const occurrences = occurrencesPassees(de(seances.data, e.id));
-    const { comptees, avant } = seancesComptees(occurrences.map((o) => o.date), new Date(e.created_at));
+    // Une séance déclarée non tenue n'a pas eu lieu : ni dans le rythme, ni
+    // dans la frise. Son mentor l'a dit, avec sa raison.
+    const rapportDe = new Map(mesRapports.map((r) => [`${r.session_id}|${r.occurrence_date}`, r]));
+    const nonTenue = (o: { sessionId: string; date: string }) => rapportDe.get(`${o.sessionId}|${o.date}`)?.tenue === false;
+    const tenues = occurrences.filter((o) => !nonTenue(o));
+    const rapportsTenus = mesRapports.filter((r) => r.tenue !== false);
+    const { comptees, avant } = seancesComptees(tenues.map((o) => o.date), new Date(e.created_at));
     const ordre = [...comptees].sort();
     const premiere = ordre[0] ?? null;
     const derniereComptee = ordre[ordre.length - 1] ?? null;
@@ -186,8 +194,8 @@ export async function chargerEvolutions(ids: string[], detail = false, maintenan
       derniereActivite: derniere,
       seancesPassees: comptees.length,
       leconsTerminees: terminees.length,
-      engagements: mesRapports.map((r) => r.engagement ?? null),
-      avancements: mesRapports.map((r) => r.advancement ?? null),
+      engagements: rapportsTenus.map((r) => r.engagement ?? null),
+      avancements: rapportsTenus.map((r) => r.advancement ?? null),
       blocagesParLecon: exercicesAvecAide(
         mesQuestions.map((q) => ({ lessonId: q.lesson_id ?? null, blockId: q.block_id, creeLe: new Date(q.created_at) })),
         new Set(terminees.map((p) => p.lesson_id)),
@@ -221,7 +229,7 @@ export async function chargerEvolutions(ids: string[], detail = false, maintenan
     // La frise : 28 jours, du plus ancien au plus récent. Les séances d'avant
     // le compte y restent : elles ont eu lieu.
     const travail = joursDeTravail(mesEvenements as EvenementJeu[], mesProgres as ProgresLecon[], mesEntr as ProgresEntrainement[]);
-    const seancesDuJour = new Set([...occurrences.map((o) => o.date), ...mesRapports.map((r) => r.occurrence_date).filter(Boolean)]);
+    const seancesDuJour = new Set([...tenues.map((o) => o.date), ...rapportsTenus.map((r) => r.occurrence_date).filter(Boolean)]);
     const blocagesDuJour = new Set(mesQuestions.map((q) => jourTogo(new Date(q.created_at))));
     const frise: JourFrise[] = [];
     for (let i = 27; i >= 0; i--) {
@@ -259,7 +267,7 @@ export async function chargerEvolutions(ids: string[], detail = false, maintenan
       seancesPassees: comptees.length,
       seancesAvantCompte: avant,
       derniereSeance: derniereComptee
-        ? { date: derniereComptee, aUnRapport: mesRapports.some((r) => r.occurrence_date === derniereComptee) }
+        ? { date: derniereComptee, aUnRapport: rapportsTenus.some((r) => r.occurrence_date === derniereComptee) }
         : null,
       leconsTerminees: terminees.length,
       leconEnCours,
@@ -274,7 +282,11 @@ export async function chargerEvolutions(ids: string[], detail = false, maintenan
         liste,
       },
       entrainements: detail ? { faits: faits.length, essaisMoyens: essais.length ? essais.reduce((a, b) => a + b, 0) / essais.length : null } : null,
-      rapports: mesRapports.slice(0, 3).map((r) => ({
+      seancesNonTenues: mesRapports
+        .filter((r) => r.tenue === false)
+        .slice(0, 3)
+        .map((r) => ({ date: r.occurrence_date ?? String(r.reported_at ?? "").slice(0, 10), raison: r.raison_non_tenue ?? "" })),
+      rapports: rapportsTenus.slice(0, 3).map((r) => ({
         date: r.occurrence_date ?? String(r.reported_at ?? "").slice(0, 10),
         engagement: r.engagement ?? null,
         avancement: r.advancement ?? null,

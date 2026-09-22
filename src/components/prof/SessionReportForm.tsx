@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition, useEffect } from "react";
 import { submitSessionReport } from "@/app/[locale]/prof/actions";
+import { NON_TENUE } from "@/lib/rapports-libelles";
 
 type Props = {
   sessionId?: string;
@@ -11,6 +12,14 @@ type Props = {
   occurrenceDate: string; // ISO date YYYY-MM-DD — identifie l'occurrence exacte
   onClose: () => void;
 };
+
+/**
+ * Le compte rendu d'une séance, en quelques gestes.
+ *
+ * Première question : la séance a-t-elle eu lieu ? Sans elle, une séance sans
+ * compte rendu voulait dire deux choses — le mentor a oublié, ou la séance
+ * n'a pas eu lieu — et le suivi des mentors comptait les deux pareil.
+ */
 
 const ADVANCEMENT = [
   { value: "completed",  icon: "✅", label: "A terminé la séance prévue" },
@@ -35,9 +44,15 @@ const HELP_METHODS = [
   { value: "other",       label: "Autre" },
 ];
 
+const CHOIX = "flex items-center gap-3 p-3 rounded-2xl cursor-pointer border-2 transition-all";
+const CHOISI = "border-yellow-400 bg-yellow-50";
+const NON_CHOISI = "border-gray-100 bg-gray-50 hover:border-gray-200";
+
 export default function SessionReportForm({ sessionId, studentId, sessionTitle, sessionDate, occurrenceDate, onClose }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(1);
+  const [tenue, setTenue] = useState<boolean | null>(null);
+  const [raison, setRaison] = useState("");
   const [advancement, setAdvancement] = useState("");
   const [engagement, setEngagement] = useState("");
   const [helpMethods, setHelpMethods] = useState<string[]>([]);
@@ -46,28 +61,39 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
   const [pending, startTransition] = useTransition();
   const [canSubmit, setCanSubmit] = useState(false);
 
+  // Une séance non tenue tient en deux écrans : ce qui s'est passé, pourquoi.
+  const totalSteps = tenue === false ? 2 : 5;
+
   useEffect(() => {
     if (step === totalSteps) {
       const t = setTimeout(() => setCanSubmit(true), 400);
       return () => clearTimeout(t);
     }
     setCanSubmit(false);
-  }, [step]);
-
-  const totalSteps = 4;
+  }, [step, totalSteps]);
 
   function toggleHelp(val: string) {
     setHelpMethods(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
   }
 
+  function choisirTenue(valeur: boolean) {
+    setTenue(valeur);
+    setStep(2);
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(formRef.current!);
-    // Les étapes 1 et 2 sont démontées du DOM — on injecte les valeurs depuis le state
-    data.set("advancement", advancement);
-    data.set("engagement", engagement);
-    data.delete("help_methods");
-    helpMethods.forEach(v => data.append("help_methods", v));
+    // Les étapes précédentes sont démontées du DOM — on injecte les valeurs depuis le state
+    data.set("tenue", tenue === false ? "0" : "1");
+    if (tenue === false) {
+      data.set("raison_non_tenue", raison);
+    } else {
+      data.set("advancement", advancement);
+      data.set("engagement", engagement);
+      data.delete("help_methods");
+      helpMethods.forEach(v => data.append("help_methods", v));
+    }
 
     startTransition(async () => {
       const result = await submitSessionReport(data);
@@ -80,9 +106,13 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
         <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 text-center">
-          <div className="text-5xl mb-4">✅</div>
-          <div className="text-lg font-black" style={{ color: "#1B2D5E" }}>Rapport enregistré !</div>
-          <p className="text-sm mt-2 mb-6" style={{ color: "#64748B" }}>Merci pour ce retour pédagogique.</p>
+          <div className="text-5xl mb-4">{tenue === false ? "🗓️" : "✅"}</div>
+          <div className="text-lg font-black" style={{ color: "#1B2D5E" }}>
+            {tenue === false ? "Séance déclarée non tenue" : "Rapport enregistré !"}
+          </div>
+          <p className="text-sm mt-2 mb-6" style={{ color: "#64748B" }}>
+            {tenue === false ? "Elle ne compte plus comme un compte rendu à faire." : "Merci pour ce retour pédagogique."}
+          </p>
           <button onClick={onClose} className="w-full py-3 rounded-2xl font-black text-white text-sm" style={{ background: "#1B2D5E" }}>
             Fermer
           </button>
@@ -121,16 +151,64 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
 
           <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
 
-            {/* ÉTAPE 1 : Avancement */}
+            {/* ÉTAPE 1 : la séance a-t-elle eu lieu ? */}
             {step === 1 && (
               <div>
-                <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Où en est l'élève ?</div>
+                <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>La séance a-t-elle eu lieu ?</div>
+                <div className="text-xs mb-4" style={{ color: "#94A3B8" }}>Une séance qui n'a pas eu lieu se déclare aussi</div>
+                <div className="space-y-2">
+                  <button type="button" onClick={() => choisirTenue(true)}
+                    className={`w-full text-left ${CHOIX} ${tenue === true ? CHOISI : NON_CHOISI}`}>
+                    <span className="text-xl">✅</span>
+                    <span className="text-sm font-bold" style={{ color: "#1B2D5E" }}>Oui, elle a eu lieu</span>
+                  </button>
+                  <button type="button" onClick={() => choisirTenue(false)}
+                    className={`w-full text-left ${CHOIX} ${tenue === false ? CHOISI : NON_CHOISI}`}>
+                    <span className="text-xl">🚫</span>
+                    <span className="text-sm font-bold" style={{ color: "#1B2D5E" }}>Non, elle n&apos;a pas eu lieu</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ÉTAPE 2 (séance non tenue) : pourquoi */}
+            {step === 2 && tenue === false && (
+              <div className="space-y-5">
+                <div>
+                  <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Pourquoi n&apos;a-t-elle pas eu lieu ?</div>
+                  <div className="text-xs mb-4" style={{ color: "#94A3B8" }}>Cette raison sert au suivi : dites ce qui s&apos;est passé</div>
+                  <div className="space-y-2">
+                    {Object.entries(NON_TENUE).map(([valeur, r]) => (
+                      <label key={valeur} className={`${CHOIX} ${raison === valeur ? CHOISI : NON_CHOISI}`}>
+                        <input type="radio" name="raison_non_tenue" value={valeur} checked={raison === valeur}
+                          onChange={() => setRaison(valeur)} className="sr-only" />
+                        <span className="text-xl">{r.icon}</span>
+                        <span className="text-sm font-bold" style={{ color: "#1B2D5E" }}>{r.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Un mot de plus ?</div>
+                  <div className="text-xs mb-2" style={{ color: "#94A3B8" }}>Optionnel — ce que la direction doit savoir</div>
+                  <textarea name="difficulty_notes" rows={3} placeholder="Ex : prévenu la veille, on décale à samedi prochain."
+                    className="w-full rounded-2xl border text-sm p-3 resize-none outline-none focus:border-yellow-400 transition-colors"
+                    style={{ borderColor: "#E2E8F0", color: "#1B2D5E" }} />
+                  {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
+                </div>
+              </div>
+            )}
+
+            {/* ÉTAPE 2 : Avancement */}
+            {step === 2 && tenue !== false && (
+              <div>
+                <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Où en est l&apos;élève ?</div>
                 <div className="text-xs mb-4" style={{ color: "#94A3B8" }}>À la fin de cette séance</div>
                 <div className="space-y-2">
                   {ADVANCEMENT.map(opt => (
-                    <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer border-2 transition-all ${advancement === opt.value ? "border-yellow-400 bg-yellow-50" : "border-gray-100 bg-gray-50 hover:border-gray-200"}`}>
+                    <label key={opt.value} className={`${CHOIX} ${advancement === opt.value ? CHOISI : NON_CHOISI}`}>
                       <input type="radio" name="advancement" value={opt.value} checked={advancement === opt.value}
-                        onChange={() => setAdvancement(opt.value)} className="sr-only" required />
+                        onChange={() => setAdvancement(opt.value)} className="sr-only" />
                       <span className="text-xl">{opt.icon}</span>
                       <span className="text-sm font-bold" style={{ color: "#1B2D5E" }}>{opt.label}</span>
                     </label>
@@ -139,16 +217,16 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
               </div>
             )}
 
-            {/* ÉTAPE 2 : Engagement */}
-            {step === 2 && (
+            {/* ÉTAPE 3 : Engagement */}
+            {step === 3 && (
               <div>
-                <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Comment était l'élève ?</div>
+                <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Comment était l&apos;élève ?</div>
                 <div className="text-xs mb-4" style={{ color: "#94A3B8" }}>Son engagement durant la séance</div>
                 <div className="space-y-2">
                   {ENGAGEMENT.map(opt => (
-                    <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer border-2 transition-all ${engagement === opt.value ? "border-yellow-400 bg-yellow-50" : "border-gray-100 bg-gray-50 hover:border-gray-200"}`}>
+                    <label key={opt.value} className={`${CHOIX} ${engagement === opt.value ? CHOISI : NON_CHOISI}`}>
                       <input type="radio" name="engagement" value={opt.value} checked={engagement === opt.value}
-                        onChange={() => setEngagement(opt.value)} className="sr-only" required />
+                        onChange={() => setEngagement(opt.value)} className="sr-only" />
                       <span className="text-xl">{opt.icon}</span>
                       <span className="text-sm font-bold" style={{ color: "#1B2D5E" }}>{opt.label}</span>
                     </label>
@@ -157,12 +235,12 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
               </div>
             )}
 
-            {/* ÉTAPE 3 : Difficultés + approche pédagogique */}
-            {step === 3 && (
+            {/* ÉTAPE 4 : Difficultés + approche pédagogique */}
+            {step === 4 && (
               <div className="space-y-5">
                 <div>
                   <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Difficultés rencontrées ?</div>
-                  <div className="text-xs mb-2" style={{ color: "#94A3B8" }}>Laisse vide si tout s'est bien passé</div>
+                  <div className="text-xs mb-2" style={{ color: "#94A3B8" }}>Laisse vide si tout s&apos;est bien passé</div>
                   <textarea name="difficulty_notes" rows={3} placeholder="Ex : la notion de boucle ne rentre pas encore, on a fait des exercices supplémentaires..."
                     className="w-full rounded-2xl border text-sm p-3 resize-none outline-none focus:border-yellow-400 transition-colors"
                     style={{ borderColor: "#E2E8F0", color: "#1B2D5E" }} />
@@ -172,7 +250,7 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
                   <div className="text-xs mb-3" style={{ color: "#94A3B8" }}>Plusieurs choix possibles</div>
                   <div className="space-y-2">
                     {HELP_METHODS.map(opt => (
-                      <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer border-2 transition-all ${helpMethods.includes(opt.value) ? "border-yellow-400 bg-yellow-50" : "border-gray-100 bg-gray-50 hover:border-gray-200"}`}>
+                      <label key={opt.value} className={`${CHOIX} ${helpMethods.includes(opt.value) ? CHOISI : NON_CHOISI}`}>
                         <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border-2 transition-all ${helpMethods.includes(opt.value) ? "border-yellow-400 bg-yellow-400" : "border-gray-300"}`}>
                           {helpMethods.includes(opt.value) && <span className="text-white text-[10px]">✓</span>}
                         </div>
@@ -186,8 +264,8 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
               </div>
             )}
 
-            {/* ÉTAPE 4 : Note pour la prochaine fois */}
-            {step === 4 && (
+            {/* ÉTAPE 5 : Note pour la prochaine fois */}
+            {step === 5 && (
               <div>
                 <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Note pour la prochaine fois</div>
                 <div className="text-xs mb-3" style={{ color: "#94A3B8" }}>Optionnel — un rappel que tu te laisses à toi-même</div>
@@ -209,18 +287,20 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
               </button>
             )}
             {step < totalSteps ? (
-              <button type="button"
-                disabled={(step === 1 && !advancement) || (step === 2 && !engagement)}
-                onClick={() => setStep(s => s + 1)}
-                className="flex-1 py-3 rounded-2xl font-black text-sm text-white transition-all disabled:opacity-40"
-                style={{ background: "#1B2D5E" }}>
-                Suivant →
-              </button>
+              step > 1 && (
+                <button type="button"
+                  disabled={(step === 2 && !advancement) || (step === 3 && !engagement)}
+                  onClick={() => setStep(s => s + 1)}
+                  className="flex-1 py-3 rounded-2xl font-black text-sm text-white transition-all disabled:opacity-40"
+                  style={{ background: "#1B2D5E" }}>
+                  Suivant →
+                </button>
+              )
             ) : (
-              <button type="submit" disabled={pending || !canSubmit}
+              <button type="submit" disabled={pending || !canSubmit || (tenue === false && !raison)}
                 className="flex-1 py-3 rounded-2xl font-black text-sm text-white transition-all disabled:opacity-60"
                 style={{ background: "#FDB813", color: "#1B2D5E" }}>
-                {pending ? "Enregistrement..." : "✓ Valider le rapport"}
+                {pending ? "Enregistrement..." : tenue === false ? "✓ Déclarer la séance non tenue" : "✓ Valider le rapport"}
               </button>
             )}
           </div>

@@ -43,7 +43,9 @@ export async function getDashboardComptaKPIs(month: number, year: number) {
 
   const [{ data: reports }, { data: mentorPaid }, { data: parentPaid }] = await Promise.all([
     (admin.from("session_reports") as any)
+      // Une séance déclarée non tenue n'a pas eu lieu : ni payée, ni facturée.
       .select("session_id, occurrence_date")
+      .eq("tenue", true)
       .gte("occurrence_date", monthStart)
       .lte("occurrence_date", monthEnd),
     (admin.from("mentor_payments") as any)

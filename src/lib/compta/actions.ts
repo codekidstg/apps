@@ -244,7 +244,9 @@ export async function getComptaMentorsData(month: number, year: number) {
         .select("id, teacher_id, title, session_type, weekday, start_time, scheduled_at, duration_min, active_from, active_until, student_id, students(id, profiles!profile_id(display_name))")
         .order("weekday").order("start_time"),
       (admin.from("session_reports") as any)
-        .select("id, session_id, teacher_id, occurrence_date, advancement, engagement"),
+        // Seules les séances tenues se paient.
+        .select("id, session_id, teacher_id, occurrence_date, advancement, engagement")
+        .eq("tenue", true),
       (admin.from("mentor_payments") as any)
         .select("id, teacher_id, session_id, occurrence_date, status, amount_fcfa, paid_at, notes"),
       (admin.from("teacher_rates") as any)
@@ -371,7 +373,9 @@ export async function getComptaParentsData(month: number, year: number) {
         .select("id, teacher_id, title, session_type, weekday, start_time, scheduled_at, duration_min, active_from, active_until, student_id")
         .order("weekday").order("start_time"),
       (admin.from("session_reports") as any)
-        .select("id, session_id, teacher_id, occurrence_date"),
+        // Seules les séances tenues se facturent.
+        .select("id, session_id, teacher_id, occurrence_date")
+        .eq("tenue", true),
       (admin.from("parent_session_payments") as any)
         .select("id, parent_id, student_id, session_id, occurrence_date, status, amount_fcfa, paid_at, comment"),
       (admin.from("student_session_rates") as any)
