@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import PageHeader from "@/components/backoffice/PageHeader";
 import BilanMentorForm from "@/components/backoffice/BilanMentorForm";
 import { ChoixMois, Pastille } from "@/components/backoffice/SuiviMentors";
+import { JaugesAvecRegle } from "@/components/backoffice/RegleNote";
 import { chargerSuiviMentors, lireMois, libelleMois, libelleNonTenue, type SeanceVue, type EleveVue, type QuestionVue } from "@/lib/backoffice/suivi-mentors";
 import { chargerBilansMentor } from "@/lib/backoffice/bilans";
-import { SEUIL, DELAI_HEURES, type Bloc } from "@/lib/backoffice/note-mentor";
+import { SEUIL, DELAI_HEURES } from "@/lib/backoffice/note-mentor";
 import { AVANCEMENT, ENGAGEMENT, NON_TENUE } from "@/lib/rapports-libelles";
 import { STATUT_ELEVE } from "@/lib/backoffice/statut-eleve";
 
@@ -23,22 +24,6 @@ import { STATUT_ELEVE } from "@/lib/backoffice/statut-eleve";
 
 const jourCourt = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 const heure = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
-
-function Jauge({ bloc }: { bloc: Bloc }) {
-  if (!bloc.sur) return null;
-  const part = Math.max(0, Math.min(100, (bloc.points / bloc.sur) * 100));
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-xs font-black text-ink">{bloc.nom}</span>
-        <span className="text-xs font-black text-ink-muted">{bloc.points} / {bloc.sur}</span>
-      </div>
-      <div className="mt-1.5 h-2 rounded-full bg-slate-100 overflow-hidden">
-        <div className="h-full rounded-full" style={{ width: `${part}%`, background: part >= 80 ? "#10b981" : part >= 60 ? "#f59e0b" : "#ef4444" }} />
-      </div>
-    </div>
-  );
-}
 
 function LigneSeance({ s }: { s: SeanceVue }) {
   const r = s.rapport;
@@ -185,7 +170,7 @@ export default async function FicheMentor({ espace, id, mois }: {
               {m.note.note === null && (
                 <p className="text-sm font-bold text-amber-700">{m.note.sansNote}</p>
               )}
-              {m.note.blocs.filter((b) => b.sur > 0).map((b) => <Jauge key={b.nom} bloc={b} />)}
+              <JaugesAvecRegle blocs={m.note.blocs} />
               <p className="text-xs font-bold text-ink-muted">
                 {m.note.seances.comptees} séance{m.note.seances.comptees > 1 ? "s" : ""} comptée{m.note.seances.comptees > 1 ? "s" : ""}
                 {m.note.seances.nonTenues.length > 0 && (

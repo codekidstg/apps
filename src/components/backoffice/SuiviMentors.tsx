@@ -3,6 +3,7 @@ import PageHeader from "@/components/backoffice/PageHeader";
 import { chargerSuiviMentors, moisDisponibles, lireMois, libelleMois, type MentorMois } from "@/lib/backoffice/suivi-mentors";
 import { chargerBilansDuMois, type Bilan } from "@/lib/backoffice/bilans";
 import { couleurNote, SEUIL, type NoteMentor } from "@/lib/backoffice/note-mentor";
+import RegleNote from "@/components/backoffice/RegleNote";
 
 /**
  * Écran « Suivi des mentors » — la liste, servie telle quelle à l'admin et au
@@ -147,12 +148,7 @@ export default async function SuiviMentors({ espace, mois }: { espace: "admin" |
           </div>
         )}
 
-        <p className="text-xs font-bold text-ink-muted leading-relaxed">
-          La note porte sur ce que le mentor tient dans sa main : ses séances et leurs comptes rendus (50),
-          ses réponses aux « Je bloque ici » (25), et sa réaction quand un élève décroche (25).
-          La progression des élèves n&apos;y entre pas — elle dépend aussi de leur maison et de leur santé.
-          Sous trois séances dans le mois, il n&apos;y a pas de note.
-        </p>
+        <RegleNote />
       </div>
     </div>
   );
