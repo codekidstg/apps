@@ -1,10 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { occurrencesPassees, type Rapport } from "@/lib/rapports";
 import { NON_TENUE } from "@/lib/rapports-libelles";
-import { jourTogo } from "@/lib/planning/dates";
 import { chargerEvolutions } from "./evolution";
 import { STATUT_ELEVE, type StatutEleve } from "./statut-eleve";
 import { calculerNote, type NoteMentor, type SeanceDuMois, type QuestionDuMois, type EleveDuMois } from "./note-mentor";
+
+// Les mois (début du suivi, fenêtre glissante) sont à côté, avec leurs tests,
+// et ré-exportés ici : les écrans n'ont qu'un module à connaître.
+export { libelleMois, moisCourant, moisDisponibles, lireMois, DEBUT_SUIVI, type Mois } from "./mois";
 
 /**
  * Le suivi des mentors, mois par mois — pour le point de fin de mois.
@@ -26,35 +29,6 @@ import { calculerNote, type NoteMentor, type SeanceDuMois, type QuestionDuMois, 
  * mois, fait dans les jours qui suivent, c'est le bon. Sur un mois ancien, il
  * dit l'élève tel qu'il est maintenant — la fiche le précise.
  */
-
-export type Mois = { cle: string; label: string };
-
-const MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
-
-/** « 2026-09 » → « septembre 2026 ». */
-export function libelleMois(cle: string): string {
-  const [an, mois] = cle.split("-");
-  return `${MOIS_FR[Number(mois) - 1] ?? cle} ${an}`;
-}
-
-export function moisCourant(maintenant: Date = new Date()): string {
-  return jourTogo(maintenant).slice(0, 7);
-}
-
-/** Le mois en cours et les onze précédents, du plus récent au plus ancien. */
-export function moisDisponibles(maintenant: Date = new Date(), combien = 12): Mois[] {
-  const [an, mois] = moisCourant(maintenant).split("-").map(Number);
-  return Array.from({ length: combien }, (_, i) => {
-    const d = new Date(Date.UTC(an, mois - 1 - i, 1));
-    const cle = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-    return { cle, label: libelleMois(cle) };
-  });
-}
-
-/** Le mois demandé s'il existe, sinon le mois en cours. */
-export function lireMois(brut: string | undefined, maintenant: Date = new Date()): string {
-  return brut && /^\d{4}-(0[1-9]|1[0-2])$/.test(brut) ? brut : moisCourant(maintenant);
-}
 
 /** Une séance du mois, telle que la fiche l'affiche. */
 export type SeanceVue = {

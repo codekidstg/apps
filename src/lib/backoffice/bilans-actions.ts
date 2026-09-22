@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { chargerSuiviMentors } from "./suivi-mentors";
+import { lireMois, DEBUT_SUIVI, libelleMois } from "./mois";
 
 /**
  * Enregistrer le bilan de fin de mois d'un mentor — admin et manager.
@@ -14,7 +15,6 @@ import { chargerSuiviMentors } from "./suivi-mentors";
  */
 
 const AJUSTEMENT_MAX = 10;
-const MOIS = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 const texte = (v: FormDataEntryValue | null) => {
   const t = String(v ?? "").trim();
@@ -36,7 +36,11 @@ export async function enregistrerBilan(_prev: ResultatBilan, formData: FormData)
 
   const mentorId = String(formData.get("mentorId") ?? "");
   const mois = String(formData.get("mois") ?? "");
-  if (!mentorId || !MOIS.test(mois)) return { error: "Mentor ou mois manquant." };
+  if (!mentorId) return { error: "Mentor manquant." };
+  // Un mois d'avant le suivi, ou à venir, n'a pas de point à écrire.
+  if (lireMois(mois) !== mois) {
+    return { error: `Le suivi commence en ${libelleMois(DEBUT_SUIVI)}, et un mois à venir n'a pas encore eu lieu.` };
+  }
 
   const brut = String(formData.get("ajustement") ?? "0").replace(",", ".");
   const ajustement = Math.trunc(Number(brut));

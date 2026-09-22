@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { libelleMois } from "./suivi-mentors";
+import { libelleMois } from "./mois";
 
 /**
  * Les bilans de fin de mois — la lecture. L'écriture est dans
