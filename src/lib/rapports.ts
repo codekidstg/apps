@@ -36,6 +36,12 @@ export type Rapport = {
   help_methods: string[] | null;
   difficulty_notes: string | null;
   next_session_note: string | null;
+  /** La leçon travaillée en séance — le mentor la nomme (migration 038). */
+  lesson_id: string | null;
+  lesson_2_id: string | null;
+  lecon_finie: boolean;
+  lecon?: { title: string } | null;
+  lecon_2?: { title: string } | null;
 };
 
 /**
@@ -60,7 +66,8 @@ export async function getRapportsData(fenetre: Fenetre = {}): Promise<{
       .select("*, profiles!teacher_id(display_name), students(id, profiles!profile_id(display_name))")
       .order("scheduled_at", { ascending: false }),
     (admin.from("session_reports") as any)
-      .select("id, session_id, occurrence_date, reported_at, tenue, raison_non_tenue, advancement, engagement, help_methods, difficulty_notes, next_session_note")
+      // Deux clés étrangères vers `lessons` : PostgREST veut qu'on dise laquelle.
+      .select("id, session_id, occurrence_date, reported_at, tenue, raison_non_tenue, advancement, engagement, help_methods, difficulty_notes, next_session_note, lesson_id, lesson_2_id, lecon_finie, lecon:lessons!lesson_id(title), lecon_2:lessons!lesson_2_id(title)")
       .order("reported_at", { ascending: false }),
   ]);
 

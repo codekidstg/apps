@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import RapportsClient from "./RapportsClient";
 import { occurrencesPassees, debutPeriode, PERIODE_DEFAUT } from "@/lib/planning/occurrences-passees";
+import { leconsPourSeance } from "@/lib/rapports-lecons";
 
 const WEEKDAY_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
@@ -58,6 +59,13 @@ export default async function RapportsPage() {
     return (notesParEleve.get(eleve) ?? []).find((n: any) => n.quand < date) ?? null;
   };
 
+  // Les leçons proposées, une fois par élève : le formulaire s'ouvre déjà sur
+  // la bonne, le mentor n'a qu'à confirmer.
+  const eleves = [...new Set([...eleveDeSeance.values()])];
+  const leconsParEleve = new Map<string, Awaited<ReturnType<typeof leconsPourSeance>>>(
+    await Promise.all(eleves.map(async (id) => [id, await leconsPourSeance(id)] as const)),
+  );
+
   const items = past.map(occ => {
     const at = new Date(occ.quand);
     return {
@@ -74,6 +82,8 @@ export default async function RapportsPage() {
       recurring:      occ.recurrente,
       report:         reportsByKey.get(`${occ.sessionId}|${occ.date}`) ?? null,
       notePrecedente: notePrecedenteDe(occ.sessionId, occ.date),
+      studentId:      eleveDeSeance.get(occ.sessionId) ?? null,
+      lecons:         leconsParEleve.get(eleveDeSeance.get(occ.sessionId) ?? "") ?? [],
     };
   });
 

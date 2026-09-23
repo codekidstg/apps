@@ -57,6 +57,8 @@ type Item = {
   report: Report | null;
   /** La note laissée à la séance précédente de cet enfant. */
   notePrecedente?: { texte: string; date: string } | null;
+  studentId?: string | null;
+  lecons?: { id: string; titre: string; theme: string; rang: number; etat: string; suggeree: boolean }[];
 };
 
 // ─── Modal rapport rempli ──────────────────────────────────────────────────────
@@ -357,11 +359,12 @@ export default function RapportsClient({ items }: { items: Item[] }) {
       {openForm && (
         <SessionReportForm
           sessionId={openForm.sessionId}
-          studentId={undefined}
+          studentId={openForm.studentId ?? undefined}
           occurrenceDate={openForm.occurrenceDate}
           sessionTitle={openForm.title}
           sessionDate={`${openForm.dateStr} à ${openForm.time}`}
           notePrecedente={openForm.notePrecedente}
+          lecons={openForm.lecons}
           onClose={() => setOpenForm(null)}
         />
       )}

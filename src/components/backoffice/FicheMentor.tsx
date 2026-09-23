@@ -51,6 +51,11 @@ function LigneSeance({ s }: { s: SeanceVue }) {
       )}
       {r && r.tenue !== false && (
         <div className="mt-2 flex flex-wrap gap-2">
+          {r.lecon?.title && (
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700">
+              📘 {r.lecon.title}{r.lecon_finie ? " · terminée" : ""}
+            </span>
+          )}
           {av && <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg" style={{ background: `${av.color}18`, color: av.color }}>{av.icon} {av.label}</span>}
           {en && <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600">{en.icon} {en.label}</span>}
           {r.next_session_note?.trim() && <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700">📌 Note pour la prochaine fois</span>}

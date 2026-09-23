@@ -1,6 +1,7 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { processGamificationEvent } from "@/lib/gamification/process-event";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { NON_TENUE } from "@/lib/rapports";
@@ -37,6 +38,10 @@ export async function submitSessionReport(formData: FormData) {
   const difficulty_notes = formData.get("difficulty_notes") as string | null;
   const help_methods     = formData.getAll("help_methods") as string[];
   const next_session_note = formData.get("next_session_note") as string | null;
+  // La leçon travaillée : le mentor dit ce qui a été fait, rien ne le devine.
+  const lesson_id   = (formData.get("lesson_id") as string | null) || null;
+  const lesson_2_id = (formData.get("lesson_2_id") as string | null) || null;
+  const lecon_finie = formData.get("lecon_finie") === "1";
 
   // Une séance qui n'a pas eu lieu se déclare aussi : elle ne laisse ni
   // avancement ni engagement, seulement sa raison.
@@ -69,11 +74,19 @@ export async function submitSessionReport(formData: FormData) {
     difficulty_notes: difficulty_notes || null,
     help_methods:     tenue ? help_methods : [],
     next_session_note: tenue ? (next_session_note || null) : null,
+    // Une séance non tenue n'a travaillé aucune leçon, et une deuxième leçon
+    // sans première n'a pas de sens — la base le refuse aussi.
+    lesson_id:        tenue ? lesson_id : null,
+    lesson_2_id:      tenue && lesson_id && lesson_2_id !== lesson_id ? lesson_2_id : null,
+    lecon_finie:      Boolean(tenue && lesson_id && lecon_finie),
   });
 
   if (error) return { error: error.message };
   revalidatePath("/prof/planning");
-  return { success: true };
+  // Le mentor dit qu'ils l'ont terminée ensemble : l'écran le lui proposera,
+  // il ne se décide pas ici. L'enfant valide ce qu'il a fait, le mentor dit ce
+  // qui a été travaillé — deux vérités différentes (voir migration 038).
+  return { success: true, aProposer: tenue && lecon_finie && lesson_id ? lesson_id : null };
 }
 
 export async function upsertGrade(formData: FormData) {
@@ -99,4 +112,48 @@ export async function upsertGrade(formData: FormData) {
   if (error) return { error: error.message };
   revalidatePath("/prof/classes");
   return { success: true };
+}
+
+/**
+ * Marquer une leçon terminée pour l'élève, à la demande du mentor.
+ *
+ * Le compte rendu dit « on l'a terminée ensemble » ; l'écran le propose, le
+ * mentor accepte, et alors seulement l'enfant a sa leçon validée et ses
+ * points. Le 23 septembre, ce geste s'est fait à la main, après un tour de
+ * téléphone : Kenneth et Samuel avaient fini « Choisir » en séance, et
+ * l'application les croyait encore au milieu — donc bloqués sur leur leçon
+ * suivante et privés de leurs entraînements.
+ *
+ * L'XP passe par le moteur du jeu, qui tient le compte de ce qui a déjà été
+ * payé : refaire la leçon ensuite ne la paiera pas une seconde fois.
+ */
+export async function marquerLeconTerminee(lessonId: string, studentId: string, leJour?: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié" };
+
+  const admin = createAdminClient();
+  // Le mentor de cet élève, ou la direction.
+  const [{ data: profil }, { data: eleve }] = await Promise.all([
+    supabase.from("profiles").select("role").eq("id", user.id).single<{ role: string }>(),
+    (admin.from("students") as any).select("id, teacher_id").eq("id", studentId).maybeSingle(),
+  ]);
+  const autorise = profil?.role === "admin" || profil?.role === "manager" || eleve?.teacher_id === user.id;
+  if (!eleve || !autorise) return { error: "Seul le mentor de cet élève peut valider sa leçon." };
+
+  const { data: ligne } = await (admin.from("lesson_progress") as any)
+    .select("id, status").eq("student_id", studentId).eq("lesson_id", lessonId).maybeSingle();
+  if (ligne?.status === "completed") return { success: true, deja: true };
+
+  // Terminée le jour de la séance, pas aujourd'hui : l'historique doit dire
+  // quand le travail a été fait.
+  const quand = leJour ? new Date(`${leJour}T12:00:00Z`).toISOString() : new Date().toISOString();
+  const { error } = ligne
+    ? await (admin.from("lesson_progress") as any).update({ status: "completed", completed_at: quand }).eq("id", ligne.id)
+    : await (admin.from("lesson_progress") as any).insert({ student_id: studentId, lesson_id: lessonId, status: "completed", completed_at: quand });
+  if (error) return { error: error.message };
+
+  const { xpGained } = await processGamificationEvent(studentId, "lesson_completed", { lessonId, enSeance: true });
+  revalidatePath("/prof/rapports");
+  return { success: true, xp: xpGained };
 }

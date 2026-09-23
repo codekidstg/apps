@@ -61,6 +61,14 @@ function Ligne({ o }: { o: Occurrence }) {
 
       {r && r.tenue !== false && (
         <div className="mt-3 space-y-2.5">
+          {/* Ce qui a été travaillé : la première chose qu'on veut savoir, et
+              la seule que le compte rendu ne disait pas. */}
+          {r.lecon?.title && (
+            <div className="text-sm font-bold" style={{ color: "#1B2D5E" }}>
+              📘 {r.lecon.title}{r.lecon_2?.title ? ` puis ${r.lecon_2.title}` : ""}
+              {r.lecon_finie && <span className="ml-2 text-xs font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">terminée ensemble</span>}
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             {av && (
               <span className="text-xs font-bold px-2.5 py-1 rounded-lg"

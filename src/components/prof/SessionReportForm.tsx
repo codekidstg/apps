@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition, useEffect } from "react";
-import { submitSessionReport } from "@/app/[locale]/prof/actions";
+import { submitSessionReport, marquerLeconTerminee } from "@/app/[locale]/prof/actions";
 import { NON_TENUE } from "@/lib/rapports-libelles";
 
 type Props = {
@@ -12,6 +12,8 @@ type Props = {
   occurrenceDate: string; // ISO date YYYY-MM-DD — identifie l'occurrence exacte
   /** La note laissée à la séance précédente de cet enfant, s'il y en a une. */
   notePrecedente?: { texte: string; date: string } | null;
+  /** Les leçons de l'élève, celle où il en est marquée `suggeree`. */
+  lecons?: { id: string; titre: string; theme: string; rang: number; etat: string; suggeree: boolean }[];
   onClose: () => void;
 };
 
@@ -61,7 +63,7 @@ const CHOIX = "flex items-center gap-3 p-3 rounded-2xl cursor-pointer border-2 t
 const CHOISI = "border-yellow-400 bg-yellow-50";
 const NON_CHOISI = "border-gray-100 bg-gray-50 hover:border-gray-200";
 
-export default function SessionReportForm({ sessionId, studentId, sessionTitle, sessionDate, occurrenceDate, notePrecedente, onClose }: Props) {
+export default function SessionReportForm({ sessionId, studentId, sessionTitle, sessionDate, occurrenceDate, notePrecedente, lecons = [], onClose }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(1);
   const [tenue, setTenue] = useState<boolean | null>(null);
@@ -70,6 +72,17 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
   const [engagement, setEngagement] = useState("");
   const [helpMethods, setHelpMethods] = useState<string[]>([]);
   const [difficultes, setDifficultes] = useState("");
+  // La leçon travaillée : proposée, jamais imposée. « Pas de leçon » est une
+  // réponse valable — on a repris les bases, l'enfant était fatigué.
+  const [leconId, setLeconId] = useState(() => lecons.find((l) => l.suggeree)?.id ?? "");
+  const [lecon2Id, setLecon2Id] = useState("");
+  const [deuxieme, setDeuxieme] = useState(false);
+  const [leconFinie, setLeconFinie] = useState(false);
+  const laLecon = lecons.find((l) => l.id === leconId) ?? null;
+  // « On l'a terminée ensemble » : l'écran de fin le propose, il ne le fait
+  // jamais tout seul (voir migration 038).
+  const [aProposer, setAProposer] = useState(false);
+  const [valide, setValide] = useState<"non" | "en_cours" | "fait">("non");
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -105,6 +118,9 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
     } else {
       data.set("advancement", advancement);
       data.set("engagement", engagement);
+      data.set("lesson_id", leconId);
+      data.set("lesson_2_id", deuxieme ? lecon2Id : "");
+      data.set("lecon_finie", leconFinie ? "1" : "0");
       data.delete("help_methods");
       helpMethods.forEach(v => data.append("help_methods", v));
     }
@@ -112,7 +128,10 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
     startTransition(async () => {
       const result = await submitSessionReport(data);
       if (result?.error) setError(result.error);
-      else setSuccess(true);
+      else {
+        setAProposer(Boolean(result?.aProposer) && !!studentId);
+        setSuccess(true);
+      }
     });
   }
 
@@ -127,6 +146,41 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
           <p className="text-sm mt-2 mb-6" style={{ color: "#64748B" }}>
             {tenue === false ? "Elle ne compte plus comme un compte rendu à faire." : "Merci pour ce retour pédagogique."}
           </p>
+
+          {aProposer && laLecon && valide !== "fait" && (
+            <div className="rounded-2xl p-4 mb-4 text-left" style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}>
+              <p className="text-sm font-bold" style={{ color: "#1B2D5E" }}>
+                Vous avez terminé « {laLecon.titre} » ensemble.
+              </p>
+              <p className="text-xs mt-1" style={{ color: "#92400E" }}>
+                La marquer comme faite pour l&apos;élève ? Il gagnera ses points et la leçon suivante s&apos;ouvrira.
+              </p>
+              <div className="flex gap-2 mt-3">
+                <button type="button" disabled={valide === "en_cours"}
+                  onClick={() => {
+                    setValide("en_cours");
+                    startTransition(async () => {
+                      const r = await marquerLeconTerminee(laLecon.id, studentId!, occurrenceDate);
+                      setValide(r?.error ? "non" : "fait");
+                      if (r?.error) setError(r.error);
+                    });
+                  }}
+                  className="flex-1 py-2.5 rounded-2xl font-black text-sm text-white disabled:opacity-50"
+                  style={{ background: "#1B2D5E" }}>
+                  {valide === "en_cours" ? "Un instant…" : "Oui, la marquer faite"}
+                </button>
+                <button type="button" onClick={() => setAProposer(false)}
+                  className="px-4 py-2.5 rounded-2xl font-bold text-sm" style={{ color: "#94A3B8" }}>
+                  Non
+                </button>
+              </div>
+            </div>
+          )}
+          {valide === "fait" && (
+            <p className="text-sm font-bold mb-4" style={{ color: "#059669" }}>
+              ✅ Leçon marquée faite — ses points sont versés.
+            </p>
+          )}
           <button onClick={onClose} className="w-full py-3 rounded-2xl font-black text-white text-sm" style={{ background: "#1B2D5E" }}>
             Fermer
           </button>
@@ -214,6 +268,54 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
             )}
 
             {/* ÉTAPE 2 : Avancement */}
+            {step === 2 && tenue !== false && lecons.length > 0 && (
+              <div className="mb-5">
+                <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Quelle leçon avez-vous travaillée ?</div>
+                <div className="text-xs mb-3" style={{ color: "#94A3B8" }}>
+                  Rien ne le disait jusqu&apos;ici — et c&apos;est ce qui manquait pour suivre l&apos;enfant
+                </div>
+                <select name="lesson_id" value={leconId} onChange={(e) => { setLeconId(e.target.value); if (!e.target.value) setLeconFinie(false); }}
+                  className="w-full rounded-2xl border text-sm p-3 outline-none focus:border-yellow-400 transition-colors"
+                  style={{ borderColor: "#E2E8F0", color: "#1B2D5E" }}>
+                  <option value="">Pas de leçon — on a repris les bases, ou autre chose</option>
+                  {lecons.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.rang}. {l.titre}{l.etat === "terminee" ? " (déjà terminée)" : ""}
+                    </option>
+                  ))}
+                </select>
+
+                {laLecon && (
+                  <>
+                    <label className={`${CHOIX} mt-2 ${leconFinie ? CHOISI : NON_CHOISI}`}>
+                      <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border-2 ${leconFinie ? "border-yellow-400 bg-yellow-400" : "border-gray-300"}`}>
+                        {leconFinie && <span className="text-white text-[10px]">✓</span>}
+                      </div>
+                      <input type="checkbox" name="lecon_finie" value="1" checked={leconFinie}
+                        onChange={() => setLeconFinie((v) => !v)} className="sr-only" />
+                      <span className="text-sm font-bold" style={{ color: "#1B2D5E" }}>On l&apos;a terminée ensemble</span>
+                    </label>
+
+                    {deuxieme ? (
+                      <select name="lesson_2_id" value={lecon2Id} onChange={(e) => setLecon2Id(e.target.value)}
+                        className="w-full mt-2 rounded-2xl border text-sm p-3 outline-none focus:border-yellow-400"
+                        style={{ borderColor: "#E2E8F0", color: "#1B2D5E" }}>
+                        <option value="">Et une deuxième leçon…</option>
+                        {lecons.filter((l) => l.id !== leconId).map((l) => (
+                          <option key={l.id} value={l.id}>{l.rang}. {l.titre}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <button type="button" onClick={() => setDeuxieme(true)}
+                        className="text-xs font-bold mt-2 underline" style={{ color: "#94A3B8" }}>
+                        + On a vu une deuxième leçon
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
             {step === 2 && tenue !== false && (
               <div>
                 <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Où en est l&apos;élève ?</div>
