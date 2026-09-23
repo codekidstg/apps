@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { chargerMesQuestions, marquerReponsesVuesEleve } from "@/lib/questions/donnees";
-import { LIBELLE_RAISON, motCloture } from "@/lib/questions/raisons";
+import { libelleRaison, motCloture } from "@/lib/questions/raisons";
 import { dateEtHeure } from "@/lib/planning/dates";
 
 export const dynamic = "force-dynamic";
@@ -70,7 +70,7 @@ export default async function MesQuestionsPage() {
               </div>
 
               <p className="text-sm" style={{ color: "#cbd5e1" }}>
-                « {LIBELLE_RAISON[q.raison]} »{q.message ? ` — ${q.message}` : ""}
+                « {libelleRaison(q.raison)} »{q.message ? ` — ${q.message}` : ""}
               </p>
 
               {q.reponse ? (

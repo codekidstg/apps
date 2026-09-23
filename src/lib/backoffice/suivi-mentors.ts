@@ -141,6 +141,9 @@ export async function chargerSuiviMentors(
     idsEleves.length
       ? admin.from("student_questions")
           .select("id, student_id, block_id, created_at, replied_at, closed_at, closed_reason")
+          // Les messages que l'enfant écrit sans rien demander ne sont dus à
+          // personne : ils ne comptent pas dans la note (migration 037).
+          .eq("kind", "question")
           .in("student_id", idsEleves).gte("created_at", debut).lt("created_at", fin)
       : Promise.resolve({ data: [], error: null }),
     chargerEvolutions(idsEleves),

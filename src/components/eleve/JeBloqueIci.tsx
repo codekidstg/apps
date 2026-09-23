@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { poserQuestion, type ResultatQuestion } from "@/lib/questions/actions";
-import { RAISONS, LIBELLE_RAISON, ECHECS_AVANT_AIDE, motCloture, type Raison } from "@/lib/questions/raisons";
+import { poserQuestion, repondreAuMentor, type ResultatQuestion, type ResultatSimple } from "@/lib/questions/actions";
+import { RAISONS, libelleRaison, ECHECS_AVANT_AIDE, motCloture, type Raison } from "@/lib/questions/raisons";
 import type { Question } from "@/lib/questions/donnees";
 
 /**
@@ -30,6 +30,7 @@ type Props = {
 };
 
 const INITIAL: ResultatQuestion = {};
+const INITIAL_SIMPLE: ResultatSimple = {};
 
 function avantLaSeance(seance: string | null | undefined): string {
   if (!seance) return "dès que possible";
@@ -40,6 +41,11 @@ export default function JeBloqueIci({ cible, blocId, indice, echecs, question, c
   const [etape, setEtape] = useState<Etape>("ferme");
   const [raison, setRaison] = useState<Raison | null>(null);
   const [etat, envoyer, envoiEnCours] = useActionState(poserQuestion, INITIAL);
+  // Répondre à son mentor n'est pas poser une question : le message rejoint le
+  // fil et n'ouvre aucune attente. Sans ce bouton, l'enfant n'avait que
+  // « Je bloque ici » pour dire merci.
+  const [etatReponse, repondre, reponseEnCours] = useActionState(repondreAuMentor, INITIAL_SIMPLE);
+  const [ecritAuMentor, setEcritAuMentor] = useState(false);
   // La promesse s'affiche une fois par envoi, jusqu'à ce que l'enfant la ferme.
   const [etatVu, setEtatVu] = useState<ResultatQuestion | null>(null);
 
@@ -175,14 +181,46 @@ export default function JeBloqueIci({ cible, blocId, indice, echecs, question, c
   // ── Fermé : la question déjà posée, ou le bouton ──
   if (question?.etat === "repondue" && question.reponse) {
     return (
-      <div className="rounded-2xl p-5 space-y-2" style={{ background: "#052e16", border: "1px solid #10b98140" }}>
+      <div className="rounded-2xl p-5 space-y-3" style={{ background: "#052e16", border: "1px solid #10b98140" }}>
         <div className="text-xs font-black uppercase tracking-widest" style={{ color: "#6ee7b7" }}>
           💬 {question.reponse.parNom} t&apos;a répondu
         </div>
         <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">{question.reponse.texte}</p>
-        <button type="button" onClick={ouvrir} className="text-xs font-bold underline" style={{ color: "#a7f3d0" }}>
-          Je bloque encore
-        </button>
+
+        {etatReponse.success ? (
+          <p className="text-sm" style={{ color: "#a7f3d0" }}>✅ Ton message est parti à {question.reponse.parNom}.</p>
+        ) : ecritAuMentor ? (
+          <form action={repondre} className="space-y-2">
+            <input type="hidden" name="questionId" value={question.id} />
+            <textarea
+              name="message" rows={2} required maxLength={500} autoFocus
+              placeholder={`Écris à ${question.reponse.parNom} — « merci », « ça marche ! »…`}
+              className="w-full rounded-xl px-3 py-2 text-sm"
+              style={{ background: "#0f172a", border: "1px solid #334155", color: "white" }}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="submit" disabled={reponseEnCours}
+                className="font-black text-sm px-4 py-2 rounded-xl disabled:opacity-40"
+                style={{ background: "#10b981", color: "#052e16" }}>
+                {reponseEnCours ? "Envoi…" : "Envoyer"}
+              </button>
+              <button type="button" onClick={() => setEcritAuMentor(false)}
+                className="font-bold text-xs" style={{ color: "#94a3b8" }}>Annuler</button>
+              {etatReponse.error && <p className="text-xs font-bold w-full" style={{ color: "#fca5a5" }}>{etatReponse.error}</p>}
+            </div>
+          </form>
+        ) : (
+          <div className="flex flex-wrap items-center gap-4">
+            <button type="button" onClick={() => setEcritAuMentor(true)}
+              className="text-xs font-black px-3 py-1.5 rounded-xl"
+              style={{ background: "#10b98120", color: "#6ee7b7", border: "1px solid #10b98140" }}>
+              💬 Répondre à mon mentor
+            </button>
+            <button type="button" onClick={ouvrir} className="text-xs font-bold underline" style={{ color: "#a7f3d0" }}>
+              Je bloque encore
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -202,7 +240,7 @@ export default function JeBloqueIci({ cible, blocId, indice, echecs, question, c
     return (
       <div className="rounded-2xl p-4 flex flex-wrap items-center justify-between gap-2" style={{ background: "#1e293b", border: "1px solid #334155" }}>
         <p className="text-sm" style={{ color: "#cbd5e1" }}>
-          🙋 Ta question est partie — « {LIBELLE_RAISON[question.raison]} ». Ton mentor va te répondre.
+          🙋 Ta question est partie — « {libelleRaison(question.raison)} ». Ton mentor va te répondre.
         </p>
         <button type="button" onClick={ouvrir} className="text-xs font-bold underline" style={{ color: "#94a3b8" }}>
           Ajouter quelque chose

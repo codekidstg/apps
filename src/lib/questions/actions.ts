@@ -113,10 +113,13 @@ export async function poserQuestion(_prev: ResultatQuestion, formData: FormData)
 
   const maintenant = new Date().toISOString();
 
-  // Une seule question ouverte par exercice : redemander la complète.
+  // Une seule question ouverte par exercice : redemander la complète. Un
+  // message que l'enfant a écrit sans rien demander n'en est pas une : sans
+  // ce filtre, « Je bloque ici » viendrait s'y coller et ne compterait plus.
   const { data: ouverte, error: eOuverte } = await (admin.from("student_questions") as any)
     .select("id, message, reason")
     .eq("student_id", eleve.id)
+    .eq("kind", "question")
     .eq("block_id", blockId)
     .is("replied_at", null)
     .is("closed_at", null)
@@ -193,6 +196,55 @@ async function repondant(questionId: string): Promise<{ id: string; ligne: { rep
   if (!q) return null;
   const autorise = role === "admin" || role === "manager" || (role === "teacher" && q.students?.teacher_id === user.id);
   return autorise ? { id: user.id, ligne: q } : null;
+}
+
+/**
+ * L'enfant écrit dans le fil, sans rien demander — « merci », « ça marche ! ».
+ *
+ * C'est le geste qui manquait : jusqu'ici il n'avait que « Je bloque ici », et
+ * son merci arrivait chez son mentor comme une question restée sans réponse.
+ * Le message rejoint le fil de l'exercice, avec le même contexte, et ne crée
+ * aucune dette : `kind = 'reponse'` le sort de tous les décomptes.
+ */
+export async function repondreAuMentor(_prev: ResultatSimple, formData: FormData): Promise<ResultatSimple> {
+  const questionId = String(formData.get("questionId") ?? "");
+  const message = String(formData.get("message") ?? "").trim();
+  if (!message) return { error: "Écris ton message avant de l'envoyer." };
+  if (message.length > MESSAGE_MAX) return { error: `Ton message dépasse ${MESSAGE_MAX} caractères.` };
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Reconnecte-toi pour écrire à ton mentor." };
+
+  const admin = createAdminClient();
+  const { data: eleve } = await (admin.from("students") as any)
+    .select("id").eq("profile_id", user.id).maybeSingle();
+  if (!eleve) return { error: "Reconnecte-toi pour écrire à ton mentor." };
+
+  // Le fil auquel il répond doit être le sien : on relit la question en base
+  // plutôt que de croire l'identifiant qui arrive du navigateur.
+  const { data: fil } = await (admin.from("student_questions") as any)
+    .select("id, student_id, block_id, lesson_id, training_id, context")
+    .eq("id", questionId).maybeSingle();
+  if (!fil || fil.student_id !== eleve.id) return { error: "Ce message n'est pas le tien." };
+
+  const { error } = await (admin.from("student_questions") as any).insert({
+    student_id: eleve.id,
+    lesson_id: fil.lesson_id,
+    training_id: fil.training_id,
+    block_id: fil.block_id,
+    kind: "reponse",
+    reason: null,
+    message,
+    // Le même contexte que la question : le fil garde son titre d'exercice.
+    context: fil.context ?? {},
+  });
+  if (error) {
+    console.error("[questions] réponse de l'élève :", error.message);
+    return { error: "Ton message n'est pas parti. Réessaie dans un instant." };
+  }
+  rafraichir();
+  return { success: true };
 }
 
 export async function repondreQuestion(_prev: ResultatSimple, formData: FormData): Promise<ResultatSimple> {

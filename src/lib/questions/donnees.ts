@@ -24,11 +24,14 @@ export type Contexte = {
 
 export type Question = {
   id: string;
+  /** « reponse » : l'enfant écrit dans le fil sans rien demander (migration 037). */
+  kind: "question" | "reponse";
   eleveId: string;
   blocId: string;
   lessonId: string | null;
   trainingId: string | null;
-  raison: Raison;
+  /** null pour un message que l'enfant écrit sans rien demander. */
+  raison: Raison | null;
   message: string | null;
   poseeLe: string;
   misAJourLe: string;
@@ -44,11 +47,12 @@ export type QuestionAvecEleve = Question & { eleveNom: string };
 
 type Ligne = {
   id: string;
+  kind: "question" | "reponse" | null;
   student_id: string;
   lesson_id: string | null;
   training_id: string | null;
   block_id: string;
-  reason: Raison;
+  reason: Raison | null;
   message: string | null;
   context: Contexte | null;
   created_at: string;
@@ -73,6 +77,7 @@ function versQuestion(l: Ligne, noms: Map<string, string>, maintenant: number): 
   const etat = etatQuestion(l);
   return {
     id: l.id,
+    kind: l.kind ?? "question",
     eleveId: l.student_id,
     blocId: l.block_id,
     lessonId: l.lesson_id,
@@ -198,6 +203,7 @@ export async function compterQuestionsMentor(teacherId: string): Promise<number>
   const { count, error } = await (admin.from("student_questions") as any)
     .select("id", { count: "exact", head: true })
     .in("student_id", [...eleves.keys()])
+    .eq("kind", "question")
     .is("replied_at", null)
     .is("closed_at", null);
   if (error) {

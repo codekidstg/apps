@@ -3,7 +3,7 @@ import { enFils, parEnfant, lireFiltre, filtrerFils, compterFils } from "./fils"
 import type { Question } from "./donnees";
 
 const question = (p: Partial<Question> & Pick<Question, "id" | "poseeLe">): Question => ({
-  eleveId: "kenneth", blocId: "quiz-choisir", lessonId: "choisir", trainingId: null,
+  kind: "question", eleveId: "kenneth", blocId: "quiz-choisir", lessonId: "choisir", trainingId: null,
   raison: "autre", message: null, misAJourLe: p.poseeLe,
   etat: "en_attente", enRetard: false, reponse: null, reglee: null, contexte: {},
   ...p,
@@ -81,5 +81,33 @@ describe("filtres des échanges", () => {
     ]);
     expect(compterFils(fils)).toEqual({ tous: 3, attente: 2, retard: 1 });
     expect(filtrerFils(fils, "retard").map((f) => f.derniere.id)).toEqual(["a"]);
+  });
+});
+
+describe("le message que l'enfant écrit sans rien demander", () => {
+  const q = (p: Parameters<typeof question>[0]) => question(p);
+
+  it("rejoint le fil sans y ouvrir d'attente", () => {
+    // Le cas de Kenneth : sa question est répondue, puis il écrit « merci ».
+    const fils = enFils([
+      q({ id: "merci", poseeLe: "2026-09-19T21:40:00Z", kind: "reponse", message: "OUI C'EST REPARTI, merci" }),
+      q({
+        id: "q1", poseeLe: "2026-09-19T12:13:00Z", etat: "repondue",
+        reponse: { texte: "tu as pu revoir le cours ?", parNom: "Bernard", le: "2026-09-19T17:41:00Z", vueLe: null },
+      }),
+    ]);
+    expect(fils).toHaveLength(1);
+    // Les deux messages restent lisibles, dans l'ordre…
+    expect(fils[0].questions.map((x) => x.id)).toEqual(["q1", "merci"]);
+    // …mais le fil est répondu : plus rien n'attend le mentor.
+    expect(fils[0].etat).toBe("repondue");
+    expect(fils[0].derniere.id).toBe("q1");
+    expect(compterFils(fils)).toEqual({ tous: 1, attente: 0, retard: 0 });
+  });
+
+  it("un fil fait de ce seul message n'attend personne non plus", () => {
+    const fils = enFils([q({ id: "seul", poseeLe: "2026-09-19T21:40:00Z", kind: "reponse", etat: "en_attente" })]);
+    expect(fils[0].derniere.id).toBe("seul");
+    expect(compterFils(fils)).toEqual({ tous: 1, attente: 0, retard: 0 });
   });
 });

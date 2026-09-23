@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireParentPermission } from "@/lib/permissions/parent";
 import { chargerQuestionsEnfants } from "@/lib/questions/donnees";
-import { LIBELLE_RAISON, LIBELLE_CLOTURE, motCloture } from "@/lib/questions/raisons";
+import { libelleRaison, LIBELLE_CLOTURE, motCloture } from "@/lib/questions/raisons";
 import { dateEtHeure } from "@/lib/planning/dates";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +57,7 @@ export default async function QuestionsEnfantPage({ params }: { params: Promise<
               </div>
 
               <p className="text-sm text-slate-300">
-                « {LIBELLE_RAISON[q.raison]} »{q.message ? ` — ${q.message}` : ""}
+                « {libelleRaison(q.raison)} »{q.message ? ` — ${q.message}` : ""}
               </p>
 
               {q.reponse && (

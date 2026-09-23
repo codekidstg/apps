@@ -19,7 +19,7 @@ export type Fil<Q extends Question> = {
   derniere: Q;
   /** La dernière chose arrivée dans le fil : question, réponse ou clôture. */
   derniereActivite: string;
-  /** L'état du fil est celui de sa dernière question. */
+  /** L'état du fil est celui de sa dernière question — pas de ses messages. */
   etat: EtatQuestion;
   enRetard: boolean;
 };
@@ -35,10 +35,19 @@ export function enFils<Q extends Question>(questions: Q[]): Fil<Q>[] {
 
   const fils = [...parCle.entries()].map(([cle, liste]): Fil<Q> => {
     const ordre = [...liste].sort((a, b) => temps(a.poseeLe) - temps(b.poseeLe));
-    const derniere = ordre[ordre.length - 1];
+    // L'état du fil est celui de sa dernière *question* : un message que
+    // l'enfant écrit sans rien demander n'ouvre aucune attente (migration 037).
+    const questions = ordre.filter((q) => q.kind !== "reponse");
+    const derniere = questions[questions.length - 1] ?? ordre[ordre.length - 1];
     const moments = ordre.flatMap((q) => [q.poseeLe, q.reponse?.le, q.reglee?.le]).filter((m): m is string => !!m);
     const derniereActivite = moments.reduce((a, b) => (temps(b) > temps(a) ? b : a));
-    return { cle, questions: ordre, derniere, derniereActivite, etat: derniere.etat, enRetard: derniere.enRetard };
+    // Un fil sans aucune question n'attend personne — l'enfant ne peut écrire
+    // que dans un fil existant, mais la règle doit tenir sans cette hypothèse.
+    return {
+      cle, questions: ordre, derniere, derniereActivite,
+      etat: questions.length ? derniere.etat : "reglee",
+      enRetard: questions.length ? derniere.enRetard : false,
+    };
   });
 
   // Ceux qui attendent au-delà du délai d'abord, puis les plus récemment actifs.

@@ -5,7 +5,7 @@ import { DELAI_QUESTION_HEURES, type QuestionDirection } from "@/lib/questions/d
 import type { Enfant, Fil, FiltreEchanges } from "@/lib/questions/fils";
 import type { FicheExercice as Fiche } from "@/lib/questions/corrige";
 import { reponsesDansLaFiche } from "@/lib/questions/reponses-eleve";
-import { LIBELLE_RAISON, LIBELLE_CLOTURE } from "@/lib/questions/raisons";
+import { libelleRaison, LIBELLE_CLOTURE } from "@/lib/questions/raisons";
 import { dateEtHeure, ilYa } from "@/lib/planning/dates";
 
 /**
@@ -83,7 +83,10 @@ function Conversation({ fil }: { fil: Fil<QuestionDirection> }) {
         <li key={q.id} className="space-y-2">
           <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 sm:mr-10">
             <div className="text-[11px] font-bold" style={{ color: "#64748B" }}>
-              👦 {q.eleveNom} · {dateEtHeure(q.poseeLe)} · {LIBELLE_RAISON[q.raison] ?? q.raison}
+              {/* Un message que l'enfant écrit sans rien demander n'a pas de
+                  raison cochée, et n'attend pas de réponse (migration 037). */}
+              {q.kind === "reponse" ? "💬" : "👦"} {q.eleveNom} · {dateEtHeure(q.poseeLe)}
+              {` · ${libelleRaison(q.raison)}`}
             </div>
             {q.message
               ? <p className="text-sm whitespace-pre-wrap mt-1" style={{ color: "#1B2D5E" }}>{q.message}</p>

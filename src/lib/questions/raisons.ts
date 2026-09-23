@@ -19,6 +19,14 @@ export const RAISONS: { id: Raison; libelle: string; emoji: string }[] = [
 
 export const LIBELLE_RAISON = Object.fromEntries(RAISONS.map((r) => [r.id, r.libelle])) as Record<Raison, string>;
 
+/**
+ * Ce qui s'affiche à la place de la raison. Un message que l'enfant écrit sans
+ * rien demander n'en a pas : il répond à son mentor (migration 037).
+ */
+export function libelleRaison(raison: Raison | null | undefined): string {
+  return raison ? LIBELLE_RAISON[raison] ?? raison : "te répond";
+}
+
 export const estRaison = (v: unknown): v is Raison => RAISONS.some((r) => r.id === v);
 
 /**

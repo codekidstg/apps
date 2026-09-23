@@ -93,6 +93,9 @@ export async function chargerEvolutions(ids: string[], detail = false, maintenan
     admin.from("session_reports").select("student_id, session_id, occurrence_date, reported_at, tenue, raison_non_tenue, engagement, advancement, next_session_note").in("student_id", ids),
     admin.from("student_questions")
       .select(`student_id, lesson_id, block_id, created_at, replied_at, closed_at${detail ? ", reason, message, context, reply, replied_by, closed_by, closed_note" : ""}`)
+      // « bloqué » se mesure aux « Je bloque ici », pas aux messages que
+      // l'enfant écrit à son mentor sans rien demander (migration 037).
+      .eq("kind", "question")
       .in("student_id", ids),
     // `payload` dit si un « lesson_completed » est une leçon ou un entraînement.
     admin.from("gamification_events").select("student_id, event_type, created_at, payload").in("student_id", ids).gte("created_at", depuis60),
