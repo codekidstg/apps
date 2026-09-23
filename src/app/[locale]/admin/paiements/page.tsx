@@ -1,22 +1,42 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import PageHeader from "@/components/backoffice/PageHeader";
 import ValidateCashButton from "./ValidateCashButton";
 
-export default async function PaiementsPage() {
+/** Combien de lignes d'historique s'affichent d'un coup. */
+const LOT = 25;
+
+const CHAMPS = "*, profiles!payments_parent_id_fkey(display_name), subscriptions(subscription_plans(name))";
+
+export default async function PaiementsPage({ searchParams }: { searchParams: Promise<{ voir?: string }> }) {
+  const { voir } = await searchParams;
   const supabase = await createClient();
+  const montrees = Math.max(LOT, Number(voir) || LOT);
 
-  const { data: payments } = await (supabase.from("payments") as any)
-    .select("*, profiles!payments_parent_id_fkey(display_name), subscriptions(subscription_plans(name))")
-    .order("created_at", { ascending: false });
+  // Ce qui attend une validation est chargé en entier : un paiement espèces
+  // qu'on ne voit pas est un parent qui a payé sans que personne ne le sache.
+  // L'historique, lui, ne cesse de grandir — il vient par lots.
+  const [enAttente, historique] = await Promise.all([
+    (supabase.from("payments") as any)
+      .select(CHAMPS)
+      .eq("provider", "cash").eq("status", "pending")
+      .order("created_at", { ascending: false }),
+    (supabase.from("payments") as any)
+      .select(CHAMPS, { count: "exact" })
+      .neq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(montrees),
+  ]);
 
-  const pending  = (payments ?? []).filter((p: any) => p.provider === "cash" && p.status === "pending");
-  const history  = (payments ?? []).filter((p: any) => p.status !== "pending");
+  const pending = (enAttente.data ?? []) as any[];
+  const history = (historique.data ?? []) as any[];
+  const encore  = Math.max(0, (historique.count ?? 0) - history.length);
 
   return (
     <div>
       <PageHeader
         title="Paiements"
-        subtitle={`${payments?.length ?? 0} paiements au total`}
+        subtitle={`${(historique.count ?? 0) + pending.length} paiement${(historique.count ?? 0) + pending.length > 1 ? "s" : ""} au total`}
         actions={
           <a
             href="/api/admin/export/paiements"
@@ -61,7 +81,7 @@ export default async function PaiementsPage() {
         {/* Historique */}
         <div>
           <h2 className="text-sm font-black text-ink-light uppercase tracking-widest mb-4">
-            Historique des paiements
+            Historique des paiements ({history.length}{encore > 0 ? ` sur ${history.length + encore}` : ""})
           </h2>
           <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden">
             <table className="w-full text-sm">
@@ -99,6 +119,16 @@ export default async function PaiementsPage() {
               </tbody>
             </table>
           </div>
+
+          {encore > 0 && (
+            <div className="text-center mt-4">
+              <Link href={`/admin/paiements?voir=${montrees + LOT}`}
+                className="inline-block text-sm font-black px-5 py-2.5 rounded-xl border border-stone-200 bg-white hover:border-brand-orange transition-colors"
+                style={{ color: "#1B2D5E" }}>
+                Voir plus — {encore} paiement{encore > 1 ? "s" : ""} encore
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

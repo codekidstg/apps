@@ -234,8 +234,23 @@ export async function upsertParentPayment(
 
 // ── Données compta mentors ───────────────────────────────────
 
+/**
+ * Les bornes d'un mois, en dates civiles — « 2026-09-01 » et « 2026-09-30 ».
+ *
+ * Les deux écrans de compta ne regardent qu'un mois, mais tiraient tous les
+ * comptes rendus et tous les paiements depuis le début pour n'en garder que
+ * trente jours. Ces deux tables grossissent d'une ligne par séance et par
+ * semaine : c'est le genre de chargement qui ne se remarque qu'au bout d'un an.
+ */
+function bornesDuMois(month: number, year: number): { debut: string; fin: string } {
+  const deuxChiffres = (n: number) => String(n).padStart(2, "0");
+  const dernier = new Date(year, month, 0).getDate();
+  return { debut: `${year}-${deuxChiffres(month)}-01`, fin: `${year}-${deuxChiffres(month)}-${deuxChiffres(dernier)}` };
+}
+
 export async function getComptaMentorsData(month: number, year: number) {
   const admin = createAdminClient();
+  const { debut, fin } = bornesDuMois(month, year);
 
   const [{ data: teachers }, { data: allSessions }, { data: allReports }, { data: allPayments }, { data: allRates }] =
     await Promise.all([
@@ -246,9 +261,11 @@ export async function getComptaMentorsData(month: number, year: number) {
       (admin.from("session_reports") as any)
         // Seules les séances tenues se paient.
         .select("id, session_id, teacher_id, occurrence_date, advancement, engagement")
-        .eq("tenue", true),
+        .eq("tenue", true)
+        .gte("occurrence_date", debut).lte("occurrence_date", fin),
       (admin.from("mentor_payments") as any)
-        .select("id, teacher_id, session_id, occurrence_date, status, amount_fcfa, paid_at, notes"),
+        .select("id, teacher_id, session_id, occurrence_date, status, amount_fcfa, paid_at, notes")
+        .gte("occurrence_date", debut).lte("occurrence_date", fin),
       (admin.from("teacher_rates") as any)
         .select("teacher_id, rate_fcfa, rate_type, effective_from")
         .order("effective_from", { ascending: false }),
@@ -363,6 +380,7 @@ export async function getComptaMentorsData(month: number, year: number) {
 
 export async function getComptaParentsData(month: number, year: number) {
   const admin = createAdminClient();
+  const { debut, fin } = bornesDuMois(month, year);
 
   const [{ data: parents }, { data: links }, { data: allSessions }, { data: allReports }, { data: allPayments }, { data: allRates }] =
     await Promise.all([
@@ -375,9 +393,11 @@ export async function getComptaParentsData(month: number, year: number) {
       (admin.from("session_reports") as any)
         // Seules les séances tenues se facturent.
         .select("id, session_id, teacher_id, occurrence_date")
-        .eq("tenue", true),
+        .eq("tenue", true)
+        .gte("occurrence_date", debut).lte("occurrence_date", fin),
       (admin.from("parent_session_payments") as any)
-        .select("id, parent_id, student_id, session_id, occurrence_date, status, amount_fcfa, paid_at, comment"),
+        .select("id, parent_id, student_id, session_id, occurrence_date, status, amount_fcfa, paid_at, comment")
+        .gte("occurrence_date", debut).lte("occurrence_date", fin),
       (admin.from("student_session_rates") as any)
         .select("student_id, rate_fcfa, effective_from")
         .order("effective_from", { ascending: false }),
