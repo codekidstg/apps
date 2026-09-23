@@ -1,4 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/server";
+// Le déroulé des séances récurrentes vit à côté, sans accès à la base : c'est
+// ce qui le rend testable, et c'est là qu'est la fenêtre de dates.
+export { occurrencesPassees, type Fenetre } from "@/lib/planning/occurrences-passees";
+import { occurrencesPassees, type Fenetre } from "@/lib/planning/occurrences-passees";
 
 /**
  * Rapports de séance — le chargement, partagé par les trois espaces. Les
@@ -33,57 +37,6 @@ export type Rapport = {
   difficulty_notes: string | null;
   next_session_note: string | null;
 };
-
-function jourLocal(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/**
- * Toutes les séances déjà passées, récurrentes déroulées semaine par semaine.
- *
- * Extrait de l'écran prof, où la fonction était enfermée : c'est elle qui dit
- * quelles séances auraient dû donner lieu à un rapport, donc lesquelles
- * manquent.
- */
-export function occurrencesPassees(sessions: any[]) {
-  const out: Omit<Occurrence, "cle" | "rapport">[] = [];
-  const limite = new Date(Date.now() - 1);
-
-  for (const s of sessions) {
-    const mentor = s.profiles?.display_name ?? "Mentor";
-    const eleve  = s.students?.profiles?.display_name ?? null;
-
-    const ajoute = (at: Date) => out.push({
-      sessionId: s.id,
-      titre: s.title ?? "Séance",
-      date: jourLocal(at),
-      quand: at.toISOString(),
-      mentor,
-      eleve,
-    });
-
-    if (s.session_type === "recurring") {
-      const debut = new Date(s.active_from ?? s.created_at);
-      debut.setHours(0, 0, 0, 0);
-      const [h, m] = String(s.start_time ?? "00:00").split(":").map(Number);
-      const curseur = new Date(debut);
-      curseur.setHours(h || 0, m || 0, 0, 0);
-
-      const ecart = (s.weekday - curseur.getDay() + 7) % 7;
-      curseur.setDate(curseur.getDate() + (ecart === 0 && curseur >= debut ? 0 : ecart === 0 ? 7 : ecart));
-
-      while (curseur <= limite) {
-        if (!s.active_until || curseur <= new Date(s.active_until)) ajoute(new Date(curseur));
-        curseur.setDate(curseur.getDate() + 7);
-      }
-    } else if (s.scheduled_at) {
-      const at = new Date(s.scheduled_at);
-      if (at <= limite) ajoute(at);
-    }
-  }
-
-  return out.sort((a, b) => b.quand.localeCompare(a.quand));
-}
 
 /**
  * Séances passées de toute la structure, chacune avec son rapport ou sans.

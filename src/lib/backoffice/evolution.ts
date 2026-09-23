@@ -168,7 +168,12 @@ export async function chargerEvolutions(ids: string[], detail = false, maintenan
 
     // Séances passées : les récurrentes déroulées semaine par semaine. Pour le
     // rythme, seules comptent celles qui suivent la création du compte.
-    const occurrences = occurrencesPassees(de(seances.data, e.id));
+    // Les séances d'avant le compte ne comptent pas dans son rythme : on les
+    // affiche seulement en nombre. Deux mois de marge suffisent — une séance
+    // ne précède jamais l'élève de plus d'un jour, elle se crée depuis sa
+    // fiche —, et au-delà on ne déroulerait que des semaines à jeter.
+    const depuis = new Date(new Date(e.created_at).getTime() - 60 * JOUR);
+    const occurrences = occurrencesPassees(de(seances.data, e.id), { depuis });
     // Une séance déclarée non tenue n'a pas eu lieu : ni dans le rythme, ni
     // dans la frise. Son mentor l'a dit, avec sa raison.
     const rapportDe = new Map(mesRapports.map((r) => [`${r.session_id}|${r.occurrence_date}`, r]));

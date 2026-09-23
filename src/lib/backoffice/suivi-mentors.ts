@@ -171,7 +171,10 @@ export async function chargerSuiviMentors(
   // séance du 2 du mois suivant.
   const seancesParMentor = new Map<string, SeanceVue[]>();
   const seancesParEleve = new Map<string, SeanceEleve[]>();
-  for (const o of occurrencesPassees(lignesSeances)) {
+  // On ne déroule que le mois demandé : sans cette borne, chaque affichage
+  // recalculait toutes les semaines depuis la création de chaque séance pour
+  // n'en garder qu'une trentaine de jours.
+  for (const o of occurrencesPassees(lignesSeances, { depuis: new Date(debut) })) {
     const eleveId = eleveDeSeance.get(o.sessionId) ?? null;
     if (eleveId) {
       const tenue = parOccurrence.get(`${o.sessionId}|${o.date}`)?.tenue !== false;
