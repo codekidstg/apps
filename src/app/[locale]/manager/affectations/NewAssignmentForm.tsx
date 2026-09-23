@@ -54,7 +54,7 @@ export default function NewAssignmentForm({ themes, classes, teachers }: Props) 
               <div>
                 <label className="block text-xs font-extrabold text-ink-light mb-1.5">Professeur *</label>
                 <select name="teacher_id" required className={ic}>
-                  <option value="">Choisir un professeur…</option>
+                  <option value="">Choisir un mentor…</option>
                   {teachers.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
                 </select>
               </div>

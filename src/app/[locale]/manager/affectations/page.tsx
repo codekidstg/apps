@@ -61,7 +61,7 @@ export default async function AffectationsPage() {
               render: (a) => <span className="font-bold text-ink">{a.classes?.name ?? "—"}</span>,
             },
             {
-              key: "teacher", label: "Professeur",
+              key: "teacher", label: "Mentor",
               render: (a) => <span className="text-sm text-ink-muted">{a.profiles?.display_name ?? "—"}</span>,
             },
             {

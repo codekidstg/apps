@@ -57,7 +57,7 @@ export default async function ProfLessonPage({
       <div className="mb-5 flex items-center gap-3 bg-indigo-950 border border-indigo-800 rounded-2xl px-5 py-3">
         <span className="text-lg">👁️</span>
         <div className="flex-1 text-sm text-indigo-300 font-bold">
-          Aperçu professeur — contenu identique à celui de l&apos;élève. Aucune progression enregistrée.
+          Aperçu mentor — contenu identique à celui de l&apos;élève. Aucune progression enregistrée.
         </div>
         <Link href="/fr/prof/cours" className="text-xs font-black text-indigo-400 hover:text-white transition-colors">
           ← Retour aux cours

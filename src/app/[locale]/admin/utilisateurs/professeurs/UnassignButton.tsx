@@ -10,7 +10,7 @@ export default function UnassignButton({ studentId, studentName }: { studentId: 
     <button
       disabled={pending}
       onClick={() => {
-        if (!confirm(`Désassigner ${studentName} de ce professeur ?`)) return;
+        if (!confirm(`Désassigner ${studentName} de ce mentor ?`)) return;
         startTransition(async () => {
           await assignTeacherToStudent(studentId, null);
         });

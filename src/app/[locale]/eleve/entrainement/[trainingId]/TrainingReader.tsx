@@ -1134,7 +1134,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
           {readOnly ? (
             <div className="rounded-2xl px-6 py-4 text-center font-bold text-sm"
               style={{ background: "#1e293b", border: "1px solid #334155", color: "#94a3b8" }}>
-              👁️ Mode aperçu professeur — aucune progression enregistrée
+              👁️ Mode aperçu mentor — aucune progression enregistrée
             </div>
           ) : (
             <>

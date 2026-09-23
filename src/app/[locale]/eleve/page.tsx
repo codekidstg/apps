@@ -207,7 +207,7 @@ export default async function EleveDashboard({
           <div className="text-3xl mb-2">🔒</div>
           <div className="font-black text-white text-sm">Ton parcours n&apos;est pas encore ouvert</div>
           <div className="text-xs mt-1" style={{ color: "#475569" }}>
-            Ton professeur va activer tes premiers cours. Reviens juste après ta première séance.
+            Ton mentor va activer tes premiers cours. Reviens juste après ta première séance.
           </div>
         </div>
       )}

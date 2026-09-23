@@ -8,7 +8,7 @@ type StaffRole = "teacher" | "manager";
 type Override  = "inherit" | "allow" | "deny";
 type Staff     = { id: string; name: string; role: StaffRole; override: Override };
 
-const ROLE_LABEL: Record<StaffRole, string> = { teacher: "Professeur", manager: "Manager" };
+const ROLE_LABEL: Record<StaffRole, string> = { teacher: "Mentor", manager: "Manager" };
 
 export default function AtelierAdminClient({
   students,

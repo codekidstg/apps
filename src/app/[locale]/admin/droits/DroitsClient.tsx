@@ -11,7 +11,7 @@ type UserProfile   = { id: string; display_name: string; role: string };
 const ROLE_LABELS: Record<string, string> = {
   admin:   "Admin",
   manager: "Manager",
-  teacher: "Professeur",
+  teacher: "Mentor",
   parent:  "Parent",
   student: "Élève",
 };

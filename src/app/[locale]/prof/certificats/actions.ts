@@ -37,7 +37,7 @@ export async function validateCertificate(certId: string) {
       for (const { subscription } of subs ?? []) {
         await sendPushNotification(subscription, {
           title: "🎓 Certificat validé !",
-          body:  `Le professeur a validé le certificat de ${studentName}. Vous pouvez le télécharger.`,
+          body:  `Le mentor a validé le certificat de ${studentName}. Vous pouvez le télécharger.`,
           icon:  "/icons/icon-192.png",
           url:   "/fr/suivi/certificats",
           tag:   `cert-${certId}`,

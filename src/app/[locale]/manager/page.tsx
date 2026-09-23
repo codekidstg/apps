@@ -44,7 +44,7 @@ export default async function ManagerDashboard() {
 
   const kpis = [
     { label: "Élèves",         value: byRole.student  ?? 0, icon: "🎓", color: "#10b981", href: "/manager/utilisateurs/eleves" },
-    { label: "Professeurs",    value: byRole.teacher  ?? 0, icon: "👩‍🏫", color: "#a78bfa", href: "/manager/utilisateurs/professeurs" },
+    { label: "Mentors",        value: byRole.teacher  ?? 0, icon: "👩‍🏫", color: "#a78bfa", href: "/manager/utilisateurs/professeurs" },
     { label: "Parents",        value: byRole.parent   ?? 0, icon: "👨‍👩‍👦", color: "#60a5fa", href: "/manager/utilisateurs/parents" },
     { label: "Sessions / 7j",  value: seances.length,        icon: "📅", color: "#FDB813", href: `/manager/compta/mentors?month=${month}&year=${year}` },
     { label: "À payer mentors",    value: mentorToPay,   icon: "💰", color: "#f97316", href: "/manager/compta/mentors" },

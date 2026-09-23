@@ -4,7 +4,7 @@ import type { Role } from "@/lib/supabase/types";
 const ROLE_LABELS: Record<Role, string> = {
   admin:   "Administration",
   manager: "Manager",
-  teacher: "Professeur",
+  teacher: "Mentor",
   student: "Élève",
   parent:  "Parent",
 };

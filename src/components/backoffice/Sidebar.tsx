@@ -17,7 +17,7 @@ const adminNav: NavItem[] = [
       { label: "Tous",         href: "/admin/utilisateurs",              pageKey: "admin.utilisateurs.tous" },
       { label: "Parents",      href: "/admin/utilisateurs/parents",      pageKey: "admin.utilisateurs.parents" },
       { label: "Élèves",       href: "/admin/utilisateurs/eleves",       pageKey: "admin.utilisateurs.eleves" },
-      { label: "Professeurs",  href: "/admin/utilisateurs/professeurs",  pageKey: "admin.utilisateurs.professeurs" },
+      { label: "Mentors",      href: "/admin/utilisateurs/professeurs",  pageKey: "admin.utilisateurs.professeurs" },
     ],
   },
   { label: "Écoles",           href: "/admin/ecoles",       icon: "🏫", pageKey: "admin.ecoles" },
@@ -47,7 +47,7 @@ const managerNav: NavItem[] = [
       { label: "Tous",        href: "/manager/utilisateurs",              pageKey: "manager.utilisateurs.tous" },
       { label: "Parents",     href: "/manager/utilisateurs/parents",      pageKey: "manager.utilisateurs.parents" },
       { label: "Élèves",      href: "/manager/utilisateurs/eleves",       pageKey: "manager.utilisateurs.eleves" },
-      { label: "Professeurs", href: "/manager/utilisateurs/professeurs",  pageKey: "manager.utilisateurs.professeurs" },
+      { label: "Mentors",     href: "/manager/utilisateurs/professeurs",  pageKey: "manager.utilisateurs.professeurs" },
     ],
   },
   { label: "Mes thèmes",      href: "/manager/themes",       icon: "📚", pageKey: "manager.themes" },
@@ -82,7 +82,7 @@ const teacherNav: NavItem[] = [
 const roleLabel: Record<string, string> = {
   admin:   "Administrateur",
   manager: "Manager",
-  teacher: "Professeur",
+  teacher: "Mentor",
 };
 
 type Props = { role: Role; displayName: string; hiddenKeys?: string[]; badges?: Record<string, number> };

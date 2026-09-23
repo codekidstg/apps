@@ -135,7 +135,7 @@ export default function CreateUserForm({
                 <select name="role" required className={inputClass}>
                   <option value="">Choisir un rôle…</option>
                   <option value="manager">Manager</option>
-                  <option value="teacher">Professeur</option>
+                  <option value="teacher">Mentor</option>
                   <option value="student">Élève</option>
                   <option value="parent">Parent</option>
                   {viewerRole === "admin" && <option value="admin">Admin</option>}

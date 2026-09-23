@@ -10,7 +10,11 @@ export default function ProfSearchBar() {
     const lower = q.toLowerCase().trim();
     cards.forEach((card) => {
       const text = (card.dataset.profText ?? "").toLowerCase();
-      card.style.display = !lower || text.includes(lower) ? "" : "none";
+      const garde = !lower || text.includes(lower);
+      card.style.display = garde ? "" : "none";
+      // Une carte trouvée s'ouvre : un volet fermé oblige à cliquer pour
+      // savoir si c'est le bon. La recherche effacée les referme.
+      if (card instanceof HTMLDetailsElement) card.open = Boolean(lower) && garde;
     });
     // compteur
     const counter = document.getElementById("prof-count");

@@ -17,7 +17,7 @@ type Props = {
 
 const ROLES: { value: Role; label: string }[] = [
   { value: "student",  label: "Élève" },
-  { value: "teacher",  label: "Professeur" },
+  { value: "teacher",  label: "Mentor" },
   { value: "parent",   label: "Parent" },
   { value: "manager",  label: "Manager" },
   { value: "admin",    label: "Admin" },

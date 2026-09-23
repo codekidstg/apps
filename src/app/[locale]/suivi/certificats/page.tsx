@@ -43,7 +43,7 @@ export default async function CertificatsPage() {
       <div>
         <h1 className="text-2xl font-black text-white mb-1">Certificats & Diplômes</h1>
         <p className="text-slate-400 text-sm">
-          Téléchargez les attestations officielles de vos enfants. Les diplômes sont validés par le professeur.
+          Téléchargez les attestations officielles de vos enfants. Les diplômes sont validés par le mentor.
         </p>
       </div>
 
@@ -73,7 +73,7 @@ export default async function CertificatsPage() {
             {validated.length === 0 && pendingCount > 0 && (
               <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 text-center text-sm text-slate-500">
                 Aucun certificat validé pour l'instant.<br />
-                <span className="text-amber-500/80">{pendingCount} en cours de validation par le professeur.</span>
+                <span className="text-amber-500/80">{pendingCount} en cours de validation par le mentor.</span>
               </div>
             )}
 
@@ -113,7 +113,7 @@ export default async function CertificatsPage() {
                 ))}
                 {pendingCount > 0 && (
                   <p className="text-xs text-slate-500 text-center pt-1">
-                    + {pendingCount} certificat{pendingCount > 1 ? "s" : ""} en cours de validation par le professeur
+                    + {pendingCount} certificat{pendingCount > 1 ? "s" : ""} en cours de validation par le mentor
                   </p>
                 )}
               </div>

@@ -29,7 +29,7 @@ export default async function ProfLayout({ children }: { children: React.ReactNo
   return (
     <BackofficeShell
       role="teacher"
-      displayName={profile?.display_name ?? "Professeur"}
+      displayName={profile?.display_name ?? "Mentor"}
       hiddenKeys={hiddenKeys}
       badges={{ "teacher.questions": questionsEnAttente }}
     >

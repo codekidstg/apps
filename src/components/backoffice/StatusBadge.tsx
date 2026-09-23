@@ -35,7 +35,7 @@ const ROLE_STYLES: Record<string, { bg: string; color: string }> = {
 const ROLE_LABELS: Record<string, string> = {
   admin:   "Admin",
   manager: "Manager",
-  teacher: "Professeur",
+  teacher: "Mentor",
   student: "Élève",
   parent:  "Parent",
 };
