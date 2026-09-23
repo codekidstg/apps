@@ -68,10 +68,10 @@ export default async function AlerteSuiviMentors(
           href={`/${espace}/mentors?mois=${mois}`}
           emoji="🧑‍🏫"
           ton="ambre"
-          titre={`Point de fin de mois à faire pour ${bilans.aFaire} mentor${bilans.aFaire > 1 ? "s" : ""}`}
+          titre={`${bilans.aFaire} mentor${bilans.aFaire > 1 ? "s n'ont" : " n'a"} pas encore eu ${bilans.aFaire > 1 ? "leur" : "son"} point de fin de mois`}
           // « pour 3 mentors … sur 3 mentors » : le total ne se dit que s'il
           // reste des points déjà faits, sinon il répète le même chiffre.
-          detail={`${libelleMois(mois)}${bilans.aFaire < bilans.mentors ? ` — sur ${bilans.mentors}` : ""}. La note du mois est prête, il reste à en parler avec eux.`}
+          detail={`${libelleMois(mois)}${bilans.aFaire < bilans.mentors ? ` — sur ${bilans.mentors}` : ""}. La note du mois est prête si vous voulez en parler ; un mois peut aussi se passer.`}
         />
       )}
     </div>

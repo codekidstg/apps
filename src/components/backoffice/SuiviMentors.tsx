@@ -73,7 +73,7 @@ function Carte({ m, lien, bilan }: { m: MentorMois; lien: string; bilan: Bilan |
                 ✓ Point fait{bilan.ajustement !== 0 ? ` · ${bilan.ajustement > 0 ? "+" : "−"}${Math.abs(bilan.ajustement)} → ${bilan.noteRetenue}` : ""}
               </span>
             ) : (
-              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Point de fin de mois à faire</span>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Pas encore de point</span>
             )}
           </div>
 
@@ -130,9 +130,11 @@ export default async function SuiviMentors({ espace, mois }: { espace: "admin" |
 
         <ChoixMois base={base} actif={cle} />
 
+        {/* Un constat, pas une injonction : le point de fin de mois se tient
+            quand il a lieu d'être, et un mois peut se passer. */}
         {aFaire > 0 && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-900">
-            {aFaire} point{aFaire > 1 ? "s" : ""} de fin de mois {aFaire > 1 ? "restent" : "reste"} à faire pour {libelleMois(cle)}.
+          <div className="rounded-2xl border border-cream-border bg-white px-5 py-4 text-sm font-bold text-ink-muted">
+            {aFaire} mentor{aFaire > 1 ? "s n'ont" : " n'a"} pas encore eu {aFaire > 1 ? "leur" : "son"} point pour {libelleMois(cle)}.
           </div>
         )}
 

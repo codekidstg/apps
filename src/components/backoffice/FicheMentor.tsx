@@ -169,6 +169,9 @@ export default async function FicheMentor({ espace, id, mois }: {
 
   const duMois = bilans.find((b) => b.mois === cle) ?? null;
   const passes = bilans.filter((b) => b.mois !== cle);
+  // Le dernier point écrit avant ce mois — pas celui du mois précédent : un
+  // mois sauté ne doit pas effacer ce qui avait été décidé.
+  const precedent = bilans.find((b) => b.mois < cle) ?? null;
   const fiche = (eleveId: string | null) => eleveId ? `/${espace}/utilisateurs/eleves/${eleveId}` : base;
 
   return (
@@ -226,6 +229,11 @@ export default async function FicheMentor({ espace, id, mois }: {
         {/* Le point de fin de mois */}
         <BilanMentorForm
           mentorId={id} mois={cle} moisLabel={libelleMois(cle)} note={m.note.note}
+          precedent={precedent && {
+            moisLabel: precedent.moisLabel,
+            decisions: precedent.decisions,
+            aAmeliorer: precedent.aAmeliorer,
+          }}
           bilan={duMois && {
             ajustement: duMois.ajustement,
             raisonAjustement: duMois.raisonAjustement,

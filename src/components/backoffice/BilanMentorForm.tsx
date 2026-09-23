@@ -18,6 +18,24 @@ import { enregistrerBilan, type ResultatBilan } from "@/lib/backoffice/bilans-ac
 const INITIAL: ResultatBilan = {};
 const MAX = 10;
 
+/** Le dernier point écrit avant celui-ci — ce qu'on avait décidé. */
+type PointPrecedent = {
+  moisLabel: string;
+  decisions: string | null;
+  aAmeliorer: string | null;
+};
+
+/**
+ * Les suites possibles d'une décision prise le mois d'avant. Chacune amorce le
+ * champ qui lui convient : ce qui a été tenu est un point fort, le reste est à
+ * reprendre. Ce sont des débuts de phrase, pas des cases.
+ */
+const SUITES: { chip: string; champ: "forts" | "ameliorer"; texte: (m: string) => string }[] = [
+  { chip: "Tenu",     champ: "forts",     texte: (m) => `Ce qui avait été décidé en ${m} a été tenu : ` },
+  { chip: "En partie", champ: "ameliorer", texte: (m) => `Ce qui avait été décidé en ${m} n'a été tenu qu'en partie : ` },
+  { chip: "Pas tenu",  champ: "ameliorer", texte: (m) => `Ce qui avait été décidé en ${m} n'a pas été tenu : ` },
+];
+
 type BilanExistant = {
   ajustement: number;
   raisonAjustement: string | null;
@@ -30,16 +48,25 @@ type BilanExistant = {
 
 const champ = "w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-ink focus:border-brand-orange focus:outline-none";
 
-export default function BilanMentorForm({ mentorId, mois, moisLabel, note, bilan }: {
+export default function BilanMentorForm({ mentorId, mois, moisLabel, note, bilan, precedent }: {
   mentorId: string;
   mois: string;
   moisLabel: string;
   /** La note vivante du mois — null s'il n'y en a pas. */
   note: number | null;
   bilan: BilanExistant | null;
+  precedent?: PointPrecedent | null;
 }) {
   const [etat, action, enCours] = useActionState(enregistrerBilan, INITIAL);
   const [ajustement, setAjustement] = useState(String(bilan?.ajustement ?? 0));
+  // Les deux champs sont tenus ici pour que les suites puissent les amorcer.
+  const [forts, setForts] = useState(bilan?.pointsForts ?? "");
+  const [ameliorer, setAmeliorer] = useState(bilan?.aAmeliorer ?? "");
+  const amorcer = (s: (typeof SUITES)[number]) => {
+    const texte = s.texte(precedent?.moisLabel ?? "");
+    const ajoute = (t: string) => (t.trim() ? `${t.trimEnd()}\n${texte}` : texte);
+    if (s.champ === "forts") setForts(ajoute); else setAmeliorer(ajoute);
+  };
   const valeur = Math.trunc(Number(ajustement.replace(",", ".")) || 0);
   const retenue = note === null ? null : Math.max(0, Math.min(100, note + valeur));
 
@@ -86,16 +113,40 @@ export default function BilanMentorForm({ mentorId, mois, moisLabel, note, bilan
         )}
       </div>
 
+      {/* Ce qui avait été décidé revient ici : sans ce rappel, on décide chaque
+          mois dans le vide et on ne vérifie jamais rien. */}
+      {precedent?.decisions && (
+        <div className="rounded-xl px-4 py-3" style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}>
+          <div className="text-[11px] font-black" style={{ color: "#B45309" }}>
+            📌 En {precedent.moisLabel}, vous aviez décidé :
+          </div>
+          <p className="text-sm mt-1 whitespace-pre-wrap text-ink">{precedent.decisions}</p>
+          {precedent.aAmeliorer && (
+            <p className="text-xs mt-1.5 font-bold text-ink-muted">À améliorer alors : {precedent.aAmeliorer}</p>
+          )}
+          <div className="text-[11px] font-black mt-2" style={{ color: "#B45309" }}>Qu&apos;est-ce que ça a donné ?</div>
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {SUITES.map((s) => (
+              <button key={s.chip} type="button" onClick={() => amorcer(s)}
+                className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-white"
+                style={{ borderColor: "#FDE68A", color: "#B45309" }}>
+                {s.chip}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3">
         <div>
           <label className="block text-[11px] font-black text-ink-muted mb-1" htmlFor="pointsForts">Ses points forts</label>
           <textarea id="pointsForts" name="pointsForts" rows={2} className={champ}
-            defaultValue={bilan?.pointsForts ?? ""} placeholder="Ce qu'il fait bien, et qu'on veut garder" />
+            value={forts} onChange={(e) => setForts(e.target.value)} placeholder="Ce qu'il fait bien, et qu'on veut garder" />
         </div>
         <div>
           <label className="block text-[11px] font-black text-ink-muted mb-1" htmlFor="aAmeliorer">À améliorer</label>
           <textarea id="aAmeliorer" name="aAmeliorer" rows={2} className={champ}
-            defaultValue={bilan?.aAmeliorer ?? ""} placeholder="Ce qui a coûté des points, dit avec ses mots" />
+            value={ameliorer} onChange={(e) => setAmeliorer(e.target.value)} placeholder="Ce qui a coûté des points, dit avec ses mots" />
         </div>
         <div>
           <label className="block text-[11px] font-black text-ink-muted mb-1" htmlFor="decisions">Ce qui est décidé pour le mois prochain</label>
