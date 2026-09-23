@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { chargerMesQuestions, marquerReponsesVuesEleve } from "@/lib/questions/donnees";
-import { LIBELLE_RAISON } from "@/lib/questions/raisons";
+import { LIBELLE_RAISON, motCloture } from "@/lib/questions/raisons";
 import { dateEtHeure } from "@/lib/planning/dates";
 
 export const dynamic = "force-dynamic";
@@ -81,7 +81,7 @@ export default async function MesQuestionsPage() {
                   <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">{q.reponse.texte}</p>
                 </div>
               ) : q.reglee ? (
-                <p className="text-sm" style={{ color: "#94a3b8" }}>✅ {q.reglee.note ?? "Réglé en séance."}</p>
+                <p className="text-sm" style={{ color: "#94a3b8" }}>✅ {motCloture(q.reglee.raison, q.reglee.note)}</p>
               ) : (
                 <p className="text-sm" style={{ color: "#94a3b8" }}>⏳ Ton mentor va te répondre.</p>
               )}

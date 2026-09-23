@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import type { Raison } from "./raisons";
+import type { Cloture, Raison } from "./raisons";
 
 /**
  * « Je bloque ici » — les lectures, pour l'élève, son mentor et son parent.
@@ -35,7 +35,8 @@ export type Question = {
   etat: EtatQuestion;
   enRetard: boolean;
   reponse: { texte: string; parNom: string; le: string; vueLe: string | null } | null;
-  reglee: { note: string | null; parNom: string; le: string } | null;
+  /** Close sans réponse écrite : la raison dit ce que le mentor a fait. */
+  reglee: { note: string | null; parNom: string; le: string; raison: Cloture } | null;
   contexte: Contexte;
 };
 
@@ -58,6 +59,7 @@ type Ligne = {
   closed_at: string | null;
   closed_by: string | null;
   closed_note: string | null;
+  closed_reason: Cloture | null;
   reply_seen_at: string | null;
 };
 
@@ -85,7 +87,8 @@ function versQuestion(l: Ligne, noms: Map<string, string>, maintenant: number): 
       ? { texte: l.reply, parNom: noms.get(l.replied_by ?? "") ?? "Ton mentor", le: l.replied_at, vueLe: l.reply_seen_at }
       : null,
     reglee: l.closed_at
-      ? { note: l.closed_note, parNom: noms.get(l.closed_by ?? "") ?? "Ton mentor", le: l.closed_at }
+      // Les clôtures d'avant la migration 036 voulaient dire « réglé en séance ».
+      ? { note: l.closed_note, parNom: noms.get(l.closed_by ?? "") ?? "Ton mentor", le: l.closed_at, raison: l.closed_reason ?? "seance" }
       : null,
     contexte: l.context ?? {},
   };

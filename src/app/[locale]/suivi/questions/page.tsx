@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireParentPermission } from "@/lib/permissions/parent";
 import { chargerQuestionsEnfants } from "@/lib/questions/donnees";
-import { LIBELLE_RAISON } from "@/lib/questions/raisons";
+import { LIBELLE_RAISON, LIBELLE_CLOTURE, motCloture } from "@/lib/questions/raisons";
 import { dateEtHeure } from "@/lib/planning/dates";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +52,7 @@ export default async function QuestionsEnfantPage({ params }: { params: Promise<
                   q.etat === "repondue" ? "bg-emerald-900/50 text-emerald-300"
                   : q.etat === "reglee" ? "bg-slate-700 text-slate-300"
                   : "bg-amber-900/40 text-amber-300"}`}>
-                  {q.etat === "repondue" ? "💬 Répondue" : q.etat === "reglee" ? "✅ Réglée en séance" : "⏳ En attente"}
+                  {q.etat === "repondue" ? "💬 Répondue" : q.etat === "reglee" ? `✅ ${LIBELLE_CLOTURE[q.reglee?.raison ?? "seance"].libelle}` : "⏳ En attente"}
                 </span>
               </div>
 
@@ -68,7 +68,7 @@ export default async function QuestionsEnfantPage({ params }: { params: Promise<
                   <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">{q.reponse.texte}</p>
                 </div>
               )}
-              {!q.reponse && q.reglee?.note && <p className="text-sm text-slate-400">{q.reglee.note}</p>}
+              {!q.reponse && q.reglee && <p className="text-sm text-slate-400">{motCloture(q.reglee.raison, q.reglee.note)}</p>}
             </div>
           ))}
         </div>

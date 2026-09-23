@@ -5,7 +5,7 @@ import { DELAI_QUESTION_HEURES, type QuestionDirection } from "@/lib/questions/d
 import type { Enfant, Fil, FiltreEchanges } from "@/lib/questions/fils";
 import type { FicheExercice as Fiche } from "@/lib/questions/corrige";
 import { reponsesDansLaFiche } from "@/lib/questions/reponses-eleve";
-import { LIBELLE_RAISON } from "@/lib/questions/raisons";
+import { LIBELLE_RAISON, LIBELLE_CLOTURE } from "@/lib/questions/raisons";
 import { dateEtHeure, ilYa } from "@/lib/planning/dates";
 
 /**
@@ -105,7 +105,7 @@ function Conversation({ fil }: { fil: Fil<QuestionDirection> }) {
           {!q.reponse && q.reglee && (
             <div className="rounded-xl px-3 py-2 sm:ml-10 bg-slate-50 border border-slate-200">
               <div className="text-[11px] font-bold" style={{ color: "#64748B" }}>
-                ✅ Réglée en séance par {q.reglee.parNom} · {dateEtHeure(q.reglee.le)}
+                {LIBELLE_CLOTURE[q.reglee.raison].emoji} {LIBELLE_CLOTURE[q.reglee.raison].libelle} — par {q.reglee.parNom} · {dateEtHeure(q.reglee.le)}
               </div>
               {q.reglee.note && <p className="text-sm mt-1" style={{ color: "#334155" }}>{q.reglee.note}</p>}
             </div>

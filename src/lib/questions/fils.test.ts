@@ -77,7 +77,7 @@ describe("filtres des échanges", () => {
       question({ id: "a", poseeLe: "2026-09-16T10:00:00Z", blocId: "x", enRetard: true }),
       question({ id: "b", poseeLe: "2026-09-20T10:00:00Z", blocId: "y" }),
       question({ id: "c", poseeLe: "2026-09-19T10:00:00Z", blocId: "z", etat: "reglee",
-        reglee: { note: null, parNom: "Jean", le: "2026-09-19T12:00:00Z" } }),
+        reglee: { note: null, parNom: "Jean", raison: "seance", le: "2026-09-19T12:00:00Z" } }),
     ]);
     expect(compterFils(fils)).toEqual({ tous: 3, attente: 2, retard: 1 });
     expect(filtrerFils(fils, "retard").map((f) => f.derniere.id)).toEqual(["a"]);

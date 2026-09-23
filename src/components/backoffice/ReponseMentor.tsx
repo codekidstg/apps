@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { repondreQuestion, reglerEnSeance, type ResultatSimple } from "@/lib/questions/actions";
-import { REPONSES_RAPIDES } from "@/lib/questions/raisons";
+import { repondreQuestion, clorEchange, type ResultatSimple } from "@/lib/questions/actions";
+import { REPONSES_RAPIDES, CLOTURES, type Cloture } from "@/lib/questions/raisons";
 import type { FicheExercice as Fiche } from "@/lib/questions/corrige";
 import FicheExercice from "./FicheExercice";
 
@@ -27,7 +27,9 @@ export default function ReponseMentor({ questionId, fiche, choixEleve }: {
 }) {
   const [texte, setTexte] = useState("");
   const [etatReponse, actionReponse, reponseEnCours] = useActionState(repondreQuestion, INITIAL);
-  const [etatReglage, actionReglage, reglageEnCours] = useActionState(reglerEnSeance, INITIAL);
+  const [etatCloture, actionCloture, clotureEnCours] = useActionState(clorEchange, INITIAL);
+  // La clôture est repliée : répondre reste le geste normal.
+  const [raison, setRaison] = useState<Cloture | null>(null);
   // Une explication de l'exercice, versée à la suite de ce qui est déjà écrit :
   // le mentor la relit et l'ajuste avant d'envoyer.
   const reprendre = (explication: string) =>
@@ -81,16 +83,36 @@ export default function ReponseMentor({ questionId, fiche, choixEleve }: {
         </div>
       </form>
 
-      <form action={actionReglage} className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
-        <input type="hidden" name="id" value={questionId} />
-        <input name="note" maxLength={300} placeholder="Note pour l'élève (facultatif)"
-          className="flex-1 min-w-[200px] rounded-xl border border-slate-200 px-3 py-2 text-xs focus:outline-none" style={{ color: "#1B2D5E" }} />
-        <button type="submit" disabled={reglageEnCours}
-          className="font-black text-xs px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-60" style={{ color: "#1B2D5E" }}>
-          {reglageEnCours ? "Un instant…" : "✅ Réglé en séance"}
-        </button>
-        {etatReglage.error && <p className="text-xs font-bold text-red-600 w-full">{etatReglage.error}</p>}
-      </form>
+      <details className="pt-1 border-t border-slate-100">
+        <summary className="text-xs font-black cursor-pointer select-none py-1" style={{ color: "#64748B" }}>
+          Rien à répondre ? Clore l&apos;échange
+        </summary>
+        <form action={actionCloture} className="mt-2 space-y-2">
+          <input type="hidden" name="id" value={questionId} />
+          <div className="flex flex-col gap-1.5">
+            {CLOTURES.map((c) => (
+              <label key={c.id} className="flex items-start gap-2 cursor-pointer rounded-xl px-2.5 py-2 hover:bg-slate-50">
+                <input type="radio" name="raison" value={c.id} checked={raison === c.id}
+                  onChange={() => setRaison(c.id)} className="mt-0.5 accent-[#1B2D5E]" />
+                <span className="min-w-0">
+                  <span className="block text-xs font-black" style={{ color: "#1B2D5E" }}>{c.emoji} {c.libelle}</span>
+                  <span className="block text-[11px] font-bold" style={{ color: "#94A3B8" }}>{c.aide}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input name="note" maxLength={300} placeholder="Note pour l'élève (facultatif)"
+              className="flex-1 min-w-[200px] rounded-xl border border-slate-200 px-3 py-2 text-xs focus:outline-none" style={{ color: "#1B2D5E" }} />
+            <button type="submit" disabled={clotureEnCours || !raison}
+              className="font-black text-xs px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-40" style={{ color: "#1B2D5E" }}>
+              {clotureEnCours ? "Un instant…" : "Clore l'échange"}
+            </button>
+            {etatCloture.error && <p className="text-xs font-bold text-red-600 w-full">{etatCloture.error}</p>}
+          </div>
+        </form>
+      </details>
+
     </div>
   );
 }

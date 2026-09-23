@@ -21,6 +21,58 @@ export const LIBELLE_RAISON = Object.fromEntries(RAISONS.map((r) => [r.id, r.lib
 
 export const estRaison = (v: unknown): v is Raison => RAISONS.some((r) => r.id === v);
 
+/**
+ * Pourquoi un échange se clôt, côté mentor.
+ *
+ * `compte` : l'échange entre dans son suivi comme une réponse. Un message qui
+ * n'est pas une question n'en est pas une — il sort du décompte, et le clore
+ * trois jours plus tard ne coûte rien : l'enfant n'attendait pas.
+ */
+export type Cloture = "seance" | "pas_une_question" | "autrement";
+
+export const CLOTURES: {
+  id: Cloture; emoji: string; libelle: string; aide: string;
+  noteDefaut: string; pourEnfant: string; compte: boolean;
+}[] = [
+  {
+    id: "seance", emoji: "🧑‍🏫",
+    libelle: "Réglé pendant la séance",
+    aide: "Le délai se compte jusqu'à la séance, pas jusqu'à maintenant.",
+    noteDefaut: "Réglé en séance.",
+    pourEnfant: "Réglé en séance avec ton mentor.",
+    compte: true,
+  },
+  {
+    id: "pas_une_question", emoji: "👋",
+    libelle: "Pas une question — rien à répondre",
+    aide: "Un merci, un « ça marche ! » : l'échange sort du décompte.",
+    noteDefaut: "Message lu, rien à répondre.",
+    pourEnfant: "Ton mentor a bien lu ton message.",
+    compte: false,
+  },
+  {
+    id: "autrement", emoji: "📞",
+    libelle: "Réglé autrement (téléphone, WhatsApp)",
+    aide: "Compte comme une réponse, au moment où vous le notez ici.",
+    noteDefaut: "Réglé avec ton mentor en dehors de l'application.",
+    pourEnfant: "Réglé avec ton mentor.",
+    compte: true,
+  },
+];
+
+export const LIBELLE_CLOTURE = Object.fromEntries(CLOTURES.map((c) => [c.id, c])) as Record<Cloture, (typeof CLOTURES)[number]>;
+
+export const estCloture = (v: unknown): v is Cloture => CLOTURES.some((c) => c.id === v);
+
+/**
+ * Ce que l'enfant lit quand son mentor a clos sans écrire de réponse. Les
+ * clôtures d'avant la migration 036 n'ont pas de raison : elles voulaient
+ * toutes dire « réglé en séance ».
+ */
+export function motCloture(raison: string | null, note: string | null): string {
+  return note?.trim() || LIBELLE_CLOTURE[(raison ?? "seance") as Cloture]?.pourEnfant || "Réglé avec ton mentor.";
+}
+
 /** Les réponses d'un geste, pour le mentor qui prépare plusieurs séances. */
 export const REPONSES_RAPIDES = [
   "On regarde ça ensemble à la séance.",

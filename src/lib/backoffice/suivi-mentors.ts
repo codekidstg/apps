@@ -52,6 +52,10 @@ export type QuestionVue = {
   traiteeLe: string | null;
   /** La réponse est venue à la séance, pas par écrit. */
   enSeance: boolean;
+  /** false : clos « pas une question » — l'échange sort du décompte. */
+  compte: boolean;
+  /** Clos sans réponse écrite — la direction en voit le nombre sur la fiche. */
+  close: boolean;
 };
 
 export type EleveVue = {
@@ -136,7 +140,7 @@ export async function chargerSuiviMentors(
       : Promise.resolve({ data: [], error: null }),
     idsEleves.length
       ? admin.from("student_questions")
-          .select("id, student_id, block_id, created_at, replied_at, closed_at")
+          .select("id, student_id, block_id, created_at, replied_at, closed_at, closed_reason")
           .in("student_id", idsEleves).gte("created_at", debut).lt("created_at", fin)
       : Promise.resolve({ data: [], error: null }),
     chargerEvolutions(idsEleves),
@@ -194,8 +198,8 @@ export async function chargerSuiviMentors(
     if (!mentor) continue;
     // Réglée en séance : l'enfant a eu sa réponse à la séance, pas au moment
     // où le mentor l'a notée (voir `momentTraitee`).
-    const { traiteeLe, enSeance } = momentTraitee(
-      { poseeLe: q.created_at, repondueLe: q.replied_at ?? null, regleeLe: q.closed_at ?? null },
+    const { traiteeLe, enSeance, compte } = momentTraitee(
+      { poseeLe: q.created_at, repondueLe: q.replied_at ?? null, regleeLe: q.closed_at ?? null, raisonCloture: q.closed_reason ?? null },
       seancesParEleve.get(q.student_id) ?? [],
     );
     questionsParMentor.set(mentor, [...(questionsParMentor.get(mentor) ?? []), {
@@ -206,6 +210,8 @@ export async function chargerSuiviMentors(
       poseeLe: q.created_at,
       traiteeLe,
       enSeance,
+      compte,
+      close: !q.replied_at && !!q.closed_at,
     }]);
   }
 
@@ -246,7 +252,9 @@ export async function chargerSuiviMentors(
         noteProchaine: !!s.rapport.next_session_note?.trim(),
       },
     }));
-    const questionsNote: QuestionDuMois[] = sesQuestions.map((q) => ({ eleve: q.eleve, exercice: q.exercice, poseeLe: q.poseeLe, traiteeLe: q.traiteeLe }));
+    const questionsNote: QuestionDuMois[] = sesQuestions.map((q) => ({
+      eleve: q.eleve, exercice: q.exercice, poseeLe: q.poseeLe, traiteeLe: q.traiteeLe, compte: q.compte,
+    }));
     const elevesNote: EleveDuMois[] = sesEleves.map((e) => ({
       nom: e.nom,
       enDifficulte: e.statut === "bloque" || e.statut === "ralentit",

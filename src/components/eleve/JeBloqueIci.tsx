@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { poserQuestion, type ResultatQuestion } from "@/lib/questions/actions";
-import { RAISONS, LIBELLE_RAISON, ECHECS_AVANT_AIDE, type Raison } from "@/lib/questions/raisons";
+import { RAISONS, LIBELLE_RAISON, ECHECS_AVANT_AIDE, motCloture, type Raison } from "@/lib/questions/raisons";
 import type { Question } from "@/lib/questions/donnees";
 
 /**
@@ -190,7 +190,7 @@ export default function JeBloqueIci({ cible, blocId, indice, echecs, question, c
   if (question?.etat === "reglee") {
     return (
       <div className="rounded-2xl p-4 flex flex-wrap items-center justify-between gap-2" style={{ background: "#1e293b", border: "1px solid #334155" }}>
-        <p className="text-sm" style={{ color: "#cbd5e1" }}>✅ {question.reglee?.note ?? "Réglé en séance."}</p>
+        <p className="text-sm" style={{ color: "#cbd5e1" }}>✅ {motCloture(question.reglee?.raison ?? null, question.reglee?.note ?? null)}</p>
         <button type="button" onClick={ouvrir} className="text-xs font-bold underline" style={{ color: "#94a3b8" }}>
           Je bloque encore
         </button>

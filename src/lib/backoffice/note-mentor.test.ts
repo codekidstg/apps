@@ -132,7 +132,7 @@ describe("la note du mentor", () => {
     it("compte depuis la séance, pas depuis le moment où le mentor l'a notée", () => {
       // Séance le 19 au matin, notée le 21 au soir : c'est la séance qui compte.
       expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: "2026-09-21T20:00:00Z" }, [seance("19")]))
-        .toEqual({ traiteeLe: "2026-09-19T08:00:00Z", enSeance: true });
+        .toEqual({ traiteeLe: "2026-09-19T08:00:00Z", enSeance: true, compte: true });
     });
 
     it("moins de 48 h entre la question et la séance : rien n'est perdu", () => {
@@ -151,23 +151,54 @@ describe("la note du mentor", () => {
     it("une séance non tenue n'a rien apporté à l'enfant : on prend la suivante", () => {
       expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: "2026-09-27T10:00:00Z" },
         [seance("19", "08:00", false), seance("26")]))
-        .toEqual({ traiteeLe: "2026-09-26T08:00:00Z", enSeance: true });
+        .toEqual({ traiteeLe: "2026-09-26T08:00:00Z", enSeance: true, compte: true });
     });
 
     it("sans aucune séance depuis, il reste le moment où le mentor l'a réglée", () => {
       expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: "2026-09-20T10:00:00Z" }, []))
-        .toEqual({ traiteeLe: "2026-09-20T10:00:00Z", enSeance: false });
+        .toEqual({ traiteeLe: "2026-09-20T10:00:00Z", enSeance: false, compte: true });
       // Une séance d'avant la question ne compte pas non plus.
       expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: "2026-09-20T10:00:00Z" }, [seance("12")]))
-        .toEqual({ traiteeLe: "2026-09-20T10:00:00Z", enSeance: false });
+        .toEqual({ traiteeLe: "2026-09-20T10:00:00Z", enSeance: false, compte: true });
+    });
+
+    it("« pas une question » sort l'échange du décompte", () => {
+      // Kenneth écrit « ça y est, ça remarche » : rien à répondre. Son mentor
+      // clôt trois jours plus tard, et ça ne lui coûte rien.
+      expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: "2026-09-19T20:00:00Z", raisonCloture: "pas_une_question" }, []))
+        .toEqual({ traiteeLe: "2026-09-19T20:00:00Z", enSeance: false, compte: false });
+
+      const merci = { eleve: "Kenneth", exercice: "quiz-1", poseeLe: posee, traiteeLe: "2026-09-19T20:00:00Z", compte: false };
+      expect(attentes([merci])).toEqual([]);
+      const n = note({ seances: parfaites(3), questions: [merci], eleves: [] });
+      expect(n.note).toBe(100);
+      // Plus rien à compter : le bloc des réponses rend ses points aux séances.
+      expect(n.blocs[1]).toMatchObject({ sur: 0, unites: 0 });
+    });
+
+    it("« réglé autrement » compte au moment où le mentor le note", () => {
+      // Réglé par téléphone : aucune séance n'entre en jeu.
+      expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: "2026-09-17T09:00:00Z", raisonCloture: "autrement" }, [seance("19")]))
+        .toEqual({ traiteeLe: "2026-09-17T09:00:00Z", enSeance: false, compte: true });
+    });
+
+    it("un merci clos ne fait pas disparaître la question restée en attente avant lui", () => {
+      // Une vraie question le 16, un merci le 18 clos « pas une question » :
+      // le fil se termine sans rien compter — c'est le jugement du mentor, et
+      // la fiche affiche à part ses échanges clos sans réponse.
+      const fil = [
+        { eleve: "Kenneth", exercice: "quiz-1", poseeLe: posee, traiteeLe: null },
+        { eleve: "Kenneth", exercice: "quiz-1", poseeLe: "2026-09-18T10:00:00Z", traiteeLe: "2026-09-18T11:00:00Z", compte: false },
+      ];
+      expect(attentes(fil)).toEqual([]);
     });
 
     it("une réponse écrite garde sa date, et une question ouverte attend encore", () => {
       expect(momentTraitee({ poseeLe: posee, repondueLe: "2026-09-17T09:00:00Z", regleeLe: null }, [seance("19")]))
-        .toEqual({ traiteeLe: "2026-09-17T09:00:00Z", enSeance: false });
+        .toEqual({ traiteeLe: "2026-09-17T09:00:00Z", enSeance: false, compte: true });
       // Une séance passée ne solde pas toute seule ce que le mentor doit.
       expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: null }, [seance("19")]))
-        .toEqual({ traiteeLe: null, enSeance: false });
+        .toEqual({ traiteeLe: null, enSeance: false, compte: true });
     });
   });
 

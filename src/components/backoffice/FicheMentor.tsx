@@ -73,9 +73,11 @@ function LigneQuestion({ q, lien }: { q: QuestionVue; lien: string }) {
       </div>
       <span className={`text-[11px] font-black px-2.5 py-1 rounded-full ${
         attente ? "bg-amber-200 text-amber-900"
+          : !q.compte ? "bg-slate-200 text-slate-700"
           : delai! > DELAI_HEURES ? "bg-orange-100 text-orange-700" : "bg-emerald-100 text-emerald-700"
       }`}>
         {attente ? "Sans réponse"
+          : !q.compte ? "Pas une question"
           : `${q.enSeance ? "Répondue en séance" : "Répondue"} en ${delai! < 24 ? `${Math.max(1, Math.round(delai!))} h` : `${Math.round(delai! / 24)} j`}`}
       </span>
     </div>
@@ -113,6 +115,17 @@ function LigneEleve({ e, lien }: { e: EleveVue; lien: string }) {
       )}
     </div>
   );
+}
+
+/**
+ * Le compte des questions, et ce que le mentor a clos sans répondre. Clore
+ * « pas une question » sort l'échange de sa note : le nombre s'affiche donc
+ * ici, pour que rien ne se règle en silence.
+ */
+function libelleQuestions(questions: QuestionVue[]): string {
+  const posees = `${questions.length} posée${questions.length > 1 ? "s" : ""} dans le mois`;
+  const closes = questions.filter((q) => q.close && !q.compte).length;
+  return closes ? `${posees} · ${closes} close${closes > 1 ? "s" : ""} sans réponse` : posees;
 }
 
 function Section({ titre, compte, children }: { titre: string; compte?: string; children: React.ReactNode }) {
@@ -225,7 +238,7 @@ export default async function FicheMentor({ espace, id, mois }: {
             : m.seances.map((s) => <LigneSeance key={s.cle} s={s} />)}
         </Section>
 
-        <Section titre="Les questions de ses élèves" compte={`${m.questions.length} posée${m.questions.length > 1 ? "s" : ""} dans le mois`}>
+        <Section titre="Les questions de ses élèves" compte={libelleQuestions(m.questions)}>
           {m.questions.length === 0
             ? <div className="px-5 py-8 text-center text-sm font-bold text-ink-muted">Aucune question ce mois-ci.</div>
             : m.questions.map((q) => <LigneQuestion key={q.id} q={q} lien={`/${espace}/questions?eleve=${q.eleveId}`} />)}

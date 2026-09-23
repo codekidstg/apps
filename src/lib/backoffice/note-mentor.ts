@@ -52,7 +52,13 @@ export type QuestionDuMois = {
   /** L'exercice où l'enfant a appuyé : deux messages y font un seul échange. */
   exercice: string;
   poseeLe: string;             // ISO
-  traiteeLe: string | null;    // répondue, ou réglée en séance
+  traiteeLe: string | null;    // répondue, réglée en séance, ou close
+  /**
+   * false : le mentor a clos en disant que ce n'était pas une question — un
+   * merci, un « ça y est, ça marche ». L'enfant n'attendait rien, l'échange
+   * sort du décompte au lieu d'être compté comme une réponse rapide.
+   */
+  compte?: boolean;
 };
 
 /** Un enfant qui attend : depuis quand, et jusqu'à quand. */
@@ -64,8 +70,10 @@ export type SeanceEleve = { quand: string; tenue: boolean };
 /**
  * Quand la question a-t-elle trouvé sa réponse ?
  *
- *   par écrit          au moment de la réponse
- *   réglée en séance   à la séance, pas au moment où le mentor l'a noté
+ *   par écrit           au moment de la réponse
+ *   réglée en séance    à la séance, pas au moment où le mentor l'a noté
+ *   réglée autrement    au moment où le mentor le note
+ *   pas une question    rien à compter — voir `compte`
  *
  * Un mentor qui fait sa séance le samedi matin et le note le lundi soir
  * paierait deux jours qu'il n'a pas fait attendre l'enfant. On retient donc la
@@ -78,18 +86,24 @@ export type SeanceEleve = { quand: string; tenue: boolean };
  * effacerait en silence ce qu'il devait à l'enfant.
  */
 export function momentTraitee(
-  q: { poseeLe: string; repondueLe: string | null; regleeLe: string | null },
+  q: { poseeLe: string; repondueLe: string | null; regleeLe: string | null; raisonCloture?: string | null },
   seances: SeanceEleve[],
-): { traiteeLe: string | null; enSeance: boolean } {
-  if (q.repondueLe) return { traiteeLe: q.repondueLe, enSeance: false };
-  if (!q.regleeLe) return { traiteeLe: null, enSeance: false };
+): { traiteeLe: string | null; enSeance: boolean; compte: boolean } {
+  if (q.repondueLe) return { traiteeLe: q.repondueLe, enSeance: false, compte: true };
+  if (!q.regleeLe) return { traiteeLe: null, enSeance: false, compte: true };
+
+  // Les clôtures d'avant la migration 036 n'ont pas de raison : elles
+  // voulaient toutes dire « réglé en séance ».
+  const raison = q.raisonCloture ?? "seance";
+  if (raison === "pas_une_question") return { traiteeLe: q.regleeLe, enSeance: false, compte: false };
+  if (raison !== "seance") return { traiteeLe: q.regleeLe, enSeance: false, compte: true };
 
   const posee = new Date(q.poseeLe).getTime();
   const suivante = seances
     .filter((s) => s.tenue && new Date(s.quand).getTime() > posee)
     .sort((a, b) => new Date(a.quand).getTime() - new Date(b.quand).getTime())[0];
 
-  return { traiteeLe: suivante?.quand ?? q.regleeLe, enSeance: !!suivante };
+  return { traiteeLe: suivante?.quand ?? q.regleeLe, enSeance: !!suivante, compte: true };
 }
 
 /**
@@ -119,7 +133,8 @@ export function attentes(questions: QuestionDuMois[]): Attente[] {
     for (const q of ordre) {
       depuis ??= q.poseeLe;
       if (q.traiteeLe) {
-        out.push({ eleve: q.eleve, depuis, traiteeLe: q.traiteeLe });
+        // Close « pas une question » : la suite se termine sans rien compter.
+        if (q.compte !== false) out.push({ eleve: q.eleve, depuis, traiteeLe: q.traiteeLe });
         depuis = null;
       }
     }

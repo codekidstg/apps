@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { accesLecon, accesEntrainement, MESSAGE_REFUS } from "@/lib/eleve/acces";
-import { estRaison, LIBELLE_RAISON } from "./raisons";
+import { estRaison, estCloture, LIBELLE_RAISON, LIBELLE_CLOTURE } from "./raisons";
 import { prochaineSeance, jourDeSeance, type SeanceBrute } from "./seance";
 import { dateEtHeure } from "@/lib/planning/dates";
 import type { Contexte } from "./donnees";
@@ -11,9 +11,9 @@ import type { Contexte } from "./donnees";
 /**
  * « Je bloque ici » — les écritures.
  *
- * L'élève pose sa question depuis l'exercice ; son mentor y répond, ou la
- * règle en séance. Le mentor répond, il n'ouvre jamais de conversation avec un
- * enfant : il n'existe aucune action pour ça.
+ * L'élève pose sa question depuis l'exercice ; son mentor y répond, ou clôt
+ * l'échange en disant pourquoi. Le mentor répond, il n'ouvre jamais de
+ * conversation avec un enfant : il n'existe aucune action pour ça.
  */
 
 export type ResultatQuestion = {
@@ -216,9 +216,18 @@ export async function repondreQuestion(_prev: ResultatSimple, formData: FormData
   return { success: true };
 }
 
-export async function reglerEnSeance(_prev: ResultatSimple, formData: FormData): Promise<ResultatSimple> {
+/**
+ * Clore un échange sans y répondre par écrit — avec sa raison.
+ *
+ * L'enfant n'a aucun autre bouton que « Je bloque ici » pour écrire à son
+ * mentor : un merci arrive donc comme une question. Le mentor dit ce qu'il en
+ * est, et « pas une question » sort l'échange du décompte de son suivi.
+ */
+export async function clorEchange(_prev: ResultatSimple, formData: FormData): Promise<ResultatSimple> {
   const id = String(formData.get("id") ?? "");
   const note = String(formData.get("note") ?? "").trim();
+  const raison = String(formData.get("raison") ?? "");
+  if (!estCloture(raison)) return { error: "Choisissez pourquoi vous clôturez cet échange." };
   if (note.length > NOTE_MAX) return { error: `La note dépasse ${NOTE_MAX} caractères.` };
 
   const qui = await repondant(id);
@@ -226,7 +235,13 @@ export async function reglerEnSeance(_prev: ResultatSimple, formData: FormData):
   if (qui.ligne.replied_at || qui.ligne.closed_at) return { error: "Cette question est déjà traitée." };
 
   const { error } = await (createAdminClient().from("student_questions") as any)
-    .update({ closed_at: new Date().toISOString(), closed_by: qui.id, closed_note: note || "Réglé en séance." })
+    .update({
+      closed_at: new Date().toISOString(),
+      closed_by: qui.id,
+      closed_reason: raison,
+      // Sans mot du mentor, l'enfant lit au moins ce qui s'est passé.
+      closed_note: note || LIBELLE_CLOTURE[raison].pourEnfant,
+    })
     .eq("id", id);
   if (error) {
     console.error("[questions] clôture :", error.message);
