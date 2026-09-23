@@ -10,6 +10,8 @@ type Props = {
   sessionTitle: string;
   sessionDate: string;
   occurrenceDate: string; // ISO date YYYY-MM-DD — identifie l'occurrence exacte
+  /** La note laissée à la séance précédente de cet enfant, s'il y en a une. */
+  notePrecedente?: { texte: string; date: string } | null;
   onClose: () => void;
 };
 
@@ -44,11 +46,22 @@ const HELP_METHODS = [
   { value: "other",       label: "Autre" },
 ];
 
+/**
+ * Les suites possibles de la note laissée la dernière fois. Ce sont des débuts
+ * de phrase, pas des cases : le mentor les complète. Une case cochée se coche
+ * sans réfléchir, une phrase commencée se finit.
+ */
+const SUITES = [
+  { chip: "On l'a repris, c'est réglé", texte: "On a repris ce point, c'est réglé : " },
+  { chip: "Repris, encore fragile",     texte: "On a repris ce point, c'est encore fragile : " },
+  { chip: "Pas eu le temps",            texte: "On n'a pas eu le temps d'y revenir : " },
+];
+
 const CHOIX = "flex items-center gap-3 p-3 rounded-2xl cursor-pointer border-2 transition-all";
 const CHOISI = "border-yellow-400 bg-yellow-50";
 const NON_CHOISI = "border-gray-100 bg-gray-50 hover:border-gray-200";
 
-export default function SessionReportForm({ sessionId, studentId, sessionTitle, sessionDate, occurrenceDate, onClose }: Props) {
+export default function SessionReportForm({ sessionId, studentId, sessionTitle, sessionDate, occurrenceDate, notePrecedente, onClose }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(1);
   const [tenue, setTenue] = useState<boolean | null>(null);
@@ -56,6 +69,7 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
   const [advancement, setAdvancement] = useState("");
   const [engagement, setEngagement] = useState("");
   const [helpMethods, setHelpMethods] = useState<string[]>([]);
+  const [difficultes, setDifficultes] = useState("");
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -239,9 +253,34 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
             {step === 4 && (
               <div className="space-y-5">
                 <div>
-                  <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Difficultés rencontrées ?</div>
-                  <div className="text-xs mb-2" style={{ color: "#94A3B8" }}>Laisse vide si tout s&apos;est bien passé</div>
-                  <textarea name="difficulty_notes" rows={3} placeholder="Ex : la notion de boucle ne rentre pas encore, on a fait des exercices supplémentaires..."
+                  {/* La note laissée la dernière fois revient ici : c'est ce qui
+                      transforme une suite de photos isolées en un fil suivi. Sans
+                      elle, personne ne relisait jamais ce qui avait été écrit. */}
+                  {notePrecedente && (
+                    <div className="rounded-2xl p-3 mb-3" style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}>
+                      <div className="text-[11px] font-black" style={{ color: "#B45309" }}>
+                        📌 La dernière fois ({notePrecedente.date}), vous aviez noté :
+                      </div>
+                      <p className="text-sm mt-1 whitespace-pre-wrap" style={{ color: "#1B2D5E" }}>{notePrecedente.texte}</p>
+                      <div className="text-[11px] font-black mt-2" style={{ color: "#B45309" }}>Qu&apos;est-ce que ça a donné ?</div>
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {SUITES.map((s) => (
+                          <button key={s.chip} type="button"
+                            onClick={() => setDifficultes((t) => (t.trim() ? `${t.trimEnd()}\n${s.texte}` : s.texte))}
+                            className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-white"
+                            style={{ borderColor: "#FDE68A", color: "#B45309" }}>
+                            {s.chip}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="font-black mb-1" style={{ color: "#1B2D5E" }}>Ce qui s&apos;est passé</div>
+                  <div className="text-xs mb-2" style={{ color: "#94A3B8" }}>
+                    Ce que le prochain mentor et la direction liront — deux phrases suffisent
+                  </div>
+                  <textarea name="difficulty_notes" rows={3} value={difficultes} onChange={(e) => setDifficultes(e.target.value)}
+                    placeholder="Ex : la notion de boucle ne rentre pas encore, on a fait des exercices supplémentaires..."
                     className="w-full rounded-2xl border text-sm p-3 resize-none outline-none focus:border-yellow-400 transition-colors"
                     style={{ borderColor: "#E2E8F0", color: "#1B2D5E" }} />
                 </div>

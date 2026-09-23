@@ -55,6 +55,8 @@ type Item = {
   studentName: string | null;
   recurring: boolean;
   report: Report | null;
+  /** La note laissée à la séance précédente de cet enfant. */
+  notePrecedente?: { texte: string; date: string } | null;
 };
 
 // ─── Modal rapport rempli ──────────────────────────────────────────────────────
@@ -359,6 +361,7 @@ export default function RapportsClient({ items }: { items: Item[] }) {
           occurrenceDate={openForm.occurrenceDate}
           sessionTitle={openForm.title}
           sessionDate={`${openForm.dateStr} à ${openForm.time}`}
+          notePrecedente={openForm.notePrecedente}
           onClose={() => setOpenForm(null)}
         />
       )}

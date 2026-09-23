@@ -38,6 +38,26 @@ export default async function RapportsPage() {
     if (!reportsByKey.has(key)) reportsByKey.set(key, r);
   }
 
+  // La note laissée à la séance précédente du même enfant : c'est elle que le
+  // formulaire remet sous les yeux du mentor. Par élève, et non par séance :
+  // un enfant peut changer de créneau sans que le fil se coupe.
+  const eleveDeSeance = new Map<string, string>(
+    (sessions ?? []).map((s: any) => [s.id, s.students?.id ?? s.student_id ?? s.id]),
+  );
+  const notesParEleve = new Map<string, { texte: string; date: string }[]>();
+  for (const r of (reportsRaw ?? []).filter((r: any) => r.next_session_note?.trim())) {
+    const eleve = eleveDeSeance.get(r.session_id) ?? r.session_id;
+    notesParEleve.set(eleve, [...(notesParEleve.get(eleve) ?? []), {
+      texte: r.next_session_note.trim(),
+      quand: r.occurrence_date as string,
+      date: new Date(`${r.occurrence_date}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }),
+    }].sort((a: any, b: any) => b.quand.localeCompare(a.quand)) as any);
+  }
+  const notePrecedenteDe = (sessionId: string, date: string) => {
+    const eleve = eleveDeSeance.get(sessionId) ?? sessionId;
+    return (notesParEleve.get(eleve) ?? []).find((n: any) => n.quand < date) ?? null;
+  };
+
   const items = past.map(occ => {
     const at = new Date(occ.quand);
     return {
@@ -53,6 +73,7 @@ export default async function RapportsPage() {
       studentName:    occ.eleve,
       recurring:      occ.recurrente,
       report:         reportsByKey.get(`${occ.sessionId}|${occ.date}`) ?? null,
+      notePrecedente: notePrecedenteDe(occ.sessionId, occ.date),
     };
   });
 
