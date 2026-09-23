@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Pages, { decouper, PAR_PAGE } from "@/components/backoffice/Pages";
 import { RoleBadge } from "@/components/backoffice/StatusBadge";
 import { CopyCell } from "./CopyCell";
 import { ResetPasswordCell } from "./ResetPasswordCell";
@@ -162,6 +163,12 @@ export default function UsersSearchTable({
     });
   }, [q, roleFilter, users]);
 
+  // La page se remet à zéro dès que le filtre change : rester page 4 d'une
+  // liste qui n'en fait plus qu'une afficherait un écran vide.
+  const [page, setPage] = useState(0);
+  const pageSure = Math.min(page, Math.max(0, Math.ceil(filtered.length / PAR_PAGE) - 1));
+  const visibles = decouper(filtered, pageSure);
+
   return (
     <div className="space-y-4">
       {editingUser && (
@@ -218,7 +225,7 @@ export default function UsersSearchTable({
                   Aucun utilisateur pour « {q || roleFilter} »
                 </td>
               </tr>
-            ) : filtered.map((u) => {
+            ) : visibles.map((u) => {
               const base = BASE_URL || "http://localhost:3000";
               const loginUrl = `${base}/fr/connexion`;
               const dash = DASHBOARD[u.role] ? `${base}${DASHBOARD[u.role]}` : null;
@@ -284,6 +291,7 @@ export default function UsersSearchTable({
           </tbody>
         </table>
       </div>
+      <Pages page={pageSure} total={filtered.length} onPage={setPage} quoi="utilisateur" />
     </div>
   );
 }

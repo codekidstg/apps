@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Pages, { decouper, PAR_PAGE } from "@/components/backoffice/Pages";
 import Link from "next/link";
 import LevelSelect from "./LevelSelect";
 import type { Parcours } from "@/lib/progression";
@@ -47,6 +48,12 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
       );
     });
   }, [q, levelFilter, statutFilter, students]);
+
+  // La page se remet à zéro dès que le filtre change : rester page 4 d'une
+  // liste qui n'en fait plus qu'une afficherait un écran vide.
+  const [page, setPage] = useState(0);
+  const pageSure = Math.min(page, Math.max(0, Math.ceil(filtered.length / PAR_PAGE) - 1));
+  const visibles = decouper(filtered, pageSure);
 
   const parStatut = useMemo(() => {
     const n: Partial<Record<StatutEleve, number>> = {};
@@ -118,7 +125,7 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
               <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400 font-bold">
                 Aucun élève pour ce filtre
               </td></tr>
-            ) : filtered.map((s) => {
+            ) : visibles.map((s) => {
               const lvl = LEVELS.find((l) => l.num === s.level_num) ?? LEVELS[0];
               const p   = s.parcours;
               const pct = p.total ? Math.round((p.faites / p.total) * 100) : 0;
@@ -203,6 +210,7 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
           </tbody>
         </table>
       </div>
+      <Pages page={pageSure} total={filtered.length} onPage={setPage} quoi="élève" />
     </div>
   );
 }

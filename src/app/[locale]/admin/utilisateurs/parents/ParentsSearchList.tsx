@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Pages, { decouper, PAR_PAGE } from "@/components/backoffice/Pages";
 import AddChildForm from "./AddChildForm";
 import UnlinkButton from "./UnlinkButton";
 import { STATUT_PARENT, type StatutParent } from "@/lib/backoffice/statut-parent";
@@ -67,6 +68,12 @@ export default function ParentsSearchList({
       .sort((a, b) => STATUT_PARENT[a.activite.statut].ordre - STATUT_PARENT[b.activite.statut].ordre);
   }, [q, statut, parents]);
 
+  // La page se remet à zéro dès que le filtre change : rester page 4 d'une
+  // liste qui n'en fait plus qu'une afficherait un écran vide.
+  const [page, setPage] = useState(0);
+  const pageSure = Math.min(page, Math.max(0, Math.ceil(filtered.length / PAR_PAGE) - 1));
+  const visibles = decouper(filtered, pageSure);
+
   const parStatut = useMemo(() => {
     const n: Partial<Record<StatutParent, number>> = {};
     for (const p of parents) n[p.activite.statut] = (n[p.activite.statut] ?? 0) + 1;
@@ -119,7 +126,7 @@ export default function ParentsSearchList({
           <div className="text-center text-gray-400 py-12 bg-white rounded-2xl border border-gray-100">
             Aucun parent pour ce filtre
           </div>
-        ) : filtered.map((parent) => {
+        ) : visibles.map((parent) => {
           const a = parent.activite;
           const s = STATUT_PARENT[a.statut];
           return (
@@ -209,6 +216,7 @@ export default function ParentsSearchList({
           );
         })}
       </div>
+      <Pages page={pageSure} total={filtered.length} onPage={setPage} quoi="parent" />
     </div>
   );
 }
