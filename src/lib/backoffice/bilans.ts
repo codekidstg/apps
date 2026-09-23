@@ -78,3 +78,23 @@ export async function chargerBilansDuMois(mois: string): Promise<Map<string, Bil
   }
   return new Map((data ?? []).map((l: Ligne) => [l.mentor_id as string, versBilan(l)]));
 }
+
+/**
+ * Combien de mentors n'ont pas encore eu leur point pour ce mois — deux
+ * comptages, pour l'alerte du tableau de bord. La liste complète, elle, passe
+ * par `chargerSuiviMentors`, bien plus lourde : une alerte ne doit pas coûter
+ * le calcul de toutes les notes.
+ */
+export async function compterBilansAFaire(mois: string): Promise<{ mentors: number; aFaire: number }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  const [mentors, faits] = await Promise.all([
+    admin.from("profiles").select("id", { count: "exact", head: true }).eq("role", "teacher"),
+    admin.from("bilans_mentors").select("id", { count: "exact", head: true }).eq("mois", mois),
+  ]);
+  if (mentors.error) console.error("[bilans] mentors :", mentors.error.message);
+  if (faits.error) console.error("[bilans] faits :", faits.error.message);
+
+  const total = mentors.count ?? 0;
+  return { mentors: total, aFaire: Math.max(0, total - (faits.count ?? 0)) };
+}

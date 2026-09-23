@@ -3,6 +3,7 @@ import PageHeader from "@/components/backoffice/PageHeader";
 import AlerteBoiteDirection from "@/components/backoffice/AlerteBoiteDirection";
 import ProchainesSeances from "@/components/backoffice/ProchainesSeances";
 import AlerteParents from "@/components/backoffice/AlerteParents";
+import AlerteSuiviMentors from "@/components/backoffice/AlerteSuiviMentors";
 
 async function getStats() {
   const supabase = await createClient();
@@ -52,6 +53,7 @@ export default async function AdminDashboard() {
 
         <AlerteBoiteDirection href="/admin/messages" />
         <AlerteParents espace="admin" />
+        <AlerteSuiviMentors espace="admin" />
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {kpis.map((k) => (

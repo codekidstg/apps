@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { moisDisponibles, lireMois, libelleMois, DEBUT_SUIVI } from "./mois";
+import { moisDisponibles, lireMois, libelleMois, moisABoucler, DEBUT_SUIVI } from "./mois";
 
 const le = (jour: string) => new Date(`${jour}T12:00:00Z`);
 const cles = (d: Date) => moisDisponibles(d).map((m) => m.cle);
@@ -44,5 +44,24 @@ describe("les mois du suivi", () => {
   it("les libellés sont écrits en français", () => {
     expect(libelleMois("2026-09")).toBe("septembre 2026");
     expect(libelleMois("2027-01")).toBe("janvier 2027");
+  });
+});
+
+describe("le mois dont le point est à faire", () => {
+  it("avant le 25, c'est le mois précédent", () => {
+    expect(moisABoucler(le("2026-10-10"))).toBe("2026-09");
+    expect(moisABoucler(le("2027-01-24"))).toBe("2026-12");
+  });
+
+  it("à partir du 25, c'est le mois en cours — le point se tient dans les derniers jours", () => {
+    expect(moisABoucler(le("2026-09-25"))).toBe("2026-09");
+    expect(moisABoucler(le("2026-09-30"))).toBe("2026-09");
+    expect(moisABoucler(le("2026-10-25"))).toBe("2026-10");
+  });
+
+  it("avant le début du suivi, il n'y a rien à boucler", () => {
+    // Le 23 septembre 2026 : le mois précédent est août, hors suivi.
+    expect(moisABoucler(le("2026-09-23"))).toBeNull();
+    expect(moisABoucler(le("2026-06-10"))).toBeNull();
   });
 });

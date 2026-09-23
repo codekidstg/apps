@@ -16,6 +16,8 @@ import { jourTogo } from "../planning/dates";
 
 export const DEBUT_SUIVI = "2026-09";
 export const FENETRE_MOIS = 12;
+/** À partir de ce jour du mois, le point de fin de mois se prépare. */
+export const JOUR_BILAN = 25;
 
 export type Mois = { cle: string; label: string };
 
@@ -53,6 +55,22 @@ export function moisDisponibles(maintenant: Date = new Date(), combien = FENETRE
   }
   // Une horloge réglée avant septembre 2026 ne doit pas rendre une liste vide.
   return liste.length ? liste : [{ cle: courant, label: libelleMois(courant) }];
+}
+
+/**
+ * Le mois dont le point de fin de mois est à faire, pour l'alerte du tableau
+ * de bord : le mois en cours à partir du 25, le mois précédent avant lui.
+ *
+ * Sans cette bascule, l'alerte réclamerait dès le 2 un bilan sur un mois qui
+ * vient de commencer, ou attendrait le 1er du mois suivant pour rappeler un
+ * point qui se tient dans les derniers jours. `null` : il n'y a pas encore de
+ * mois à boucler — avant le début du suivi, il n'y a rien à dire.
+ */
+export function moisABoucler(maintenant: Date = new Date()): string | null {
+  const jour = Number(jourTogo(maintenant).slice(8, 10));
+  const courant = moisCourant(maintenant);
+  const cible = jour >= JOUR_BILAN ? courant : decale(courant, -1);
+  return cible < DEBUT_SUIVI ? null : cible;
 }
 
 /**
