@@ -1,5 +1,7 @@
 import PageHeader from "@/components/backoffice/PageHeader";
+import Link from "next/link";
 import { getRapportsData, AVANCEMENT, ENGAGEMENT, AIDES, NON_TENUE, type Occurrence } from "@/lib/rapports";
+import { PERIODES, PERIODE_DEFAUT, debutPeriode, libellePeriode } from "@/lib/planning/occurrences-passees";
 
 /**
  * Écran « Rapports de séance », en lecture seule.
@@ -102,15 +104,45 @@ function Ligne({ o }: { o: Occurrence }) {
   );
 }
 
-export default async function RapportsPage() {
-  const { occurrences, faits, manquants, nonTenues } = await getRapportsData();
+/** Combien de séances s'affichent d'un coup, et de combien « Voir plus » avance. */
+const LOT = 15;
+
+export default async function RapportsPage({ espace, periode, voir }: {
+  espace: "admin" | "manager";
+  periode?: string;
+  voir?: string;
+}) {
+  // Deux bornes, deux métiers : la période décide de ce qu'on déroule — donc
+  // du travail fait —, le lot décide de ce qu'on affiche. Sans la première,
+  // chaque ouverture recalculait toutes les semaines depuis la création de
+  // chaque séance ; sans la seconde, la page rendait tout d'un bloc.
+  const choisie = PERIODES.some((p) => p.cle === periode) ? periode! : PERIODE_DEFAUT;
+  const depuis = debutPeriode(choisie) ?? undefined;
+  const { occurrences, faits, manquants, nonTenues } = await getRapportsData({ depuis });
+
+  const montrees = Math.max(LOT, Number(voir) || LOT);
+  const visibles = occurrences.slice(0, montrees);
+  const reste = occurrences.length - visibles.length;
+  const base = `/${espace}/rapports`;
+  const lien = (p: Record<string, string | number>) =>
+    `${base}?${new URLSearchParams({ periode: choisie, ...Object.fromEntries(Object.entries(p).map(([k, v]) => [k, String(v)])) })}`;
 
   return (
     <div className="max-w-4xl space-y-6">
       <PageHeader
         title="Rapports de séance"
-        subtitle="Ce que les mentors ont écrit après chaque séance — et ce qui manque"
+        subtitle={`Ce que les mentors ont écrit après chaque séance — et ce qui manque. ${libellePeriode(choisie)}.`}
       />
+
+      <div className="flex flex-wrap gap-2">
+        {PERIODES.map((p) => (
+          <Link key={p.cle} href={lien({ periode: p.cle })}
+            className={`text-xs font-black px-3 py-1.5 rounded-xl border transition-colors ${
+              p.cle === choisie ? "bg-[#1B2D5E] text-white border-[#1B2D5E]" : "bg-white text-ink-muted border-cream-border hover:text-ink"}`}>
+            {p.label}
+          </Link>
+        ))}
+      </div>
 
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-cream-border p-5">
@@ -136,13 +168,24 @@ export default async function RapportsPage() {
           </div>
         ) : (
           <div className="divide-y divide-cream-border">
-            {occurrences.map(o => <Ligne key={o.cle} o={o} />)}
+            {visibles.map(o => <Ligne key={o.cle} o={o} />)}
           </div>
         )}
       </div>
 
+      {reste > 0 && (
+        <div className="text-center">
+          <Link href={lien({ voir: montrees + LOT })}
+            className="inline-block text-sm font-black px-5 py-2.5 rounded-xl border border-cream-border bg-white hover:border-brand-orange transition-colors"
+            style={{ color: "#1B2D5E" }}>
+            Voir plus — {reste} séance{reste > 1 ? "s" : ""} encore
+          </Link>
+        </div>
+      )}
+
       <p className="text-xs text-gray-400 px-1">
         Lecture seule — le compte rendu est rédigé par le mentor qui a fait la séance.
+        Les compteurs ci-dessus portent sur la période choisie.
       </p>
     </div>
   );

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getRapportsData } from "@/lib/rapports";
 import { compterBilansAFaire } from "@/lib/backoffice/bilans";
 import { moisABoucler, libelleMois } from "@/lib/backoffice/mois";
+import { debutPeriode, PERIODE_DEFAUT, libellePeriode } from "@/lib/planning/occurrences-passees";
 
 /**
  * Les deux choses du suivi des mentors qui attendent quelqu'un, en tête des
@@ -42,8 +43,10 @@ export default async function AlerteSuiviMentors(
   { espace, maintenant = new Date() }: { espace: "admin" | "manager"; maintenant?: Date },
 ) {
   const mois = moisABoucler(maintenant);
+  // La même période que la page des rapports : l'alerte et l'écran qu'elle
+  // ouvre doivent annoncer le même nombre.
   const [{ manquants }, bilans] = await Promise.all([
-    getRapportsData(),
+    getRapportsData({ depuis: debutPeriode(PERIODE_DEFAUT) ?? undefined }),
     mois ? compterBilansAFaire(mois) : Promise.resolve({ mentors: 0, aFaire: 0 }),
   ]);
 
@@ -57,7 +60,7 @@ export default async function AlerteSuiviMentors(
           emoji="📝"
           ton="rouge"
           titre={`${manquants} compte${manquants > 1 ? "s" : ""} rendu${manquants > 1 ? "s" : ""} de séance manquant${manquants > 1 ? "s" : ""}`}
-          detail="Des séances passées dont le mentor n'a rien écrit. Une séance non tenue se déclare, elle ne se laisse pas vide."
+          detail={`${libellePeriode(PERIODE_DEFAUT)} : des séances passées dont le mentor n'a rien écrit. Une séance non tenue se déclare, elle ne se laisse pas vide.`}
         />
       )}
       {mois && bilans.aFaire > 0 && (

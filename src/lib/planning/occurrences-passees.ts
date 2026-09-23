@@ -29,7 +29,37 @@ export type OccurrencePassee = {
   quand: string;   // ISO complet, pour l'heure
   mentor: string;
   eleve: string | null;
+  eleveId: string | null;
+  /** Minutes prévues — l'écran du mentor l'affiche. */
+  duree: number | null;
+  recurrente: boolean;
 };
+
+/**
+ * Les périodes proposées à l'écran. « Tout » reste possible : la fenêtre sert
+ * à ne pas payer l'historique entier par défaut, pas à l'interdire.
+ */
+export const PERIODES = [
+  { cle: "3", label: "3 derniers mois", mois: 3 },
+  { cle: "6", label: "6 mois", mois: 6 },
+  { cle: "12", label: "12 mois", mois: 12 },
+  { cle: "tout", label: "Tout", mois: null },
+] as const;
+
+export const PERIODE_DEFAUT = "3";
+
+/** La date de début d'une période, ou null pour « tout ». */
+export function debutPeriode(cle: string | undefined, maintenant: Date = new Date()): Date | null {
+  const p = PERIODES.find((x) => x.cle === cle) ?? PERIODES.find((x) => x.cle === PERIODE_DEFAUT)!;
+  if (p.mois === null) return null;
+  const d = new Date(maintenant);
+  d.setMonth(d.getMonth() - p.mois);
+  return d;
+}
+
+export function libellePeriode(cle: string | undefined): string {
+  return (PERIODES.find((x) => x.cle === cle) ?? PERIODES.find((x) => x.cle === PERIODE_DEFAUT)!).label;
+}
 
 /** La tranche de temps demandée. Sans elle, tout l'historique est déroulé. */
 export type Fenetre = {
@@ -59,11 +89,14 @@ export function occurrencesPassees(sessions: Seance[], fenetre: Fenetre = {}): O
 
     const ajoute = (at: Date) => out.push({
       sessionId: s.id,
-      titre: s.title ?? "Séance",
+      titre: (s.title ?? "").trim() || "Séance",
       date: jourLocal(at),
       quand: at.toISOString(),
       mentor,
       eleve,
+      eleveId: s.student_id ?? s.students?.id ?? null,
+      duree: s.duration_min ?? null,
+      recurrente: s.session_type === "recurring",
     });
 
     if (s.session_type === "recurring") {

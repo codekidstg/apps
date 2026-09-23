@@ -41,8 +41,12 @@ export type Rapport = {
 /**
  * Séances passées de toute la structure, chacune avec son rapport ou sans.
  * Un seul chargement pour l'écran admin et l'écran manager.
+ *
+ * `fenetre` borne le déroulé : sans elle, chaque affichage recalcule toutes les
+ * semaines depuis la création de chaque séance récurrente. Les compteurs
+ * rendus ne portent alors que sur la période demandée — l'écran le dit.
  */
-export async function getRapportsData(): Promise<{
+export async function getRapportsData(fenetre: Fenetre = {}): Promise<{
   occurrences: Occurrence[];
   faits: number;
   manquants: number;
@@ -71,7 +75,7 @@ export async function getRapportsData(): Promise<{
     if (!parCle.has(cle)) parCle.set(cle, r);
   }
 
-  const occurrences: Occurrence[] = occurrencesPassees(sessions ?? []).map(o => ({
+  const occurrences: Occurrence[] = occurrencesPassees(sessions ?? [], fenetre).map(o => ({
     ...o,
     cle: `${o.sessionId}|${o.date}`,
     rapport: parCle.get(`${o.sessionId}|${o.date}`) ?? null,

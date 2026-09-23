@@ -51,7 +51,7 @@ type Item = {
   day: number;
   monthShort: string;
   time: string;
-  duration: number;
+  duration: number | null;
   studentName: string | null;
   recurring: boolean;
   report: Report | null;
@@ -153,7 +153,7 @@ function ItemRow({ item, onFill, onView }: {
       <div className="flex-1 min-w-0">
         <div className="font-black text-sm truncate" style={{ color: "#1B2D5E" }}>{item.title}</div>
         <div className="text-xs mt-0.5" style={{ color: "#94A3B8" }}>
-          {item.time} · {item.duration} min
+          {item.time}{item.duration ? ` · ${item.duration} min` : ""}
           {item.studentName && <> · 👦 {item.studentName}</>}
         </div>
       </div>

@@ -3,46 +3,15 @@ export const dynamic = "force-dynamic";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import RapportsClient from "./RapportsClient";
+import { occurrencesPassees, debutPeriode, PERIODE_DEFAUT } from "@/lib/planning/occurrences-passees";
 
 const WEEKDAY_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
-function buildPastOccurrences(sessions: any[]) {
-  const out: { sessionId: string; title: string; at: Date; duration_min: number; studentName: string | null; recurring: boolean }[] = [];
-  const now = new Date();
-  const to  = new Date(now.getTime() - 1); // jusqu'à maintenant - 1ms (passé uniquement)
-
-  for (const s of sessions) {
-    if (s.session_type === "recurring") {
-      // Utiliser active_from (date de début configurée par l'admin), sinon created_at
-      const startStr = s.active_from ?? s.created_at;
-      const startDate = new Date(startStr);
-      startDate.setHours(0, 0, 0, 0);
-
-      const [h, m] = (s.start_time as string).split(":").map(Number);
-      const cursor = new Date(startDate);
-      cursor.setHours(h, m, 0, 0);
-      // Aligner sur le bon jour de la semaine
-      const daysUntil = (s.weekday - cursor.getDay() + 7) % 7;
-      cursor.setDate(cursor.getDate() + (daysUntil === 0 && cursor >= startDate ? 0 : daysUntil === 0 ? 7 : daysUntil));
-
-      // Générer TOUTES les occurrences passées depuis active_from, sans limite de temps en arrière
-      while (cursor <= to) {
-        if (!s.active_until || cursor <= new Date(s.active_until)) {
-          out.push({ sessionId: s.id, title: s.title, at: new Date(cursor), duration_min: s.duration_min, studentName: s.students?.profiles?.display_name ?? null, recurring: true });
-        }
-        cursor.setDate(cursor.getDate() + 7);
-      }
-    } else {
-      const at = new Date(s.scheduled_at);
-      if (at <= to) {
-        out.push({ sessionId: s.id, title: s.title, at, duration_min: s.duration_min, studentName: s.students?.profiles?.display_name ?? null, recurring: false });
-      }
-    }
-  }
-  return out.sort((a, b) => b.at.getTime() - a.at.getTime());
-}
-
 export default async function RapportsPage() {
+  // Le déroulé des séances est partagé (lib/planning/occurrences-passees.ts).
+  // Cette page en gardait sa propre copie, qui remontait « sans limite de temps
+  // en arrière » — et qui portait encore le défaut de la dernière séance d'une
+  // récurrence, corrigé dans la fonction commune.
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
@@ -60,7 +29,7 @@ export default async function RapportsPage() {
       .order("reported_at", { ascending: false }),
   ]);
 
-  const past = buildPastOccurrences(sessions ?? []);
+  const past = occurrencesPassees(sessions ?? [], { depuis: debutPeriode(PERIODE_DEFAUT) ?? undefined });
 
   // Index par (session_id, occurrence_date) pour que chaque occurrence soit unique
   const reportsByKey = new Map<string, any>();
@@ -70,21 +39,20 @@ export default async function RapportsPage() {
   }
 
   const items = past.map(occ => {
-    const occDate = occ.at.toISOString().slice(0, 10);
-    const key = `${occ.sessionId}|${occDate}`;
+    const at = new Date(occ.quand);
     return {
       sessionId:      occ.sessionId,
-      occurrenceDate: occDate,
-      title:          occ.title,
-      dateStr:        occ.at.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
-      dayShort:       WEEKDAY_SHORT[occ.at.getDay()],
-      day:            occ.at.getDate(),
-      monthShort:     occ.at.toLocaleDateString("fr-FR", { month: "short" }),
-      time:           occ.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
-      duration:       occ.duration_min,
-      studentName:    occ.studentName,
-      recurring:      occ.recurring,
-      report:         reportsByKey.get(key) ?? null,
+      occurrenceDate: occ.date,
+      title:          occ.titre,
+      dateStr:        at.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+      dayShort:       WEEKDAY_SHORT[at.getDay()],
+      day:            at.getDate(),
+      monthShort:     at.toLocaleDateString("fr-FR", { month: "short" }),
+      time:           at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+      duration:       occ.duree,
+      studentName:    occ.eleve,
+      recurring:      occ.recurrente,
+      report:         reportsByKey.get(`${occ.sessionId}|${occ.date}`) ?? null,
     };
   });
 
