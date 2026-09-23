@@ -1,6 +1,7 @@
+import Link from "next/link";
 import PageHeader from "@/components/backoffice/PageHeader";
 import { createClient } from "@/lib/supabase/server";
-import { chargerBoiteDirection, DELAI_PROMIS_HEURES, type MessageDirection } from "@/lib/contact/boite";
+import { chargerBoiteDirection, LOT_TRAITES, DELAI_PROMIS_HEURES, type MessageDirection } from "@/lib/contact/boite";
 import CarteMessage, { type LibellesMessage } from "./CarteMessage";
 
 /**
@@ -37,10 +38,15 @@ function libellesDe(m: MessageDirection, maintenant: number): LibellesMessage {
   };
 }
 
-export default async function BoiteDirection() {
+export default async function BoiteDirection({ espace, voir }: {
+  espace: "admin" | "manager";
+  voir?: string;
+}) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { aTraiter, traites, erreur } = await chargerBoiteDirection();
+  // Ce qui attend est toujours entier ; l'archive vient par lots.
+  const montrees = Math.max(LOT_TRAITES, Number(voir) || LOT_TRAITES);
+  const { aTraiter, traites, encore, erreur } = await chargerBoiteDirection({ traites: montrees });
 
   const maintenant = Date.now();
   const enRetard = aTraiter.filter((m) => m.enRetard).length;
@@ -83,11 +89,22 @@ export default async function BoiteDirection() {
           <section className="space-y-4">
             <h2 className="font-display font-black text-base text-ink flex items-center gap-2">
               Traités
-              <span className="text-xs font-black px-2 py-0.5 rounded-full bg-gray-100 text-ink-muted">{traites.length}</span>
+              <span className="text-xs font-black px-2 py-0.5 rounded-full bg-gray-100 text-ink-muted">
+                {traites.length}{encore > 0 ? ` sur ${traites.length + encore}` : ""}
+              </span>
             </h2>
             {traites.map((m) => (
               <CarteMessage key={m.id} message={m} moiId={user?.id ?? null} libelles={libellesDe(m, maintenant)} />
             ))}
+            {encore > 0 && (
+              <div className="text-center">
+                <Link href={`/${espace}/messages?voir=${montrees + LOT_TRAITES}`}
+                  className="inline-block text-sm font-black px-5 py-2.5 rounded-xl border border-cream-border bg-white hover:border-brand-orange transition-colors"
+                  style={{ color: "#1B2D5E" }}>
+                  Voir plus — {encore} message{encore > 1 ? "s" : ""} encore
+                </Link>
+              </div>
+            )}
           </section>
         )}
       </div>

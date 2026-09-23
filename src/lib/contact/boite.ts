@@ -65,9 +65,23 @@ export function estEnRetard(
   return maintenant - new Date(l.created_at).getTime() > DELAI_PROMIS_HEURES * 3_600_000;
 }
 
-export async function chargerBoiteDirection(): Promise<{
+/** Combien de messages déjà traités s'affichent d'un coup. */
+export const LOT_TRAITES = 15;
+
+/**
+ * La boîte de la direction.
+ *
+ * Deux chargements, et pas un seul : **ce qui attend est toujours complet**.
+ * Une file d'attente tronquée laisse un parent sans réponse sans que personne
+ * ne le sache — c'est arrivé, quarante-trois jours durant. Ce qui est traité,
+ * lui, est une archive qui ne cesse de grandir : on en montre les plus récents,
+ * et « Voir plus » va chercher la suite.
+ */
+export async function chargerBoiteDirection({ traites: combien = LOT_TRAITES }: { traites?: number } = {}): Promise<{
   aTraiter: MessageDirection[];
   traites: MessageDirection[];
+  /** Ce qui reste d'archives derrière le lot affiché. */
+  encore: number;
   erreur: string | null;
 }> {
   const admin = createAdminClient();
@@ -75,14 +89,25 @@ export async function chargerBoiteDirection(): Promise<{
   // `select("*")` : les colonnes de prise en charge arrivent avec la migration
   // 028. Les nommer ferait échouer toute la requête tant qu'elle n'est pas
   // passée, alors que les messages eux-mêmes restent lisibles.
-  const { data, error } = await (admin.from("contact_messages") as any)
+  const attente = (admin.from("contact_messages") as any)
     .select("*")
+    .is("replied_at", null).is("closed_at", null)
     .order("created_at", { ascending: true });
+  // Un de plus que demandé : c'est ainsi qu'on sait s'il en reste.
+  const archive = (admin.from("contact_messages") as any)
+    .select("*", { count: "exact" })
+    .or("replied_at.not.is.null,closed_at.not.is.null")
+    .order("created_at", { ascending: false })
+    .limit(combien);
+
+  const [enAttente, traitees] = await Promise.all([attente, archive]);
+  const error = enAttente.error ?? traitees.error;
   if (error) {
     console.error("[boite direction] messages :", error.message);
-    return { aTraiter: [], traites: [], erreur: error.message };
+    return { aTraiter: [], traites: [], encore: 0, erreur: error.message };
   }
-  const lignes = (data ?? []) as Ligne[];
+  const lignes = [...((enAttente.data ?? []) as Ligne[]), ...((traitees.data ?? []) as Ligne[])];
+  const encore = Math.max(0, (traitees.count ?? 0) - (traitees.data ?? []).length);
 
   const idsPersonnel = [...new Set(lignes.flatMap((l) => [l.claimed_by, l.replied_by]).filter(Boolean))] as string[];
   const idsParents   = [...new Set(lignes.map((l) => l.parent_id).filter(Boolean))] as string[];
@@ -142,7 +167,7 @@ export async function chargerBoiteDirection(): Promise<{
     .filter((m) => m.etat === "repondu" || m.etat === "clos")
     .sort((a, b) => dateTraitement(b).localeCompare(dateTraitement(a)));
 
-  return { aTraiter, traites, erreur: null };
+  return { aTraiter, traites, encore, erreur: null };
 }
 
 /** Ce que les tableaux de bord et la barre latérale affichent. */
