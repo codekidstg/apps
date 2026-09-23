@@ -62,6 +62,8 @@ function LigneSeance({ s }: { s: SeanceVue }) {
 
 function LigneQuestion({ q, lien }: { q: QuestionVue; lien: string }) {
   const attente = !q.traiteeLe;
+  // Le délai se compte jusqu'au moment où l'enfant a eu sa réponse : la séance,
+  // quand elle s'est réglée là, et pas le moment où le mentor l'a noté.
   const delai = q.traiteeLe ? (new Date(q.traiteeLe).getTime() - new Date(q.poseeLe).getTime()) / 3_600_000 : null;
   return (
     <div className={`px-5 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 ${attente ? "bg-amber-50/60" : ""}`}>
@@ -74,7 +76,7 @@ function LigneQuestion({ q, lien }: { q: QuestionVue; lien: string }) {
           : delai! > DELAI_HEURES ? "bg-orange-100 text-orange-700" : "bg-emerald-100 text-emerald-700"
       }`}>
         {attente ? "Sans réponse"
-          : `${q.comment === "reglee" ? "Réglée en séance" : "Répondue"} en ${delai! < 24 ? `${Math.max(1, Math.round(delai!))} h` : `${Math.round(delai! / 24)} j`}`}
+          : `${q.enSeance ? "Répondue en séance" : "Répondue"} en ${delai! < 24 ? `${Math.max(1, Math.round(delai!))} h` : `${Math.round(delai! / 24)} j`}`}
       </span>
     </div>
   );

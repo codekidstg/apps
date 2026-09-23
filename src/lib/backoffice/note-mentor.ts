@@ -58,6 +58,40 @@ export type QuestionDuMois = {
 /** Un enfant qui attend : depuis quand, et jusqu'à quand. */
 export type Attente = { eleve: string; depuis: string; traiteeLe: string | null };
 
+/** Une séance de l'enfant : quand, et si elle a eu lieu. */
+export type SeanceEleve = { quand: string; tenue: boolean };
+
+/**
+ * Quand la question a-t-elle trouvé sa réponse ?
+ *
+ *   par écrit          au moment de la réponse
+ *   réglée en séance   à la séance, pas au moment où le mentor l'a noté
+ *
+ * Un mentor qui fait sa séance le samedi matin et le note le lundi soir
+ * paierait deux jours qu'il n'a pas fait attendre l'enfant. On retient donc la
+ * première séance de l'enfant qui a eu lieu après sa question — une séance
+ * déclarée non tenue ne lui a rien apporté, on prend la suivante. Sans aucune
+ * séance depuis, il ne reste que le moment où le mentor a réglé la question.
+ *
+ * Une séance ne solde jamais une question toute seule : si le mentor ne note
+ * rien, elle reste sans réponse. Sinon le simple passage d'une séance
+ * effacerait en silence ce qu'il devait à l'enfant.
+ */
+export function momentTraitee(
+  q: { poseeLe: string; repondueLe: string | null; regleeLe: string | null },
+  seances: SeanceEleve[],
+): { traiteeLe: string | null; enSeance: boolean } {
+  if (q.repondueLe) return { traiteeLe: q.repondueLe, enSeance: false };
+  if (!q.regleeLe) return { traiteeLe: null, enSeance: false };
+
+  const posee = new Date(q.poseeLe).getTime();
+  const suivante = seances
+    .filter((s) => s.tenue && new Date(s.quand).getTime() > posee)
+    .sort((a, b) => new Date(a.quand).getTime() - new Date(b.quand).getTime())[0];
+
+  return { traiteeLe: suivante?.quand ?? q.regleeLe, enSeance: !!suivante };
+}
+
 /**
  * Les « Je bloque ici » comptés comme le mentor les voit : un fil par élève et
  * par exercice, et dans un fil, une attente par suite de messages qui finit

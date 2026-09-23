@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { attentes, calculerNote, couleurNote, type SeanceDuMois } from "./note-mentor";
+import { attentes, calculerNote, couleurNote, momentTraitee, type SeanceDuMois } from "./note-mentor";
 
 // Le 1er octobre à midi : le mois de septembre vient de finir.
 const MAINTENANT = new Date("2026-10-01T12:00:00Z");
@@ -120,6 +120,54 @@ describe("la note du mentor", () => {
       // dernier message, mais 3 jours après le premier. C'est le premier qui compte.
       const n = note({ seances: parfaites(3), questions: [q("quiz-1", "19"), q("quiz-1", "20", "2026-09-22T11:00:00Z")], eleves: [] });
       expect(n.pertes[0].manques).toEqual(["répondue au bout de 3 jours"]);
+    });
+  });
+
+  // Une question réglée en séance est une réponse comme une autre : ce qui
+  // compte, c'est quand l'enfant l'a eue.
+  describe("la question réglée en séance", () => {
+    const posee = "2026-09-16T18:32:00Z";
+    const seance = (jour: string, heure = "08:00", tenue = true) => ({ quand: `2026-09-${jour}T${heure}:00Z`, tenue });
+
+    it("compte depuis la séance, pas depuis le moment où le mentor l'a notée", () => {
+      // Séance le 19 au matin, notée le 21 au soir : c'est la séance qui compte.
+      expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: "2026-09-21T20:00:00Z" }, [seance("19")]))
+        .toEqual({ traiteeLe: "2026-09-19T08:00:00Z", enSeance: true });
+    });
+
+    it("moins de 48 h entre la question et la séance : rien n'est perdu", () => {
+      const quest = { eleve: "Samuel", exercice: "quiz-1", poseeLe: "2026-09-18T19:00:00Z" };
+      const { traiteeLe } = momentTraitee({ poseeLe: quest.poseeLe, repondueLe: null, regleeLe: "2026-09-25T09:00:00Z" }, [seance("19")]);
+      expect(note({ seances: parfaites(3), questions: [{ ...quest, traiteeLe }], eleves: [] }).note).toBe(100);
+    });
+
+    it("au-delà de 48 h, elle coûte, même réglée pendant la séance", () => {
+      const quest = { eleve: "Samuel", exercice: "quiz-1", poseeLe: posee };
+      const { traiteeLe } = momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: "2026-09-19T08:30:00Z" }, [seance("19")]);
+      expect(note({ seances: parfaites(3), questions: [{ ...quest, traiteeLe }], eleves: [] }).pertes[0].manques)
+        .toEqual(["répondue au bout de 3 jours"]);
+    });
+
+    it("une séance non tenue n'a rien apporté à l'enfant : on prend la suivante", () => {
+      expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: "2026-09-27T10:00:00Z" },
+        [seance("19", "08:00", false), seance("26")]))
+        .toEqual({ traiteeLe: "2026-09-26T08:00:00Z", enSeance: true });
+    });
+
+    it("sans aucune séance depuis, il reste le moment où le mentor l'a réglée", () => {
+      expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: "2026-09-20T10:00:00Z" }, []))
+        .toEqual({ traiteeLe: "2026-09-20T10:00:00Z", enSeance: false });
+      // Une séance d'avant la question ne compte pas non plus.
+      expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: "2026-09-20T10:00:00Z" }, [seance("12")]))
+        .toEqual({ traiteeLe: "2026-09-20T10:00:00Z", enSeance: false });
+    });
+
+    it("une réponse écrite garde sa date, et une question ouverte attend encore", () => {
+      expect(momentTraitee({ poseeLe: posee, repondueLe: "2026-09-17T09:00:00Z", regleeLe: null }, [seance("19")]))
+        .toEqual({ traiteeLe: "2026-09-17T09:00:00Z", enSeance: false });
+      // Une séance passée ne solde pas toute seule ce que le mentor doit.
+      expect(momentTraitee({ poseeLe: posee, repondueLe: null, regleeLe: null }, [seance("19")]))
+        .toEqual({ traiteeLe: null, enSeance: false });
     });
   });
 

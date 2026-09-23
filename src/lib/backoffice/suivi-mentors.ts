@@ -3,7 +3,7 @@ import { occurrencesPassees, type Rapport } from "@/lib/rapports";
 import { NON_TENUE } from "@/lib/rapports-libelles";
 import { chargerEvolutions } from "./evolution";
 import { STATUT_ELEVE, type StatutEleve } from "./statut-eleve";
-import { calculerNote, type NoteMentor, type SeanceDuMois, type QuestionDuMois, type EleveDuMois } from "./note-mentor";
+import { calculerNote, momentTraitee, type NoteMentor, type SeanceDuMois, type SeanceEleve, type QuestionDuMois, type EleveDuMois } from "./note-mentor";
 
 // Les mois (début du suivi, fenêtre glissante) sont à côté, avec leurs tests,
 // et ré-exportés ici : les écrans n'ont qu'un module à connaître.
@@ -48,9 +48,10 @@ export type QuestionVue = {
   /** L'exercice : deux messages sur le même exercice font un seul échange. */
   exercice: string;
   poseeLe: string;
+  /** Le moment où l'enfant a eu sa réponse — la séance, si elle s'est réglée là. */
   traiteeLe: string | null;
-  /** Le mentor a répondu, ou a réglé la question en séance. */
-  comment: "repondue" | "reglee" | null;
+  /** La réponse est venue à la séance, pas par écrit. */
+  enSeance: boolean;
 };
 
 export type EleveVue = {
@@ -158,28 +159,17 @@ export async function chargerSuiviMentors(
     }
   }
 
-  const questionsParMentor = new Map<string, QuestionVue[]>();
-  const nomEleve = new Map<string, string>(lignesEleves.map((e) => [e.id, e.profiles?.display_name ?? "Élève"]));
-  const mentorDeleve = new Map<string, string>(lignesEleves.map((e) => [e.id, e.teacher_id]));
-  for (const q of (questions.data ?? []) as Ligne[]) {
-    const mentor = mentorDeleve.get(q.student_id);
-    if (!mentor) continue;
-    const arr = questionsParMentor.get(mentor) ?? [];
-    arr.push({
-      id: q.id,
-      eleve: nomEleve.get(q.student_id) ?? "Élève",
-      eleveId: q.student_id,
-      exercice: q.block_id,
-      poseeLe: q.created_at,
-      traiteeLe: q.replied_at ?? q.closed_at ?? null,
-      comment: q.replied_at ? "repondue" : q.closed_at ? "reglee" : null,
-    });
-    questionsParMentor.set(mentor, arr);
-  }
-
-  // Les occurrences du mois, mentor par mentor.
+  // Les occurrences du mois, mentor par mentor — et, sans filtre de mois, les
+  // séances de chaque élève : une question posée le 30 peut se régler à la
+  // séance du 2 du mois suivant.
   const seancesParMentor = new Map<string, SeanceVue[]>();
+  const seancesParEleve = new Map<string, SeanceEleve[]>();
   for (const o of occurrencesPassees(lignesSeances)) {
+    const eleveId = eleveDeSeance.get(o.sessionId) ?? null;
+    if (eleveId) {
+      const tenue = parOccurrence.get(`${o.sessionId}|${o.date}`)?.tenue !== false;
+      seancesParEleve.set(eleveId, [...(seancesParEleve.get(eleveId) ?? []), { quand: o.quand, tenue }]);
+    }
     if (!o.date.startsWith(mois)) continue;
     const mentor = mentorDeSeance.get(o.sessionId);
     if (!mentor) continue;
@@ -194,6 +184,29 @@ export async function chargerSuiviMentors(
       rapport: parOccurrence.get(`${o.sessionId}|${o.date}`) ?? null,
     });
     seancesParMentor.set(mentor, arr);
+  }
+
+  const questionsParMentor = new Map<string, QuestionVue[]>();
+  const nomEleve = new Map<string, string>(lignesEleves.map((e) => [e.id, e.profiles?.display_name ?? "Élève"]));
+  const mentorDeleve = new Map<string, string>(lignesEleves.map((e) => [e.id, e.teacher_id]));
+  for (const q of (questions.data ?? []) as Ligne[]) {
+    const mentor = mentorDeleve.get(q.student_id);
+    if (!mentor) continue;
+    // Réglée en séance : l'enfant a eu sa réponse à la séance, pas au moment
+    // où le mentor l'a notée (voir `momentTraitee`).
+    const { traiteeLe, enSeance } = momentTraitee(
+      { poseeLe: q.created_at, repondueLe: q.replied_at ?? null, regleeLe: q.closed_at ?? null },
+      seancesParEleve.get(q.student_id) ?? [],
+    );
+    questionsParMentor.set(mentor, [...(questionsParMentor.get(mentor) ?? []), {
+      id: q.id,
+      eleve: nomEleve.get(q.student_id) ?? "Élève",
+      eleveId: q.student_id,
+      exercice: q.block_id,
+      poseeLe: q.created_at,
+      traiteeLe,
+      enSeance,
+    }]);
   }
 
   const resultat: MentorMois[] = mentors.map((p) => {
