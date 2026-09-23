@@ -18,7 +18,7 @@
  * synchronisation écrivent avec la clé de service, donc hors RLS.
  */
 
-export type Refus = "introuvable" | "theme_non_ouvert" | "theme_non_publie";
+export type Refus = "introuvable" | "theme_non_ouvert" | "theme_non_publie" | "lecon_verrouillee" | "entrainement_verrouille";
 
 export type Verdict =
   | { ok: true; themeId: string }
@@ -38,6 +38,8 @@ export const MESSAGE_REFUS: Record<Refus, string> = {
   introuvable:       "Cette page n'existe pas ou plus.",
   theme_non_ouvert:  "Ce thème ne t'est pas encore ouvert — parles-en à ton mentor.",
   theme_non_publie:  "Ce thème est encore en préparation. Reviens bientôt !",
+  lecon_verrouillee: "Termine d'abord la leçon précédente — celle-ci s'ouvrira juste après.",
+  entrainement_verrouille: "Termine d'abord la leçon, et cet entraînement s'ouvrira.",
 };
 
 export function urlRefus(locale: string, raison: Refus): string {
@@ -85,14 +87,71 @@ async function themeDeLecon(admin: any, lessonId: string): Promise<string | null
   return (data as any)?.chapters?.theme_id ?? null;
 }
 
+/**
+ * L'ordre du programme, appliqué et plus seulement dessiné.
+ *
+ * La page d'un thème affichait bien un cadenas « Termine la leçon
+ * précédente », mais rien ne le faisait respecter : la page de la leçon ne
+ * vérifiait que le thème. Il suffisait d'un lien — « Voir la leçon → » sous un
+ * entraînement verrouillé — pour ouvrir n'importe quelle leçon du thème, et la
+ * ligne de progression se créait au chargement. Ryshawn a ainsi ouvert les
+ * leçons 6 et 7 de son labyrinthe sans avoir fait les 4 et 5.
+ *
+ * La règle est celle que le cadenas annonçait : une leçon s'ouvre si c'est la
+ * première du thème, si la précédente est terminée, ou si elle-même est déjà
+ * terminée — on peut toujours revoir ce qu'on a fait.
+ *
+ * L'ordre est celui du thème : chapitres, puis leçons. Les thèmes, eux, restent
+ * ouverts par le mentor.
+ */
+async function ordreVerrouille(admin: any, studentId: string, lessonId: string, themeId: string): Promise<boolean> {
+  const { data: chapitres, error: eChap } = await admin
+    .from("chapters").select("id, order_index").eq("theme_id", themeId).order("order_index");
+  if (eChap) { console.error("[acces] chapters :", eChap.message); return false; }
+
+  const ids = ((chapitres ?? []) as any[]).map((c) => c.id);
+  if (!ids.length) return false;
+  const rang = new Map<string, number>(((chapitres ?? []) as any[]).map((c, i) => [c.id, c.order_index ?? i]));
+
+  const { data: lecons, error: eLecons } = await admin
+    .from("lessons").select("id, chapter_id, order_index").in("chapter_id", ids);
+  if (eLecons) { console.error("[acces] lessons :", eLecons.message); return false; }
+
+  const ordre = ((lecons ?? []) as any[]).sort((a, b) =>
+    (rang.get(a.chapter_id) ?? 0) - (rang.get(b.chapter_id) ?? 0) || (a.order_index ?? 0) - (b.order_index ?? 0));
+
+  const i = ordre.findIndex((l) => l.id === lessonId);
+  if (i <= 0) return false;  // première leçon du thème, ou leçon introuvable
+
+  const { data: progres, error: eProgres } = await admin
+    .from("lesson_progress").select("lesson_id, status")
+    .eq("student_id", studentId).in("lesson_id", [ordre[i - 1].id, lessonId]);
+  if (eProgres) { console.error("[acces] lesson_progress :", eProgres.message); return false; }
+
+  const etat = new Map<string, string>(((progres ?? []) as any[]).map((p) => [p.lesson_id, p.status]));
+  // Déjà terminée : c'est une révision, elle reste ouverte.
+  if (etat.get(lessonId) === "completed") return false;
+  return etat.get(ordre[i - 1].id) !== "completed";
+}
+
 export async function accesLecon(admin: any, studentId: string, lessonId: string): Promise<Verdict> {
   const [themeId, perimetre] = await Promise.all([
     themeDeLecon(admin, lessonId),
     perimetreEleve(admin, studentId),
   ]);
-  return verdictPourTheme(themeId, perimetre);
+  const verdict = verdictPourTheme(themeId, perimetre);
+  if (!verdict.ok) return verdict;
+
+  return await ordreVerrouille(admin, studentId, lessonId, verdict.themeId)
+    ? { ok: false, raison: "lecon_verrouillee" }
+    : verdict;
 }
 
+/**
+ * Un entraînement est la pratique qui vient après le cours : il s'ouvre quand
+ * sa leçon est terminée. La page les listait dès la leçon *commencée*, et
+ * Samuel a fini sept entraînements de leçons qu'il n'a jamais bouclées.
+ */
 export async function accesEntrainement(admin: any, studentId: string, trainingId: string): Promise<Verdict> {
   const { data, error } = await admin
     .from("trainings")
@@ -102,7 +161,16 @@ export async function accesEntrainement(admin: any, studentId: string, trainingI
   if (error) console.error("[acces] trainings :", error.message);
   const lessonId = (data as any)?.lesson_id;
   if (!lessonId) return { ok: false, raison: "introuvable" };
-  return accesLecon(admin, studentId, lessonId);
+
+  const verdict = await accesLecon(admin, studentId, lessonId);
+  // Une leçon verrouillée verrouille son entraînement, avec le mot qui va bien.
+  if (!verdict.ok) return { ok: false, raison: verdict.raison === "lecon_verrouillee" ? "entrainement_verrouille" : verdict.raison };
+
+  const { data: progres, error: eProgres } = await admin
+    .from("lesson_progress").select("status")
+    .eq("student_id", studentId).eq("lesson_id", lessonId).maybeSingle();
+  if (eProgres) console.error("[acces] lesson_progress :", eProgres.message);
+  return (progres as any)?.status === "completed" ? verdict : { ok: false, raison: "entrainement_verrouille" };
 }
 
 /**

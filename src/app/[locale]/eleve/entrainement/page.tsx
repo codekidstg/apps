@@ -57,7 +57,8 @@ export default async function EntrainementPage() {
     lesson_id: string; lesson_title: string; lesson_completed_at: string | null;
     theme_id: string; theme_title: string; theme_level: string;
     attempts: number; last_completed_at: string | null; best_score: number | null;
-    lesson_started: boolean;
+    /** L'entraînement vient après le cours : il s'ouvre quand la leçon est terminée. */
+    lesson_terminee: boolean;
     order_index: number; lesson_order: number; chapter_order: number; theme_order: number;
   };
 
@@ -72,7 +73,7 @@ export default async function EntrainementPage() {
       lesson_completed_at: lp?.completed_at ?? null,
       theme_id: theme?.id ?? "", theme_title: theme?.title ?? "Thème", theme_level: theme?.level ?? "explorer",
       attempts: tp?.attempts ?? 0, last_completed_at: tp?.completed_at ?? null,
-      best_score: tp?.score ?? null, lesson_started: !!lp,
+      best_score: tp?.score ?? null, lesson_terminee: lp?.status === "completed",
       order_index:   t.order_index ?? 0,
       lesson_order:  lesson?.order_index ?? 0,
       chapter_order: lesson?.chapters?.order_index ?? 0,
@@ -86,11 +87,14 @@ export default async function EntrainementPage() {
     (t.theme_order ?? 0) * 1_000_000 + (t.chapter_order ?? 0) * 10_000 +
     (t.lesson_order ?? 0) * 100 + (t.order_index ?? 0);
 
+  // La page ouvrait les entraînements dès la leçon *commencée* : Samuel en a
+  // fini sept sur des leçons jamais bouclées. C'est la fin du cours qui ouvre
+  // sa pratique — le serveur applique la même règle (lib/eleve/acces.ts).
   const available = allTrainings
-    .filter(t => t.lesson_started && accessibleThemeIds.has(t.theme_id))
+    .filter(t => t.lesson_terminee && accessibleThemeIds.has(t.theme_id))
     .sort((a, b) => rang(a) - rang(b));
   const locked = allTrainings
-    .filter(t => !t.lesson_started && accessibleThemeIds.has(t.theme_id))
+    .filter(t => !t.lesson_terminee && accessibleThemeIds.has(t.theme_id))
     .sort((a, b) => rang(a) - rang(b));
 
   // Grouper thème → leçon
@@ -168,11 +172,13 @@ export default async function EntrainementPage() {
                 <span className="text-lg">🔒</span>
                 <div className="flex-1 min-w-0">
                   <div className="font-black text-sm" style={{ color: "#334155" }}>{t.title}</div>
-                  <div className="text-xs mt-0.5 font-mono" style={{ color: "#1e293b" }}>Commence d&apos;abord : {t.lesson_title}</div>
+                  <div className="text-xs mt-0.5 font-mono" style={{ color: "#1e293b" }}>Termine d&apos;abord : {t.lesson_title}</div>
                 </div>
-                <Link href={`/eleve/quete/${t.lesson_id}`}
+                {/* Plus de lien direct vers la leçon : c'est par là que des
+                    leçons jamais commencées s'ouvraient, hors de leur ordre. */}
+                <Link href={`/eleve/theme/${t.theme_id}`}
                   className="text-xs font-bold hover:underline shrink-0" style={{ color: "#FDB813" }}>
-                  Voir la leçon →
+                  Voir le thème →
                 </Link>
               </div>
             ))}
