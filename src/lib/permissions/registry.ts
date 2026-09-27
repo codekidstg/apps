@@ -28,6 +28,14 @@ export const NAV_PAGES: NavPageDef[] = [
   { role: "student", key: "student.suivi",        label: "Suivi / Progression",    href: "/suivi/progression",     icon: "📊" },
   { role: "student", key: "student.apprendre",    label: "Apprendre (cours)",       href: "/eleve",                 icon: "🎮" },
   { role: "student", key: "student.entrainement", label: "Entraînement",            href: "/eleve/entrainement",    icon: "🏋️" },
+  // Le menu de l'élève comptait sept entrées, le registre n'en connaissait que
+  // cinq : les autres n'apparaissaient donc pas dans /admin/droits, et rien ne
+  // permettait de les éteindre. Elles y sont maintenant, une par une.
+  { role: "student", key: "student.salle_de_jeu", label: "Ma salle de jeu",        href: "/eleve/salle-de-jeu",    icon: "🏟️" },
+  { role: "student", key: "student.classement",   label: "Classement",             href: "/eleve/classement",      icon: "🏆" },
+  { role: "student", key: "student.badges",       label: "Badges",                 href: "/eleve/badges",          icon: "⭐" },
+  { role: "student", key: "student.avatar",       label: "Mon robot",              href: "/eleve/avatar",          icon: "🤖" },
+  { role: "student", key: "student.questions",    label: "Mes questions",          href: "/eleve/questions",       icon: "🙋" },
   { role: "student", key: "student.certificats",  label: "Certificats",             href: "/suivi/certificats",     icon: "🎓" },
   { role: "student", key: "student.abonnement",   label: "Paiement / Abonnement",   href: "/suivi/abonnement",      icon: "💳" },
 

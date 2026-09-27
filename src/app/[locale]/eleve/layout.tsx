@@ -10,6 +10,7 @@ import BadgeToast from "@/components/eleve/BadgeToast";
 import SwRegistrar from "@/components/eleve/SwRegistrar";
 import OfflineBanner from "@/components/eleve/OfflineBanner";
 import BoutonDeconnexion from "@/components/BoutonDeconnexion";
+import { getEffectiveNavPermissions } from "@/lib/permissions/access";
 
 type StudentData = {
   display_name: string;
@@ -40,13 +41,17 @@ export default async function EleveLayout({ children, params }: { children: Reac
 
   // Badge entraînements + avatar en parallèle
   // allTrainings depuis le cache (5 min) — évite un aller-retour DB à chaque navigation élève
-  const [allTrainings, lessonProgRes, trainingProgRes, avatarRes, reponsesNonVues] = await Promise.all([
+  const [allTrainings, lessonProgRes, trainingProgRes, avatarRes, reponsesNonVues, droits] = await Promise.all([
     getCachedAllTrainings(),
     student ? (supabase.from("lesson_progress") as any).select("lesson_id, status").eq("student_id", student.id) : Promise.resolve({ data: [] }),
     student ? (supabase.from("training_progress") as any).select("training_id").eq("student_id", student.id).gt("attempts", 0) : Promise.resolve({ data: [] }),
     student ? (supabase.from("student_avatar") as any).select("*").eq("student_id", student.id).maybeSingle() : Promise.resolve({ data: null }),
     // La pastille « Mes questions » : une réponse du mentor pas encore lue.
     student ? compterReponsesNonVuesEleve(student.id) : Promise.resolve(0),
+    // L'espace élève était le seul à ne pas consulter les droits : les
+    // interrupteurs de /admin/droits bloquaient la page mais laissaient
+    // l'entrée dans le menu. Un menu qui ne s'éteint pas est un trou silencieux.
+    getEffectiveNavPermissions(user.id, "student"),
   ]);
 
   const startedIds = new Set((lessonProgRes.data ?? []).map((r: any) => r.lesson_id));
@@ -66,18 +71,21 @@ export default async function EleveLayout({ children, params }: { children: Reac
 
   const avatar = avatarRaw as StudentData["avatar"];
 
-  const nav = [
-    { href: "/eleve",              label: "Ma Cité",           icon: "🏙️" },
-    { href: "/eleve/entrainement", label: "Mon Entraînement",  icon: "💪" },
-    { href: "/eleve/salle-de-jeu", label: "Ma salle de jeu",   icon: "🏟️" },
-    { href: "/eleve/classement",   label: "Classement",        icon: "🏆" },
-    { href: "/eleve/badges",       label: "Badges",            icon: "⭐" },
-    { href: "/eleve/avatar",       label: "Mon robot",         icon: "🤖" },
-    { href: "/eleve/questions",    label: "Mes questions",     icon: "🙋" },
+  const nav = ([
+    { href: "/eleve",              label: "Ma Cité",           icon: "🏙️", cle: "student.apprendre" },
+    { href: "/eleve/entrainement", label: "Mon Entraînement",  icon: "💪", cle: "student.entrainement" },
+    { href: "/eleve/salle-de-jeu", label: "Ma salle de jeu",   icon: "🏟️", cle: "student.salle_de_jeu" },
+    { href: "/eleve/classement",   label: "Classement",        icon: "🏆", cle: "student.classement" },
+    { href: "/eleve/badges",       label: "Badges",            icon: "⭐", cle: "student.badges" },
+    { href: "/eleve/avatar",       label: "Mon robot",         icon: "🤖", cle: "student.avatar" },
+    { href: "/eleve/questions",    label: "Mes questions",     icon: "🙋", cle: "student.questions" },
+    // La séance offerte n'est pas une page du registre : elle s'ouvre et se
+    // ferme par `atelier_active`, élève par élève, et pas par les droits.
     ...(student?.atelier_active
       ? [{ href: "/atelier/lecon", label: "Séance offerte", icon: "🎟️", special: true }]
       : []),
-  ] as { href: string; label: string; icon: string; special?: boolean }[];
+  ] as { href: string; label: string; icon: string; special?: boolean; cle?: string }[])
+    .filter((item) => !item.cle || droits.has(item.cle));
 
   return (
     <div className="min-h-screen flex bg-slate-950 text-white">

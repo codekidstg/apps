@@ -19,7 +19,7 @@ export default async function SalleDeJeuPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/fr/connexion");
 
-  await requireStudentPermission(user.id, "student.entrainement");
+  await requireStudentPermission(user.id, "student.salle_de_jeu");
 
   const { data: student } = await supabase
     .from("students").select("id").eq("profile_id", user.id).single<{ id: string }>();
