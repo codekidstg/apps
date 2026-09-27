@@ -114,6 +114,9 @@ const EXOS = [
         type: "match",
         content: {
           title: "Chaque partie et son rôle",
+          instruction: "Touche une partie de l'ordinateur, puis le rôle qui lui va.",
+          left_label: "La partie",
+          right_label: "Son rôle",
           pairs: [
             { left: "🧠 Le processeur",   right: "Il calcule et il décide" },
             { left: "📋 La mémoire RAM",  right: "Elle oublie tout quand on éteint" },
@@ -217,6 +220,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Le voyage d'une touche",
+          instruction: "Touche le bon mot pour compléter chaque phrase. Elles sont dans l'ordre du voyage.",
           sentences: [
             { id: "s1", before: "Quand tu appuies sur la touche, le clavier est une", after: ".",
               options: ["entrée", "sortie", "mémoire"], correct: 0,
@@ -290,7 +294,8 @@ const EXOS = [
       jeu({
         game_type: "plan_builder",
         title: "Le plan de la salle informatique",
-        description: "Compose les cinq étapes dans l'ordre.",
+        description: "Sept cartes, cinq bonnes. Deux sont des pièges : laisse-les de côté.",
+        consigne: "Tu arrives en salle informatique, tu écris ton devoir, tu repars. Touche les cinq bonnes étapes, dans l'ordre.",
         phases: [
           "Allumer l'ordinateur",
           "Ouvrir le programme",

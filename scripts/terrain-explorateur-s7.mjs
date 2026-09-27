@@ -83,6 +83,9 @@ const EXOS = [
         type: "match",
         content: {
           title: "Chaque étape et son moment",
+          instruction: "Touche un geste d'ingénieur, puis ce qu'il apporte.",
+          left_label: "Le geste",
+          right_label: "Ce qu'il apporte",
           pairs: [
             { left: "Écrire le plan en français",     right: "Penser la solution avant de la taper" },
             { left: "Découper en segments",           right: "Un morceau entre chaque virage" },
@@ -191,6 +194,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Le plan raconté",
+          instruction: "Relis le plan affiché au-dessus, puis complète chaque phrase.",
           sentences: [
             { id: "s1", before: "Ce plan est écrit", after: ".",
               options: ["en français", "en blocs", "en chiffres"], correct: 0,
@@ -225,7 +229,8 @@ const EXOS = [
       jeu({
         game_type: "plan_builder",
         title: "Le Grand Plan",
-        description: "Compose les cinq phases dans l'ordre.",
+        description: "Sept cartes, cinq bonnes. Deux sont des pièges : laisse-les de côté.",
+        consigne: "La clé est en bas, la porte au milieu, l'étoile derrière. Touche les cinq phases, dans l'ordre.",
         phases: [
           "Observer le labyrinthe en entier",
           "Descendre chercher la clé 🗝️",

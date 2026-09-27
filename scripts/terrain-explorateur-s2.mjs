@@ -76,6 +76,9 @@ const EXOS = [
         type: "match",
         content: {
           title: "Chaque mot et ce qu'il fait",
+          instruction: "Touche un mot, puis ce que Kirikou fait quand il l'entend.",
+          left_label: "Le mot",
+          right_label: "Ce que ça fait",
           pairs: [
             { left: "Avancer",              right: "Kirikou se déplace d'une case" },
             { left: "Ramasser",             right: "Il prend ce qui est sous ses pieds" },
@@ -110,6 +113,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Deviens Kirikou",
+          instruction: "Suis le programme case par case, puis complète chaque phrase.",
           sentences: [
             { id: "s1", before: "Après le premier Avancer, Kirikou est sur la case", after: ".",
               options: ["2", "1", "3"], correct: 0,
@@ -196,7 +200,8 @@ const EXOS = [
       jeu({
         game_type: "plan_builder",
         title: "Le plan du couloir",
-        description: "Compose les phases dans l'ordre.",
+        description: "Sept cartes, cinq bonnes. Deux sont des pièges : laisse-les de côté.",
+        consigne: "Kirikou doit ramasser la gemme, puis s'arrêter pile sur l'étoile. Touche les cinq bonnes étapes, dans l'ordre.",
         phases: [
           "Compter les cases jusqu'à la gemme 💎",
           "Avancer jusqu'à la gemme",

@@ -166,6 +166,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Ce qui reste en dehors",
+          instruction: "Regarde le chemin affiché au-dessus, puis complète chaque phrase.",
           sentences: [
             { id: "s1", before: "Le motif qui revient est", after: ".",
               options: ["Avancer, Tourner à droite", "Avancer", "Tourner à droite"], correct: 0,

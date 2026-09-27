@@ -665,7 +665,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
           /* ── fill_blank ── */
           if (block.type === "fill_blank") {
             type Sentence = { id: string; before: string; after?: string; options: string[]; correct: number; explanation?: string };
-            const raw = block.content as { title?: string; sentences: Sentence[] };
+            const raw = block.content as { title?: string; instruction?: string; sentences: Sentence[] };
             const answered = raw.sentences.filter((_, i) => fillResults[`${block.id}-${i}`] != null).length;
             return (
               <div key={block.id} className="rounded-2xl overflow-hidden" style={{ border: "1px solid #0e4a6840" }}>
@@ -679,6 +679,11 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                     {answered}/{raw.sentences.length} complété{raw.sentences.length > 1 ? "s" : ""}
                   </div>
                 </div>
+                {/* La consigne vit DANS le défi. Au-dessus, dans un bloc de
+                    texte, l'enfant ne la lit pas — il commence à cliquer. */}
+                {raw.instruction && (
+                  <p className="px-6 pt-4 text-sm font-medium" style={{ background: "#020c18", color: "#94a3b8" }}>{raw.instruction}</p>
+                )}
                 <div className="divide-y" style={{ background: "#050f1a", borderColor: "#0e2a3a" }}>
                   {raw.sentences.map((s, si) => {
                     const key = `${block.id}-${si}`;
@@ -743,7 +748,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
             type Pair = { left: string; right: string };
             // Les en-têtes « Concept / Définition » ne conviennent pas à tous
             // les appariements — un trajet n'est pas un concept.
-            const raw = block.content as { title?: string; pairs: Pair[]; left_label?: string; right_label?: string };
+            const raw = block.content as { title?: string; instruction?: string; pairs: Pair[]; left_label?: string; right_label?: string };
             const bMatchPairs  = matchPairs[block.id] ?? {};
             const bMatchSel    = matchSel[block.id] ?? null;
             const isDone       = !!matchDone[block.id];
@@ -792,6 +797,11 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                     </div>
                   )}
                 </div>
+                {/* Sans consigne, le jeu de paires ne dit pas qu'il faut
+                    toucher à gauche puis à droite : l'enfant clique au hasard. */}
+                {raw.instruction && (
+                  <p className="px-5 pt-4 text-sm font-medium" style={{ background: "#0a0519", color: "#94a3b8" }}>{raw.instruction}</p>
+                )}
                 <div className="p-5" style={{ background: "#0a0519" }}>
                   <div className="grid grid-cols-2 gap-3">
                     {/* Colonne gauche */}

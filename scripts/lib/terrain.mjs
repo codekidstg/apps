@@ -165,6 +165,19 @@ export function verifier(EXOS, { interdits = [], paliers = [1, 1, 2, 2, 2, 3, 3]
         if (!c.phases?.length) mauvais(`${e.title} : plan sans phases`);
         if (!c.distracteurs?.length) mauvais(`${e.title} : plan sans distracteurs`);
         for (const d of c.distracteurs ?? []) if (c.phases?.includes(d)) mauvais(`${e.title} : « ${d} » est piège ET bonne phase`);
+
+        // Le défaut qui a échappé à tout : « Compose les cinq étapes » devant
+        // SEPT cartes. Le nombre était vrai — cinq bonnes réponses — mais faux
+        // pour ce que l'enfant avait sous les yeux, et rien ne lui disait qu'il
+        // devait en laisser deux. La consigne doit avouer les pièges.
+        const dit = [c.title, c.description, c.consigne].filter(Boolean).join(" ").toLowerCase();
+        const total = (c.phases?.length ?? 0) + (c.distracteurs?.length ?? 0);
+        if (!/piège/.test(dit) && !new RegExp(`\\b${total}\\b`).test(dit))
+          mauvais(`${e.title} : ${c.distracteurs?.length} cartes sont des pièges, et la consigne ne le dit pas — elle doit parler de pièges ou annoncer les ${total} cartes`);
+
+        // Le moteur écrivait « où Kirikou doit les faire » en dur. Une consigne
+        // propre à l'exercice évite de convoquer un robot absent de l'écran.
+        if (!c.consigne) mauvais(`${e.title} : plan sans consigne propre — le moteur en mettrait une générique`);
       }
 
       // Une substitution doit aboutir exactement à la sortie annoncée.
@@ -188,6 +201,45 @@ export function verifier(EXOS, { interdits = [], paliers = [1, 1, 2, 2, 2, 3, 3]
       // l'enfant ait écrit quoi que ce soit.
       if (c.starter_code && /:\s*\n(\s*#[^\n]*\n)*\s*$/.test(c.starter_code))
         mauvais(`${e.title} : l'amorce finit sur un bloc vide`);
+    }
+  }
+
+  /**
+   * Un nombre annoncé dans une consigne doit correspondre à ce qui est affiché.
+   *
+   * « Compose les cinq étapes dans l'ordre » devant sept cartes : l'enfant
+   * compte, ne tombe pas juste, et ne comprend pas pourquoi. Le nombre était
+   * vrai pour les bonnes réponses, faux pour ce qu'il avait sous les yeux.
+   *
+   * On ne lit que les nombres suivis d'un mot qui compte quelque chose — « cinq
+   * blocs » ou « trois cases » parlent du labyrinthe, pas des éléments.
+   */
+  // « un » et « une » sont des articles bien plus souvent que des nombres :
+  // « un programme » n'annonce aucun compte. On ne les lit pas.
+  const CHIFFRES = { deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8,
+    neuf: 9, dix: 10, onze: 11, douze: 12, treize: 13, quatorze: 14, quinze: 15, seize: 16 };
+  const COMPTEURS = /(cartes?|étapes?|phases?|phrases?|questions?|objets?|paires?|éléments?|appareils?|situations?|consignes?|gestes?|chemins?|comparaisons?|valeurs?|programmes?|trajets?|messages?|virages?|couples?|boucles?|lignes? à|instructions? à)/i;
+  for (const e of EXOS) {
+    const possibles = new Set();
+    for (const b of e.blocs) {
+      const c = b.content ?? {};
+      for (const cle of ["items", "pairs", "sentences", "questions", "phases", "distracteurs"])
+        if (Array.isArray(c[cle])) possibles.add(c[cle].length);
+      if (Array.isArray(c.phases) && Array.isArray(c.distracteurs)) possibles.add(c.phases.length + c.distracteurs.length);
+    }
+    if (!possibles.size) continue;
+    // On ne lit que la consigne DU DÉFI. Le texte de Kodi au-dessus raconte
+    // souvent une histoire où des nombres parlent d'autre chose — « deux gestes
+    // qui ne font pas pareil » désigne deux paires parmi sept, sans mentir.
+    const vu = e.blocs.map((b) => {
+      const c = b.content ?? {};
+      return [c.title, c.instruction, c.description, c.consigne, typeof c.instructions === "string" ? c.instructions : ""].join(" ");
+    }).join(" ");
+    const mots = Object.keys(CHIFFRES).join("|");
+    const rx = new RegExp(`\\b(${mots}|\\d{1,2})\\s+(?:\\S+\\s+)?${COMPTEURS.source}`, "gi");
+    for (const m of vu.matchAll(rx)) {
+      const n = CHIFFRES[m[1].toLowerCase()] ?? Number(m[1]);
+      if (!possibles.has(n)) mauvais(`${e.title} : « ${m[0].trim()} » annoncé, mais les comptes réels sont ${[...possibles].sort((a, b) => a - b).join(", ")}`);
     }
   }
 

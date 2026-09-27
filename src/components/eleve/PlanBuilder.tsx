@@ -25,6 +25,14 @@ export type PlanBuilderConfig = {
   phases: string[];
   /** Cartes plausibles mais fausses, mélangées aux bonnes. */
   distracteurs?: string[];
+  /**
+   * La consigne affichée au-dessus des cartes.
+   *
+   * Elle était écrite en dur et nommait Kirikou : juste dans le labyrinthe,
+   * absurde dans la séance sur l'ordinateur, où l'enfant cherchait un robot
+   * qui n'existe pas à l'écran. C'est au contenu de dire de quoi il parle.
+   */
+  consigne?: string;
   explanation?: string;
 };
 
@@ -113,7 +121,7 @@ export default function PlanBuilder({
         <div className="text-sm font-bold" style={{ color: verdict === "faux" ? "#fca5a5" : "#94a3b8" }}>
           {fige
             ? "✅ C'est exactement ça. Tu peux ouvrir l'atelier."
-            : "Compose ton plan : touche les étapes dans l'ordre où Kirikou doit les faire."}
+            : (config.consigne ?? "Compose ton plan : touche les étapes dans l'ordre où elles doivent être faites.")}
         </div>
 
         <div className="flex flex-col lg:flex-row gap-4">

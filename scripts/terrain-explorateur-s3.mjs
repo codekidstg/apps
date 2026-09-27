@@ -79,6 +79,9 @@ const EXOS = [
         type: "match",
         content: {
           title: "Chaque direction et sa place",
+          instruction: "Touche un mot, puis ce qu'il veut dire sur l'écran.",
+          left_label: "Le mot",
+          right_label: "Ce que ça veut dire",
           pairs: [
             { left: "Avancer",             right: "Il change de case, pas de direction" },
             { left: "Tourner à droite",    right: "Il change de direction, sans bouger de case" },
@@ -111,6 +114,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Deviens la boussole",
+          instruction: "Suis Kirikou de tête, puis complète chaque phrase.",
           sentences: [
             { id: "s1", before: "Après le premier Avancer, il regarde toujours vers", after: ".",
               options: ["l'Est", "le Sud", "le Nord"], correct: 0,
@@ -208,7 +212,8 @@ const EXOS = [
       jeu({
         game_type: "plan_builder",
         title: "Le plan du serpent",
-        description: "Compose les phases dans l'ordre.",
+        description: "Sept cartes, cinq bonnes. Deux sont des pièges : laisse-les de côté.",
+        consigne: "Le chemin fait un S : à droite, en bas, à gauche. Touche les cinq bonnes étapes, dans l'ordre.",
         phases: [
           "Observer le labyrinthe et trouver le chemin",
           "Compter les cases de la première ligne",

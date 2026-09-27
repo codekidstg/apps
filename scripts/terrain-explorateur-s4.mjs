@@ -72,6 +72,9 @@ const EXOS = [
         type: "match",
         content: {
           title: "Chaque symptôme et son remède",
+          instruction: "Touche une panne, puis le geste qui la répare.",
+          left_label: "La panne",
+          right_label: "Le remède",
           pairs: [
             { left: "Il s'arrête une case trop tôt",        right: "Ajouter un Avancer" },
             { left: "Il dépasse d'une case",                right: "Enlever un Avancer" },
@@ -105,6 +108,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Le rapport du détective",
+          instruction: "Complète ton rapport : six phrases sur le programme affiché juste au-dessus.",
           sentences: [
             { id: "s1", before: "Avant de tourner, Kirikou a fait", after: "cases vers la droite.",
               options: ["2", "3", "4"], correct: 0,
@@ -189,7 +193,8 @@ const EXOS = [
       jeu({
         game_type: "plan_builder",
         title: "Le rapport d'enquête",
-        description: "Compose les phases dans l'ordre.",
+        description: "Sept cartes, cinq bonnes. Deux sont des pièges : laisse-les de côté.",
+        consigne: "Un programme rate et tu dois trouver pourquoi. Touche les cinq gestes de l'enquête, dans l'ordre.",
         phases: [
           "Lire le programme en entier",
           "Tracer le chemin de Kirikou avec le doigt",

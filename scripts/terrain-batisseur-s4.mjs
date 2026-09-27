@@ -86,6 +86,9 @@ const EXOS = [
         type: "match",
         content: {
           title: "Chaque boucle et sa sortie",
+          instruction: "Touche une boucle, puis ce qu'elle affiche.",
+          left_label: "La boucle",
+          right_label: "Ce qu'elle affiche",
           pairs: [
             { left: "range(3), print(tour)",            right: "0 puis 1 puis 2" },
             { left: "range(3), print(tour + 1)",        right: "1 puis 2 puis 3" },
@@ -182,6 +185,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Raconte la boucle",
+          instruction: "Complète chaque phrase sur la boucle affichée au-dessus.",
           sentences: [
             { id: "s1", before: "La ligne 3 s'exécute", after: "fois.",
               options: ["4", "3", "5"], correct: 0,

@@ -77,6 +77,9 @@ const EXOS = [
         type: "match",
         content: {
           title: "La même chose, en plus court",
+          instruction: "Touche une version longue, puis la version courte qui fait exactement pareil.",
+          left_label: "Version longue",
+          right_label: "Version courte",
           pairs: [
             { left: "Avancer ×5",                              right: "Répéter 5 fois : Avancer" },
             { left: "Avancer, Avancer, Avancer",               right: "Répéter 3 fois : Avancer" },
@@ -109,6 +112,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Déroule la boucle",
+          instruction: "Déroule la boucle affichée au-dessus, tour par tour, puis complète.",
           sentences: [
             { id: "s1", before: "À chaque tour, Kirikou avance de", after: "cases.",
               options: ["2", "3", "1"], correct: 0,

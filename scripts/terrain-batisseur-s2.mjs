@@ -71,6 +71,9 @@ const EXOS = [
         type: "match",
         content: {
           title: "Chaque geste et son effet",
+          instruction: "Touche une ligne de code, puis ce qu'elle fait vraiment.",
+          left_label: "La ligne",
+          right_label: "Son effet",
           pairs: [
             { left: "age = 12",       right: "Range 12 dans la boîte age" },
             { left: "age = age + 1",  right: "Prend ce qu'il y a dedans, ajoute 1, remet" },
@@ -175,6 +178,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Raconte le calculateur",
+          instruction: "Complète chaque phrase sur le calculateur affiché au-dessus.",
           sentences: [
             { id: "s1", before: "Après la ligne 1, la boîte annee contient", after: ".",
               options: ["du texte", "un nombre", "rien"], correct: 0,

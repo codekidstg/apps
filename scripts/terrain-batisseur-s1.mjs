@@ -120,6 +120,9 @@ const EXOS = [
         type: "match",
         content: {
           title: "Chaque rouge et son remède",
+          instruction: "Touche un message d'erreur, puis le geste qui le fait disparaître.",
+          left_label: "Le message rouge",
+          right_label: "Le remède",
           pairs: [
             { left: "NameError : 'Salut'",            right: "Mettre des guillemets autour du mot" },
             { left: "NameError : 'Print'",            right: "Écrire print tout en minuscules" },
@@ -215,6 +218,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Raconte ce qui se passe",
+          instruction: "Complète chaque phrase sur le programme affiché au-dessus.",
           sentences: [
             { id: "s1", before: "La faute est à la ligne", after: ".", options: ["4", "1", "5"], correct: 0,
               explanation: "Bienvenue n'a pas de guillemets. Python le prend pour le nom de quelque chose qu'il devrait connaître." },

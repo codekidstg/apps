@@ -72,6 +72,9 @@ const EXOS = [
         type: "match",
         content: {
           title: "Chaque symptôme et sa cause",
+          instruction: "Touche un symptôme, puis sa cause.",
+          left_label: "Le symptôme",
+          right_label: "La cause",
           pairs: [
             { left: "Un print dans la boucle affiche 0 1 2 3", right: "La boucle a fait quatre tours" },
             { left: "Aucun rouge, et le résultat est faux",    right: "Un bug silencieux" },
@@ -169,6 +172,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Raconte le cumul",
+          instruction: "Complète chaque phrase sur le programme affiché au-dessus.",
           sentences: [
             { id: "s1", before: "À la fin, le programme affiche", after: ".",
               options: ["1200", "300", "4"], correct: 0,

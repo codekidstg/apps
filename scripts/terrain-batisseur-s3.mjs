@@ -69,6 +69,9 @@ const EXOS = [
         type: "match",
         content: {
           title: "Chaque signe et sa question",
+          instruction: "Touche un signe, puis la question qu'il pose — ou ce qu'il fait.",
+          left_label: "Le signe",
+          right_label: "Ce qu'il fait",
           pairs: [
             { left: "=",     right: "Range dans la boîte — ne demande rien" },
             { left: "==",    right: "Est-ce que c'est égal ?" },
@@ -180,6 +183,7 @@ const EXOS = [
         type: "fill_blank",
         content: {
           title: "Raconte le portier",
+          instruction: "Complète chaque phrase sur le portier affiché au-dessus.",
           sentences: [
             { id: "s1", before: "Si on tape kodi, le programme affiche", after: ".",
               options: ["Bienvenue !", "Refuse.", "les deux"], correct: 0,
