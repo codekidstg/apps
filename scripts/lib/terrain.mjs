@@ -62,8 +62,10 @@ export function verifier(EXOS, { interdits = [], paliers = [1, 1, 2, 2, 2, 3, 3]
       }
 
       // `swipe_sort` lit `categories`, `drag_to_bin` lit `bins` : deux noms pour
-      // la même idée, et se tromper ne se voit qu'à l'écran.
-      if (c.items) {
+      // la même idée, et se tromper ne se voit qu'à l'écran. Le jeu de remise
+      // en ordre a lui aussi des `items`, mais ce sont de simples phrases :
+      // ces règles ne le concernent pas.
+      if (c.items && (b.type === "swipe_sort" || b.type === "drag_to_bin")) {
         if (b.type === "swipe_sort" && !c.categories) mauvais(`${e.title} : swipe_sort attend categories`);
         if (b.type === "drag_to_bin" && !c.bins)      mauvais(`${e.title} : drag_to_bin attend bins`);
         const bacs = (c.categories ?? c.bins ?? []).map((x) => x.id);
@@ -101,6 +103,54 @@ export function verifier(EXOS, { interdits = [], paliers = [1, 1, 2, 2, 2, 3, 3]
         if (!Number.isInteger(c.bug_index) || !c.instructions?.[c.bug_index]) mauvais(`${e.title} / ${c.title} : bug_index hors des lignes`);
         else if (c.instructions[c.bug_index] === c.fix) mauvais(`${e.title} / ${c.title} : la réparation répète la ligne fautive`);
         if (!c.explanation) mauvais(`${e.title} / ${c.title} : sans explication`);
+      }
+
+      if (c.game_type === "maze" || c.game_type === "python_maze") {
+        const v = cheminLabyrinthe(c);
+        if (v.erreur) mauvais(`${e.title} / ${c.title} : ${v.erreur}`);
+        else {
+          // Le budget de blocs doit laisser une chance : au moins un
+          // déplacement par case du plus court chemin — sauf quand la boucle
+          // est disponible, puisque c'est justement elle qui fait tenir un
+          // long chemin dans peu de blocs.
+          const boucle = (c.available_blocks ?? []).some((b2) => b2.includes("repeat"));
+          if (!boucle && c.max_blocks !== undefined && c.max_blocks < v.pas)
+            mauvais(`${e.title} / ${c.title} : ${c.max_blocks} blocs autorisés pour un chemin de ${v.pas} cases, sans boucle disponible`);
+          if (c.collectibles?.length && !(c.available_blocks ?? []).includes("robot_pick"))
+            mauvais(`${e.title} / ${c.title} : des gemmes à ramasser, mais pas de bloc robot_pick`);
+        }
+      }
+
+      // Les moteurs de motif : le morceau annoncé doit réellement revenir à
+      // l'identique, et le compte doit tomber juste. Un motif qui ne se répète
+      // pas rend l'exercice insoluble sans qu'aucune erreur ne s'affiche.
+      if (c.game_type === "pattern_select" || c.game_type === "pattern_build") {
+        const n = (c.instructions ?? []).length;
+        const [d, f] = [c.motif_start, c.motif_end];
+        if (!Number.isInteger(d) || !Number.isInteger(f) || d < 0 || f < d || f >= n) {
+          mauvais(`${e.title} / ${c.title} : motif_start/motif_end hors des instructions`);
+        } else {
+          const motif = c.instructions.slice(d, f + 1);
+          // On compte les retours identiques, puis on s'arrête : ce qui suit est
+          // « le reste », et c'est exactement le sujet de `pattern_build`.
+          let tours = 0;
+          while (c.instructions.slice(d + tours * motif.length, d + (tours + 1) * motif.length).join("|") === motif.join("|")) tours++;
+          if (tours < 2) mauvais(`${e.title} / ${c.title} : le motif annoncé ne revient pas deux fois`);
+          if (c.repetitions !== undefined) {
+            if (c.repetitions !== tours)
+              mauvais(`${e.title} / ${c.title} : ${c.repetitions} répétitions annoncées, ${tours} trouvées`);
+            // `pattern_select` demande d'entourer le motif d'un bout à l'autre :
+            // la suite doit être entièrement couverte, sans reste.
+            if (d + tours * motif.length !== n)
+              mauvais(`${e.title} / ${c.title} : ${n - d - tours * motif.length} instruction(s) restent en dehors du motif`);
+          }
+        }
+      }
+
+      if (c.game_type === "sort") {
+        if (!Array.isArray(c.items) || c.items.length < 3) mauvais(`${e.title} : un tri d'ordre demande au moins trois phrases`);
+        else if (new Set(c.items).size !== c.items.length) mauvais(`${e.title} : deux phrases identiques dans le tri`);
+        if (!c.hint) mauvais(`${e.title} : tri d'ordre sans indice`);
       }
 
       if (c.game_type === "plan_builder") {
@@ -204,6 +254,52 @@ export async function appliquer(db, g, LECON, EXOS, { ecrire, refaire }) {
   }
   console.log(pb === 0 ? "\n✅ TOUT EST BON" : `\n⛔ ${pb} PROBLÈME(S)`);
   if (pb) process.exit(1);
+}
+
+/**
+ * Un labyrinthe est-il réellement franchissable ?
+ *
+ * Les murs sont saisis à la main : rien ne garantit qu'un chemin existe, ni que
+ * le budget de blocs suffise. On parcourt la grille en largeur — même méthode
+ * que `scripts/verifier-labyrinthes.mjs`, remontée ici pour vérifier AVANT
+ * d'écrire plutôt qu'après.
+ */
+export function cheminLabyrinthe(c) {
+  const mur = new Set((c.walls ?? []).map((m) => `${m.x},${m.y}`));
+  const dans = (x, y) => x >= 0 && y >= 0 && x < c.grid_size && y < c.grid_size;
+  if (!dans(c.start.x, c.start.y)) return { erreur: "le départ est hors de la grille" };
+  if (!dans(c.goal.x, c.goal.y)) return { erreur: "l'arrivée est hors de la grille" };
+  if (mur.has(`${c.start.x},${c.start.y}`)) return { erreur: "le départ est dans un mur" };
+  if (mur.has(`${c.goal.x},${c.goal.y}`)) return { erreur: "l'arrivée est dans un mur" };
+  for (const g of c.collectibles ?? []) {
+    if (!dans(g.x, g.y)) return { erreur: `une gemme est hors de la grille (${g.x},${g.y})` };
+    if (mur.has(`${g.x},${g.y}`)) return { erreur: `une gemme est dans un mur (${g.x},${g.y})` };
+  }
+  const distance = (a, b) => {
+    const file = [{ x: a.x, y: a.y, d: 0 }];
+    const vus = new Set([`${a.x},${a.y}`]);
+    while (file.length) {
+      const { x, y, d } = file.shift();
+      if (x === b.x && y === b.y) return d;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy, k = `${nx},${ny}`;
+        if (!dans(nx, ny) || mur.has(k) || vus.has(k)) continue;
+        vus.add(k); file.push({ x: nx, y: ny, d: d + 1 });
+      }
+    }
+    return null;
+  };
+  // Le trajet passe par chaque gemme avant l'étoile : on somme les étapes dans
+  // l'ordre donné, ce qui est le parcours qu'on demande à l'enfant.
+  let pas = 0, ici = c.start;
+  for (const g of c.collectibles ?? []) {
+    const d = distance(ici, g);
+    if (d === null) return { erreur: `aucun chemin jusqu'à la gemme (${g.x},${g.y})` };
+    pas += d; ici = g;
+  }
+  const d = distance(ici, c.goal);
+  if (d === null) return { erreur: "aucun chemin jusqu'à l'étoile" };
+  return { pas: pas + d };
 }
 
 /** Les cas du banc : chaque défi de code, avec ses bonnes et ses mauvaises solutions. */
