@@ -42,7 +42,7 @@ export default async function EleveLayout({ children, params }: { children: Reac
   // allTrainings depuis le cache (5 min) — évite un aller-retour DB à chaque navigation élève
   const [allTrainings, lessonProgRes, trainingProgRes, avatarRes, reponsesNonVues] = await Promise.all([
     getCachedAllTrainings(),
-    student ? (supabase.from("lesson_progress") as any).select("lesson_id").eq("student_id", student.id) : Promise.resolve({ data: [] }),
+    student ? (supabase.from("lesson_progress") as any).select("lesson_id, status").eq("student_id", student.id) : Promise.resolve({ data: [] }),
     student ? (supabase.from("training_progress") as any).select("training_id").eq("student_id", student.id).gt("attempts", 0) : Promise.resolve({ data: [] }),
     student ? (supabase.from("student_avatar") as any).select("*").eq("student_id", student.id).maybeSingle() : Promise.resolve({ data: null }),
     // La pastille « Mes questions » : une réponse du mentor pas encore lue.
@@ -50,9 +50,17 @@ export default async function EleveLayout({ children, params }: { children: Reac
   ]);
 
   const startedIds = new Set((lessonProgRes.data ?? []).map((r: any) => r.lesson_id));
+  // La salle de jeu s'ouvre séance par séance, quand la séance est TERMINÉE —
+  // la même règle que le serveur applique déjà aux exercices eux-mêmes.
+  const finiesIds  = new Set((lessonProgRes.data ?? []).filter((r: any) => r.status === "completed").map((r: any) => r.lesson_id));
   const doneIds    = new Set((trainingProgRes.data ?? []).map((r: any) => r.training_id));
+  // Deux pastilles, deux comptes : le programme d'un côté, la salle de l'autre.
+  // Mélangés, les exercices libres faisaient gonfler le devoir à faire.
   const trainingBadgeCount = student
-    ? allTrainings.filter((t) => startedIds.has(t.lesson_id) && !doneIds.has(t.id)).length
+    ? allTrainings.filter((t) => !t.libre_service && startedIds.has(t.lesson_id) && !doneIds.has(t.id)).length
+    : 0;
+  const salleBadgeCount = student
+    ? allTrainings.filter((t) => t.libre_service && finiesIds.has(t.lesson_id) && !doneIds.has(t.id)).length
     : 0;
   const avatarRaw = avatarRes.data;
 
@@ -61,6 +69,7 @@ export default async function EleveLayout({ children, params }: { children: Reac
   const nav = [
     { href: "/eleve",              label: "Ma Cité",           icon: "🏙️" },
     { href: "/eleve/entrainement", label: "Mon Entraînement",  icon: "💪" },
+    { href: "/eleve/salle-de-jeu", label: "Ma salle de jeu",   icon: "🏟️" },
     { href: "/eleve/classement",   label: "Classement",        icon: "🏆" },
     { href: "/eleve/badges",       label: "Badges",            icon: "⭐" },
     { href: "/eleve/avatar",       label: "Mon robot",         icon: "🤖" },
@@ -151,6 +160,13 @@ export default async function EleveLayout({ children, params }: { children: Reac
                   <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
                     style={{ background: "#FDB813", color: "#0f172a" }}>
                     {trainingBadgeCount}
+                  </span>
+                )}
+                {item.href === "/eleve/salle-de-jeu" && salleBadgeCount > 0 && (
+                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
+                    style={{ background: "#a78bfa", color: "#1e1b4b" }}
+                    aria-label={`${salleBadgeCount} exercice${salleBadgeCount > 1 ? "s" : ""} jamais joué${salleBadgeCount > 1 ? "s" : ""}`}>
+                    {salleBadgeCount}
                   </span>
                 )}
                 {item.href === "/eleve/questions" && reponsesNonVues > 0 && (

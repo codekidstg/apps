@@ -15,8 +15,8 @@ import { createAdminClient } from "@/lib/supabase/server";
 export const getCachedAllTrainings = unstable_cache(
   async () => {
     const admin = createAdminClient();
-    const { data } = await (admin.from("trainings") as any).select("id, lesson_id");
-    return (data ?? []) as { id: string; lesson_id: string }[];
+    const { data } = await (admin.from("trainings") as any).select("id, lesson_id, libre_service, palier");
+    return (data ?? []) as { id: string; lesson_id: string; libre_service: boolean; palier: number | null }[];
   },
   ["all-trainings"],
   { revalidate: 300, tags: ["trainings"] },

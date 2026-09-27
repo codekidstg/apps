@@ -94,15 +94,18 @@ export default async function EntrainementPage() {
   // La page ouvrait les entraînements dès la leçon *commencée* : Samuel en a
   // fini sept sur des leçons jamais bouclées. C'est la fin du cours qui ouvre
   // sa pratique — le serveur applique la même règle (lib/eleve/acces.ts).
+  // Cette page, c'est le programme. Les exercices en libre service vivent
+  // derrière leur propre porte — « Ma salle de jeu » — parce qu'un enfant ne
+  // redescend jamais dans une séance déjà finie pour aller s'entraîner.
   const available = allTrainings
-    .filter(t => t.lesson_terminee && accessibleThemeIds.has(t.theme_id))
+    .filter(t => !t.libre_service && t.lesson_terminee && accessibleThemeIds.has(t.theme_id))
     .sort((a, b) => rang(a) - rang(b));
   const locked = allTrainings
-    .filter(t => !t.lesson_terminee && accessibleThemeIds.has(t.theme_id))
+    .filter(t => !t.libre_service && !t.lesson_terminee && accessibleThemeIds.has(t.theme_id))
     .sort((a, b) => rang(a) - rang(b));
 
   // Grouper thème → leçon
-  type LessonGroup = { lessonId: string; lessonTitle: string; lessonCompletedAt: string | null; trainings: Training[]; terrain: Training[] };
+  type LessonGroup = { lessonId: string; lessonTitle: string; lessonCompletedAt: string | null; trainings: Training[] };
   type ThemeGroup  = { themeId: string; themeTitle: string; themeLevel: string; lessons: LessonGroup[] };
 
   const grouped: ThemeGroup[] = [];
@@ -117,21 +120,16 @@ export default async function EntrainementPage() {
     const group = themeMap.get(t.theme_id)!;
     let lg = group.lessons.find(l => l.lessonId === t.lesson_id);
     if (!lg) {
-      lg = { lessonId: t.lesson_id, lessonTitle: t.lesson_title, lessonCompletedAt: t.lesson_completed_at, trainings: [], terrain: [] };
+      lg = { lessonId: t.lesson_id, lessonTitle: t.lesson_title, lessonCompletedAt: t.lesson_completed_at, trainings: [] };
       group.lessons.push(lg);
     }
-    // Les deux portes de la même réserve : le parcours d'un côté, le Terrain de
-    // l'autre. Mélangées, les sept exercices libres passeraient pour du
-    // programme — et le mentor ne saurait plus ce que la séance exige vraiment.
-    const carte = { id: t.id, title: t.title, description: t.description, xp_reward: t.xp_reward, attempts: t.attempts, best_score: t.best_score, last_completed_at: t.last_completed_at, palier: t.palier } as any;
-    (t.libre_service ? lg.terrain : lg.trainings).push(carte);
+    lg.trainings.push({ id: t.id, title: t.title, description: t.description, xp_reward: t.xp_reward, attempts: t.attempts, best_score: t.best_score, last_completed_at: t.last_completed_at } as any);
   }
 
   // Les compteurs du haut parlent du programme : le Terrain ne se compte pas
   // comme un devoir à finir, il n'a pas de fin.
-  const parcours  = available.filter(t => !t.libre_service);
-  const totalDone = parcours.filter(t => t.attempts > 0).length;
-  const totalXP   = parcours.reduce((s, t) => s + t.xp_reward, 0);
+  const totalDone = available.filter(t => t.attempts > 0).length;
+  const totalXP   = available.reduce((s, t) => s + t.xp_reward, 0);
 
   return (
     <div className="p-6 lg:p-10 max-w-3xl">
