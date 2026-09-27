@@ -1,5 +1,6 @@
-export const dynamic = "force-dynamic";
+"use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import CarteExercice from "@/components/eleve/CarteExercice";
 import { PALIERS, ceintureDe, type Exercice } from "@/lib/eleve/paliers";
@@ -27,6 +28,21 @@ export default function SalleDeJeu({ seances }: { seances: SeanceSalle[] }) {
   const tousLesExos = seances.flatMap((s) => s.exercices);
   const joues       = tousLesExos.filter((e) => e.attempts > 0).length;
   const sansIndice  = tousLesExos.filter((e) => e.sansIndice).length;
+
+  // Une seule séance ouverte au départ : celle où il reste quelque chose à
+  // essayer. Douze séances dépliées font une page de plusieurs écrans, et un
+  // enfant n'y trouve plus où il en est.
+  const premiereAFaire = seances.find((s) => s.exercices.some((e) => e.attempts === 0))?.lessonId
+    ?? seances[0]?.lessonId ?? null;
+  const [ouvertes, setOuvertes] = useState<Set<string>>(new Set(premiereAFaire ? [premiereAFaire] : []));
+
+  function basculer(id: string) {
+    setOuvertes((prev) => {
+      const suivant = new Set(prev);
+      suivant.has(id) ? suivant.delete(id) : suivant.add(id);
+      return suivant;
+    });
+  }
 
   return (
     <div className="p-6 lg:p-10 max-w-3xl">
@@ -71,11 +87,17 @@ export default function SalleDeJeu({ seances }: { seances: SeanceSalle[] }) {
             const ceinture = ceintureDe(s.exercices);
             const faits = s.exercices.filter((e) => e.attempts > 0).length;
             const tousSansIndice = s.exercices.length > 0 && s.exercices.every((e) => e.sansIndice);
+            const estOuverte = ouvertes.has(s.lessonId);
 
             return (
               <section key={s.lessonId} className="rounded-2xl overflow-hidden"
                 style={{ background: "#0f172a", border: "1px solid #1e293b" }}>
-                <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid #1e293b" }}>
+                <button
+                  onClick={() => basculer(s.lessonId)}
+                  aria-expanded={estOuverte}
+                  className="w-full px-5 py-4 flex items-center gap-3 text-left transition-colors hover:bg-slate-800/40"
+                  style={{ borderBottom: estOuverte ? "1px solid #1e293b" : "none" }}
+                >
                   <span className="text-xl shrink-0" title={ceinture.nom}>{ceinture.emoji}</span>
                   <div className="flex-1 min-w-0">
                     <div className="font-black text-white text-sm truncate">{s.titre}</div>
@@ -83,12 +105,18 @@ export default function SalleDeJeu({ seances }: { seances: SeanceSalle[] }) {
                       {ceinture.nom}{tousSansIndice && " ★ tout sans indice"}
                     </div>
                   </div>
+                  {/* Refermée, la séance garde un point tant qu'il reste du neuf à essayer. */}
+                  {!estOuverte && faits < s.exercices.length && (
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#a78bfa" }} />
+                  )}
                   <span className="text-xs font-mono shrink-0" style={{ color: faits === s.exercices.length ? "#10b981" : "#475569" }}>
                     {faits}/{s.exercices.length}
                   </span>
-                </div>
+                  <span className="text-[10px] shrink-0 transition-transform duration-200"
+                    style={{ color: "#334155", transform: estOuverte ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+                </button>
 
-                <div className="px-4 py-4 space-y-4">
+                {estOuverte && <div className="px-4 py-4 space-y-4">
                   {PALIERS.map((p) => {
                     const lot = s.exercices.filter((e) => (e.palier ?? 1) === p.n);
                     if (!lot.length) return null;
@@ -101,7 +129,7 @@ export default function SalleDeJeu({ seances }: { seances: SeanceSalle[] }) {
                       </div>
                     );
                   })}
-                </div>
+                </div>}
               </section>
             );
           })}

@@ -193,14 +193,14 @@ const EXOS = [
             { id: "b", emoji: "📸", label: "La photo prise ce matin, déjà dans la galerie",               correct: "reste", hint: "Une photo part directement sur le disque." },
             { id: "c", emoji: "🎮", label: "La partie en cours, pas sauvegardée",                         correct: "perdu", hint: "Une partie en cours vit dans la RAM tant qu'on ne sauvegarde pas." },
             { id: "d", emoji: "🎵", label: "La chanson téléchargée hier",                                 correct: "reste", hint: "Téléchargée veut dire écrite sur le disque." },
-            { id: "e", emoji: "✉️", label: "Le message écrit mais pas envoyé",                            correct: "perdu", hint: "Tant qu'il n'est pas parti ni enregistré, il n'est que dans la RAM." },
+            { id: "e", emoji: "📋", label: "Le texte que tu viens de copier, prêt à coller",                correct: "perdu", hint: "Le presse-papier vit dans la RAM. Au rallumage, il n'y a plus rien à coller." },
             { id: "f", emoji: "📱", label: "L'application installée la semaine dernière",                 correct: "reste", hint: "Installer, c'est écrire sur le disque." },
             { id: "g", emoji: "🌐", label: "Les dix pages ouvertes dans le navigateur",                   correct: "perdu", hint: "Des pages ouvertes occupent la RAM — c'est même pour ça que l'ordi ralentit." },
             { id: "h", emoji: "📇", label: "Les contacts du téléphone",                                   correct: "reste", hint: "Ils sont enregistrés, pas seulement affichés." },
             { id: "i", emoji: "🧮", label: "Le calcul à moitié tapé sur la calculatrice",                 correct: "perdu", hint: "Rien n'est enregistré : tout est en cours." },
             { id: "j", emoji: "🎬", label: "La vidéo téléchargée pour la regarder hors ligne",            correct: "reste", hint: "Téléchargée, donc sur le disque." },
             { id: "k", emoji: "📄", label: "Le devoir enregistré hier soir",                              correct: "reste", hint: "Enregistré : il est sur le disque, il t'attend." },
-            { id: "l", emoji: "⏸️", label: "L'endroit exact où tu avais mis le film en pause",             correct: "perdu", hint: "Un piège : la position de lecture n'est que dans la RAM, sauf si l'application la note." },
+            { id: "l", emoji: "⏱️", label: "La minuterie de 10 minutes en train de tourner",                correct: "perdu", hint: "Elle compte dans la RAM. Au rallumage, plus de minuterie — il faut la relancer." },
           ],
         },
       },
@@ -212,7 +212,7 @@ const EXOS = [
     title: "Le voyage d'une touche",
     description: "Tu appuies sur A. Raconte tout ce qui se passe ensuite.",
     blocs: [
-      kodi("<p>Tu appuies sur la touche <strong>A</strong>. Une seconde plus tard, un A apparaît à l'écran.</p><p>Entre les deux, il s'est passé quatre choses. Raconte-les dans l'ordre.</p>"),
+      kodi("<p>Tu appuies sur la touche <strong>A</strong>. Une seconde plus tard, un A apparaît à l'écran.</p><p>Entre les deux, il s'est passé beaucoup de choses. Raconte-les dans l'ordre.</p>"),
       {
         type: "fill_blank",
         content: {

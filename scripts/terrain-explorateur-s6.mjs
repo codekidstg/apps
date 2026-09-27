@@ -18,11 +18,15 @@ const LECON = "Trouver le motif";
 
 const A = "Avancer", D = "Tourner à droite", G = "Tourner à gauche";
 
+// Un motif fait de la même instruction répétée n'en est pas un : son plus petit
+// morceau fait une seule instruction. Huit « Avancer » n'ont pas un motif de 2.
+
+
 // ── Les séquences à mesurer, et la longueur de leur motif, calculée ───────
 const SEQ = [
   ["a", [A, D], 3], ["b", [A, A, D], 3], ["c", [A, D, A, G], 3],
   ["d", [A, G], 4], ["e", [A, A, A, D], 2], ["f", [A, D, A], 3],
-  ["g", [A, A], 4], ["h", [A, D, D], 3], ["i", [A, A, G, G], 2],
+  ["g", [G, A], 4], ["h", [A, D, D], 3], ["i", [A, A, G, G], 2],
   ["j", [D, A], 4], ["k", [A, A, D, A], 2], ["l", [A, G, A], 3],
 ];
 const items = SEQ.map(([id, motif, tours]) => {
@@ -34,7 +38,17 @@ const items = SEQ.map(([id, motif, tours]) => {
     hint: `${motif.join(", ")} revient ${tours} fois : le motif fait ${motif.length} instruction${motif.length > 1 ? "s" : ""}.`,
   };
 });
-for (const [id, motif] of SEQ) if (![2, 3, 4].includes(motif.length)) throw new Error(`${id} : motif de ${motif.length}, hors des bacs`);
+for (const [id, motif] of SEQ) {
+  if (![2, 3, 4].includes(motif.length)) throw new Error(`${id} : motif de ${motif.length}, hors des bacs`);
+  if (new Set(motif).size === 1) throw new Error(`${id} : un motif fait d'une seule instruction répétée — le plus petit motif ferait 1`);
+  // Un motif dont la première moitié est égale à la seconde n'est pas le plus petit.
+  for (let k = 1; k < motif.length; k++) {
+    if (motif.length % k) continue;
+    const debut = motif.slice(0, k).join("|");
+    if (Array.from({ length: motif.length / k }, (_, i) => motif.slice(i * k, i * k + k).join("|")).every((t) => t === debut))
+      throw new Error(`${id} : le motif se réduit à ${k} instruction(s)`);
+  }
+}
 
 // Un escalier : droite, bas, droite, bas, droite, bas.
 const ESCALIER = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 3 }];

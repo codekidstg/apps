@@ -93,7 +93,7 @@ const EXOS = [
 
   {
     palier: 2,
-    title: "Déroule la boucle",
+    title: "Tour par tour",
     description: "Six questions sur une boucle de trois tours.",
     blocs: [
       {
@@ -165,8 +165,8 @@ const EXOS = [
 
   {
     palier: 2,
-    title: "Est-ce que ça fait pareil ?",
-    description: "Douze couples. Même résultat, ou pas ?",
+    title: "Même résultat, ou pas ?",
+    description: "Douze couples de programmes à comparer.",
     blocs: [
       kodi("<p>Pour chaque couple, une version longue et une version courte.</p><p>Fais-les tourner toutes les deux dans ta tête : arrivent-elles au même endroit ?</p>"),
       {
@@ -255,6 +255,6 @@ console.log(`✓ le couloir : ${chemin.pas} cases pour ${couloir.max_blocks} blo
 
 verifier(EXOS, {
   interdits: [/\bmotif\b/i, /print\(/, /\bdef\b/],
-  comptes: { "Combien de cases ?": 12, "Version longue, version courte": 7, "Déroule la boucle": 6, "Est-ce que ça fait pareil ?": 12 },
+  comptes: { "Combien de cases ?": 12, "Version longue, version courte": 7, "Tour par tour": 6, "Même résultat, ou pas ?": 12 },
 });
 await appliquer(db, g, LECON, EXOS, { ecrire: process.argv.includes("--ecrire"), refaire: process.argv.includes("--refaire") });

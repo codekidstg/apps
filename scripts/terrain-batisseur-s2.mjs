@@ -20,8 +20,8 @@ const LECON = "Garder une information";
 const EXOS = [
   {
     palier: 1,
-    title: "Texte ou nombre ?",
-    description: "Douze valeurs. Python ne voit pas ce que tu vois.",
+    title: "Python voit quoi ?",
+    description: "Douze valeurs. Il ne voit pas ce que tu vois.",
     blocs: [
       kodi("<p>Pour toi, <code>12</code> et <code>\"12\"</code> se ressemblent. Pour Python, ce sont deux mondes différents : l'un se calcule, l'autre se colle.</p><p>Douze valeurs. Dis ce que Python voit.</p>"),
       {
@@ -290,7 +290,7 @@ const SOLUTIONS = {
 
 verifier(EXOS, {
   interdits: [/\bif\b/, /\bfor\b/, /\bwhile\b/, /\bdef\b/, /\belse\s*:/, /\brange\(/, /\bstr\(/, /\.append/, /(?<!=)==(?!=)/, /\[\s*0\s*\]/],
-  comptes: { "Texte ou nombre ?": 12, "Chaque geste et son effet": 7, "Le calculateur raconté": 6 },
+  comptes: { "Python voit quoi ?": 12, "Chaque geste et son effet": 7, "Le calculateur raconté": 6 },
 });
 
 if (process.argv.includes("--banc")) { console.log(JSON.stringify(banc(EXOS, SOLUTIONS))); process.exit(0); }

@@ -93,6 +93,14 @@ export function verifier(EXOS, { interdits = [], paliers = [1, 1, 2, 2, 2, 3, 3]
         if (d1.length !== new Set(d1).size) mauvais(`${e.title} : deux paires ont la même droite — insoluble`);
       }
 
+      // Le moteur du quiz affiche les choix dans l'ordre donné — il ne les
+      // mélange pas, contrairement aux phrases à trous. Une bonne réponse
+      // toujours au même rang se devine sans lire la question.
+      if ((c.questions ?? []).length >= 3) {
+        const rangs = c.questions.map((q) => q.answer);
+        if (new Set(rangs).size === 1) mauvais(`${e.title} : toutes les bonnes réponses sont au rang ${rangs[0] + 1} — il suffit de cliquer toujours au même endroit`);
+        else if (new Set(rangs).size === 2 && c.questions.length >= 5) mauvais(`${e.title} : les bonnes réponses n'occupent que ${new Set(rangs).size} rangs sur ${Math.max(...c.questions.map((q) => q.choices.length))}`);
+      }
       for (const q of c.questions ?? []) {
         if (!q.choices?.[q.answer]) mauvais(`${e.title} : une question sans bonne réponse`);
         if (new Set(q.choices).size !== q.choices.length) mauvais(`${e.title} : « ${q.question?.slice(0, 40)} » a deux choix identiques`);

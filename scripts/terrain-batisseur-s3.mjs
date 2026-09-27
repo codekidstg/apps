@@ -18,8 +18,8 @@ const LECON = "Choisir";
 const EXOS = [
   {
     palier: 1,
-    title: "Vrai ou faux ?",
-    description: "Douze comparaisons. Python répond par oui ou par non.",
+    title: "Elle répond quoi ?",
+    description: "Douze comparaisons. Python tranche, il ne calcule pas.",
     blocs: [
       kodi("<p>Une comparaison ne calcule rien : elle <strong>tranche</strong>. Vrai, ou faux.</p><p>Douze comparaisons t'attendent. Deux d'entre elles cachent un piège que tu connais déjà depuis la séance dernière.</p>"),
       {
@@ -94,19 +94,19 @@ const EXOS = [
         content: {
           questions: [
             { question: 'note = 14, puis if note >= 10: print("Recu") else: print("Ajourne") — qu\'affiche le programme ?',
-              choices: ["Recu", "Ajourne", "Recu puis Ajourne"], answer: 0,
+              choices: ["Ajourne", "Recu", "Recu puis Ajourne"], answer: 1,
               explanation: "14 est plus grand que 10 : la première branche part, et l'autre est sautée." },
             { question: 'note = 10, même programme — qu\'affiche-t-il ?',
               choices: ["Recu", "Ajourne", "Rien"], answer: 0,
               explanation: ">= accepte l'égalité. Avec exactement 10, c'est encore Recu." },
             { question: 'mot = "Kodi", puis if mot == "kodi": print("Ouvert") else: print("Ferme")',
-              choices: ["Ferme", "Ouvert", "Les deux"], answer: 0,
+              choices: ["Ouvert", "Les deux", "Ferme"], answer: 2,
               explanation: "La majuscule change tout : les deux textes ne sont pas égaux, donc c'est le sinon." },
             { question: 'age = 20, puis if age > 18: print("A") puis, DÉCALÉ AUSSI, print("B") — qu\'affiche-t-il ?',
-              choices: ["A puis B", "A seulement", "B seulement"], answer: 0,
+              choices: ["A seulement", "A puis B", "B seulement"], answer: 1,
               explanation: "Tout ce qui est décalé sous le si appartient au si. Les deux lignes partent ensemble." },
             { question: 'age = 10, même programme avec A et B décalés sous le si',
-              choices: ["Rien", "B seulement", "A puis B"], answer: 0,
+              choices: ["B seulement", "A puis B", "Rien"], answer: 2,
               explanation: "La condition est fausse : tout le bloc décalé est sauté, les deux lignes avec." },
             { question: 'age = 10, mais cette fois print("B") n\'est PAS décalé — qu\'affiche-t-il ?',
               choices: ["B seulement", "Rien", "A puis B"], answer: 0,
@@ -295,7 +295,7 @@ const SOLUTIONS = {
 
 verifier(EXOS, {
   interdits: [/\bfor\b/, /\bwhile\b/, /\bdef\b/, /\belif\b/, /\brange\(/, /\bstr\(/, /\.append/, /\[\s*0\s*\]/],
-  comptes: { "Vrai ou faux ?": 12, "Chaque signe et sa question": 7, "Quelle branche s'exécute ?": 6, "Le portier raconté": 6 },
+  comptes: { "Elle répond quoi ?": 12, "Chaque signe et sa question": 7, "Quelle branche s'exécute ?": 6, "Le portier raconté": 6 },
 });
 
 if (process.argv.includes("--banc")) { console.log(JSON.stringify(banc(EXOS, SOLUTIONS))); process.exit(0); }

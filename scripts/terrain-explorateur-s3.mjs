@@ -19,6 +19,8 @@ const LECON = "Gauche ou droite ?";
 // ── Garde-fou : le cycle des directions, calculé plutôt que recopié ────────
 const ORDRE = ["N", "E", "S", "O"];            // sens des aiguilles d'une montre
 const NOM = { N: "Nord", E: "Est", S: "Sud", O: "Ouest" };
+// « le Est » ne se dit pas : deux directions sur quatre demandent l'élision.
+const LE = { N: "le Nord", E: "l'Est", S: "le Sud", O: "l'Ouest" };
 const tourner = (d, sens) => ORDRE[(ORDRE.indexOf(d) + (sens === "droite" ? 1 : 3)) % 4];
 if (tourner("N", "droite") !== "E" || tourner("N", "gauche") !== "O" || tourner(tourner("N", "droite"), "droite") !== "S")
   throw new Error("le cycle des directions est faux");
@@ -35,11 +37,11 @@ const items = VIRAGES.map(([id, depart, sens]) => {
   const liste = sens.map((s) => `tourne à ${s}`).join(", puis ");
   return {
     id, emoji: "🧭",
-    label: `Il regarde le ${NOM[depart]} et ${liste}`,
+    label: `Il regarde ${LE[depart]} et ${liste}`,
     correct: arrivee,
     hint: sens.length === 1
-      ? `Un seul quart de tour depuis le ${NOM[depart]} : il regarde le ${NOM[arrivee]}.`
-      : `${sens.length} quarts de tour depuis le ${NOM[depart]} : ${sens.reduce((acc, s) => { acc.push(tourner(acc[acc.length - 1], s)); return acc; }, [depart]).map((d) => NOM[d]).join(" → ")}.`,
+      ? `Un seul quart de tour depuis ${LE[depart]} : il regarde ${LE[arrivee]}.`
+      : `${sens.length} quarts de tour depuis ${LE[depart]} : ${sens.reduce((acc, s) => { acc.push(tourner(acc[acc.length - 1], s)); return acc; }, [depart]).map((d) => NOM[d]).join(" → ")}.`,
   };
 });
 
@@ -153,35 +155,47 @@ const EXOS = [
       jeu({
         game_type: "bug_hunt",
         title: "Le mauvais moment",
-        context: "Le virage est du bon côté, mais Kirikou descend trop tôt et se cogne au mur.",
-        description: "Clique sur la ligne fausse.",
-        bug_index: 1,
-        fix: "Avancer",
-        explanation: "Il fallait trois cases avant de tourner. Ici le virage arrive après une seule : c'est un bug de compte, pas de direction.",
-        instructions: ["Avancer", "Tourner à droite", "Avancer", "Avancer", "Avancer"],
+        context: "Le virage est du bon côté, mais Kirikou descend une colonne trop loin.",
+        description: "Clique sur la ligne en trop.",
+        bug_index: 3,
+        fix: "(rien — cette ligne était en trop)",
+        explanation: "Trois cases suffisaient avant de tourner ; il en a fait quatre. Le côté du virage était bon : c'est un bug de compte, pas de direction.",
+        instructions: ["Avancer", "Avancer", "Avancer", "Avancer", "Tourner à droite", "Avancer"],
       }),
     ],
   },
 
   {
     palier: 2,
-    title: "Remets le virage en ordre",
-    description: "Cinq instructions mélangées, un seul chemin juste.",
+    title: "Où arrive-t-il ?",
+    description: "Six trajets courts. Suis-les de tête.",
     blocs: [
-      kodi("<p>Kirikou part face à l'<strong>Est</strong>. L'étoile est <strong>deux cases à droite, puis deux cases plus bas</strong>.</p><p>Ces cinq instructions sont les bonnes — elles sont juste dans le désordre.</p>"),
-      jeu({
-        game_type: "sort",
-        title: "Remets le virage en ordre",
-        description: "Deux cases vers la droite, un virage, deux cases vers le bas.",
-        hint: "On tourne une seule fois, et seulement après avoir fini les cases de droite.",
-        items: [
-          "Avancer (1re case vers la droite)",
-          "Avancer (2e case vers la droite)",
-          "Tourner à droite",
-          "Avancer (1re case vers le bas)",
-          "Avancer (2e case vers le bas)",
-        ],
-      }),
+      kodi("<p>Six trajets, six questions. Kirikou part face à la direction indiquée.</p><p>Compte les cases et surveille son regard : ce sont les deux seules choses qui comptent.</p>"),
+      {
+        type: "quiz",
+        content: {
+          questions: [
+            { question: "Face à l'Est : Avancer, Avancer, Tourner à droite. Kirikou regarde maintenant vers…",
+              choices: ["le Sud", "le Nord", "l'Ouest"], answer: 0,
+              explanation: "Depuis l'Est, un quart de tour à droite mène au Sud. Les deux Avancer n'ont rien changé à son regard." },
+            { question: "Face à l'Est : Avancer, Tourner à droite, Avancer. Combien de cases a-t-il parcourues ?",
+              choices: ["3", "1", "2"], answer: 2,
+              explanation: "Deux Avancer, donc deux cases. Tourner ne déplace jamais." },
+            { question: "Face au Nord : Tourner à gauche, Avancer. Il avance vers…",
+              choices: ["le haut de l'écran", "la gauche de l'écran", "la droite de l'écran"], answer: 1,
+              explanation: "Depuis le Nord, à gauche on regarde l'Ouest — la gauche de l'écran." },
+            { question: "Face à l'Est : Tourner à droite, Tourner à droite. Il regarde vers…",
+              choices: ["l'Est", "le Sud", "l'Ouest"], answer: 2,
+              explanation: "Deux quarts de tour du même côté font un demi-tour : Est → Sud → Ouest." },
+            { question: "Face au Sud : Avancer, Tourner à gauche, Avancer, Avancer. Son chemin dessine…",
+              choices: ["un coin", "une ligne droite", "un demi-tour"], answer: 0,
+              explanation: "Une case vers le bas, puis deux vers l'Est : le chemin tourne une fois, c'est un coin." },
+            { question: "Face à l'Ouest : Tourner à droite, Tourner à droite, Tourner à droite. Il regarde vers…",
+              choices: ["le Nord", "le Sud", "l'Est"], answer: 1,
+              explanation: "Trois quarts de tour à droite depuis l'Ouest : Ouest → Nord → Est → Sud. Un quart de tour à gauche aurait suffi." },
+          ],
+        },
+      },
     ],
   },
 
