@@ -30,7 +30,7 @@ export default async function EntrainementPage() {
   const accessibleThemeIds = new Set((accessRows ?? []).map((r: { theme_id: string }) => r.theme_id));
 
   const { data: trainingsRaw } = await (admin.from("trainings") as any)
-    .select("id, title, description, xp_reward, order_index, lesson_id, lessons(id, title, order_index, theme_id, chapters(order_index), themes(id, title, level, order_index))")
+    .select("id, title, description, xp_reward, order_index, libre_service, palier, lesson_id, lessons(id, title, order_index, theme_id, chapters(order_index), themes(id, title, level, order_index))")
     // L'ordre du programme se reconstitue plus bas : trier ici par lesson_id
     // revenait à trier par UUID, donc au hasard.
     .order("order_index");
@@ -59,6 +59,9 @@ export default async function EntrainementPage() {
     attempts: number; last_completed_at: string | null; best_score: number | null;
     /** L'entraînement vient après le cours : il s'ouvre quand la leçon est terminée. */
     lesson_terminee: boolean;
+    /** Le Terrain : libre service, rejouable, sans XP ni note. */
+    libre_service: boolean;
+    palier: number | null;
     order_index: number; lesson_order: number; chapter_order: number; theme_order: number;
   };
 
@@ -74,6 +77,7 @@ export default async function EntrainementPage() {
       theme_id: theme?.id ?? "", theme_title: theme?.title ?? "Thème", theme_level: theme?.level ?? "explorer",
       attempts: tp?.attempts ?? 0, last_completed_at: tp?.completed_at ?? null,
       best_score: tp?.score ?? null, lesson_terminee: lp?.status === "completed",
+      libre_service: t.libre_service ?? false, palier: t.palier ?? null,
       order_index:   t.order_index ?? 0,
       lesson_order:  lesson?.order_index ?? 0,
       chapter_order: lesson?.chapters?.order_index ?? 0,
@@ -98,7 +102,7 @@ export default async function EntrainementPage() {
     .sort((a, b) => rang(a) - rang(b));
 
   // Grouper thème → leçon
-  type LessonGroup = { lessonId: string; lessonTitle: string; lessonCompletedAt: string | null; trainings: Training[] };
+  type LessonGroup = { lessonId: string; lessonTitle: string; lessonCompletedAt: string | null; trainings: Training[]; terrain: Training[] };
   type ThemeGroup  = { themeId: string; themeTitle: string; themeLevel: string; lessons: LessonGroup[] };
 
   const grouped: ThemeGroup[] = [];
@@ -113,14 +117,21 @@ export default async function EntrainementPage() {
     const group = themeMap.get(t.theme_id)!;
     let lg = group.lessons.find(l => l.lessonId === t.lesson_id);
     if (!lg) {
-      lg = { lessonId: t.lesson_id, lessonTitle: t.lesson_title, lessonCompletedAt: t.lesson_completed_at, trainings: [] };
+      lg = { lessonId: t.lesson_id, lessonTitle: t.lesson_title, lessonCompletedAt: t.lesson_completed_at, trainings: [], terrain: [] };
       group.lessons.push(lg);
     }
-    lg.trainings.push({ id: t.id, title: t.title, description: t.description, xp_reward: t.xp_reward, attempts: t.attempts, best_score: t.best_score, last_completed_at: t.last_completed_at } as any);
+    // Les deux portes de la même réserve : le parcours d'un côté, le Terrain de
+    // l'autre. Mélangées, les sept exercices libres passeraient pour du
+    // programme — et le mentor ne saurait plus ce que la séance exige vraiment.
+    const carte = { id: t.id, title: t.title, description: t.description, xp_reward: t.xp_reward, attempts: t.attempts, best_score: t.best_score, last_completed_at: t.last_completed_at, palier: t.palier } as any;
+    (t.libre_service ? lg.terrain : lg.trainings).push(carte);
   }
 
-  const totalDone = available.filter(t => t.attempts > 0).length;
-  const totalXP   = available.reduce((s, t) => s + t.xp_reward, 0);
+  // Les compteurs du haut parlent du programme : le Terrain ne se compte pas
+  // comme un devoir à finir, il n'a pas de fin.
+  const parcours  = available.filter(t => !t.libre_service);
+  const totalDone = parcours.filter(t => t.attempts > 0).length;
+  const totalXP   = parcours.reduce((s, t) => s + t.xp_reward, 0);
 
   return (
     <div className="p-6 lg:p-10 max-w-3xl">

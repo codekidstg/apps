@@ -68,7 +68,14 @@ export type Evolution = {
   quiz: { justes: number; total: number } | null;
   /** `liste` : fiche seulement — les questions en attente, et celles des 30 derniers jours. */
   questions: { sur30: number; enAttente: number; liste: QuestionVue[] };
-  entrainements: { faits: number; essaisMoyens: number | null } | null;
+  entrainements: {
+    faits: number;
+    essaisMoyens: number | null;
+    /** Tout le temps passé sur des exercices, toutes tentatives confondues. */
+    tempsSecondes: number;
+    /** Ceux qu'il a réussis sans qu'un indice s'affiche. */
+    sansIndice: number;
+  } | null;
   // Son mentor dit
   rapports: { date: string; engagement: string | null; avancement: string | null; note: string | null }[];
   // Les 4 dernières semaines, du plus ancien au plus récent
@@ -101,7 +108,7 @@ export async function chargerEvolutions(ids: string[], detail = false, maintenan
     admin.from("gamification_events").select("student_id, event_type, created_at, payload").in("student_id", ids).gte("created_at", depuis60),
     // Lus aussi pour la liste : un entraînement refait est une activité, et la
     // liste doit donner le même statut que la fiche.
-    admin.from("training_progress").select("student_id, training_id, status, attempts, completed_at, created_at").in("student_id", ids),
+    admin.from("training_progress").select("student_id, training_id, status, attempts, completed_at, created_at, temps_total_secondes, reussi_sans_indice").in("student_id", ids),
   ]);
   for (const [nom, res] of Object.entries({ eleves, progres, seances, rapports, questions, evenements, entrainements })) {
     if ((res as { error?: { message: string } }).error) console.error(`[evolution] ${nom} :`, (res as { error: { message: string } }).error.message);
@@ -289,7 +296,15 @@ export async function chargerEvolutions(ids: string[], detail = false, maintenan
         enAttente: mesQuestions.filter(enAttente).length,
         liste,
       },
-      entrainements: detail ? { faits: faits.length, essaisMoyens: essais.length ? essais.reduce((a, b) => a + b, 0) / essais.length : null } : null,
+      entrainements: detail ? {
+        faits: faits.length,
+        essaisMoyens: essais.length ? essais.reduce((a, b) => a + b, 0) / essais.length : null,
+        // Le temps passé est un fait, pas une note : il dit si l'enfant s'est
+        // posé sur l'exercice ou s'il l'a survolé. Il n'entre dans aucun calcul
+        // qui juge un mentor.
+        tempsSecondes: mesEntr.reduce((a, e) => a + (e.temps_total_secondes ?? 0), 0),
+        sansIndice: mesEntr.filter((e) => e.reussi_sans_indice).length,
+      } : null,
       seancesNonTenues: mesRapports
         .filter((r) => r.tenue === false)
         .slice(0, 3)

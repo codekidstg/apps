@@ -4,6 +4,7 @@ import { redirect, notFound } from "next/navigation";
 import PageHeader from "@/components/backoffice/PageHeader";
 import GradeForm from "./GradeForm";
 import AvatarSvg from "@/components/eleve/AvatarSvg";
+import { dureeLisible } from "@/lib/temps-passe";
 
 type StudentRow = {
   profile: { id: string; display_name: string };
@@ -114,6 +115,27 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   if (errAvatars) console.error("[classe] avatars:", errAvatars.message);
   const avatars = new Map<string, any>((avatarsRaw ?? []).map((a: any) => [a.student_id as string, a]));
 
+  // Ce que l'élève a fait seul, au Terrain : le mentor ne voyait rien de ce
+  // travail-là. Le temps est cumulé sur toutes les tentatives — il dit si
+  // l'enfant s'est posé sur l'exercice ou s'il l'a survolé. Il n'entre dans
+  // aucune note, ni celle de l'élève ni celle du mentor.
+  const terrainParEleve = new Map<string, { secondes: number; faits: number; sansIndice: number; dernier: string | null }>();
+  if (studentIds.length) {
+    const { data: terrainRaw, error: errTerrain } = await (admin.from("training_progress") as any)
+      .select("student_id, temps_total_secondes, reussi_sans_indice, completed_at, trainings!inner(libre_service)")
+      .in("student_id", studentIds)
+      .eq("trainings.libre_service", true);
+    if (errTerrain) console.error("[classe] terrain:", errTerrain.message);
+    for (const r of (terrainRaw ?? []) as any[]) {
+      const acc = terrainParEleve.get(r.student_id) ?? { secondes: 0, faits: 0, sansIndice: 0, dernier: null };
+      acc.secondes += r.temps_total_secondes ?? 0;
+      acc.faits    += 1;
+      acc.sansIndice += r.reussi_sans_indice ? 1 : 0;
+      if (r.completed_at && (!acc.dernier || r.completed_at > acc.dernier)) acc.dernier = r.completed_at;
+      terrainParEleve.set(r.student_id, acc);
+    }
+  }
+
   // Notes manuelles existantes
   const { data: gradesRaw } = await supabase
     .from("grades")
@@ -162,6 +184,18 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                     <div className="flex-1 min-w-0">
                       <div className="font-extrabold text-ink">{profile.display_name}</div>
                       <div className="text-xs text-ink-light capitalize">{student.level} · {student.xp} XP</div>
+                      {(() => {
+                        const t = terrainParEleve.get(student.id);
+                        if (!t || !t.faits) return null;
+                        const duree = dureeLisible(t.secondes);
+                        return (
+                          <div className="text-xs text-ink-muted mt-0.5">
+                            🏟️ {t.faits} exercice{t.faits > 1 ? "s" : ""} au Terrain
+                            {duree && <> · {duree} passées dessus</>}
+                            {t.sansIndice > 0 && <> · {t.sansIndice} sans indice</>}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 

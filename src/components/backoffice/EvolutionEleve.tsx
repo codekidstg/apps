@@ -2,6 +2,7 @@ import Link from "next/link";
 import { chargerEvolutions, type Evolution, type QuestionVue } from "@/lib/backoffice/evolution";
 import { STATUT_ELEVE } from "@/lib/backoffice/statut-eleve";
 import { AVANCEMENT, ENGAGEMENT, NON_TENUE } from "@/lib/rapports";
+import { dureeLisible } from "@/lib/temps-passe";
 
 /**
  * La section « Évolution » de la fiche élève — pour l'admin comme pour le
@@ -161,6 +162,8 @@ export function CarteEvolution({ ev, lienQuestions }: { ev: Evolution; lienQuest
             <div className="text-gray-500">
               Entraînements : {ev.entrainements.faits} fait{s(ev.entrainements.faits)}
               {ev.entrainements.essaisMoyens !== null && <>, {ev.entrainements.essaisMoyens.toFixed(1).replace(".", ",")} essai{ev.entrainements.essaisMoyens >= 2 ? "s" : ""} en moyenne</>}
+              {dureeLisible(ev.entrainements.tempsSecondes) && <>, <strong>{dureeLisible(ev.entrainements.tempsSecondes)}</strong> passées dessus</>}
+              {ev.entrainements.sansIndice > 0 && <>, dont {ev.entrainements.sansIndice} réussi{s(ev.entrainements.sansIndice)} sans indice</>}
             </div>
           )}
         </Ligne>

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { requireParentPermission } from "@/lib/permissions/parent";
+import { dureeLisible } from "@/lib/temps-passe";
 
 export default async function SuiviEntrainenementsPage({
   params,
@@ -43,7 +44,7 @@ export default async function SuiviEntrainenementsPage({
     .order("order_index");
 
   const { data: trainingProgressRaw } = await (admin.from("training_progress") as any)
-    .select("training_id, score, attempts, completed_at")
+    .select("training_id, score, attempts, completed_at, temps_total_secondes, reussi_sans_indice")
     .eq("student_id", child.id);
 
   // Un entraînement ne se débloque que lorsque sa leçon est commencée : sans
@@ -162,6 +163,14 @@ export default async function SuiviEntrainenementsPage({
                             <div className="text-right hidden sm:block">
                               {p.score != null && <div className="text-xs font-bold text-slate-300">{p.score}/100</div>}
                               {p.attempts > 0 && <div className="text-[11px] text-slate-500">{p.attempts} essai{p.attempts > 1 ? "s" : ""}</div>}
+                              {/* Le temps passé, dit comme un fait encourageant : jamais
+                                  une moyenne, jamais une comparaison avec un autre enfant. */}
+                              {dureeLisible(p.temps_total_secondes) && (
+                                <div className="text-[11px] text-slate-400">⏱ {dureeLisible(p.temps_total_secondes)} passées dessus</div>
+                              )}
+                              {p.reussi_sans_indice && (
+                                <div className="text-[11px]" style={{ color: "#10b981" }}>★ réussi sans indice</div>
+                              )}
                             </div>
                           )}
                           <span className={`text-xs font-black px-2 py-0.5 rounded-full whitespace-nowrap ${

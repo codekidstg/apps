@@ -11,6 +11,8 @@ type Training = {
   attempts: number;
   best_score: number | null;
   last_completed_at: string | null;
+  /** 1 je m'échauffe · 2 je m'entraîne · 3 je me dépasse. Null : exercice du parcours. */
+  palier?: number | null;
 };
 
 type LessonGroup = {
@@ -18,6 +20,8 @@ type LessonGroup = {
   lessonTitle: string;
   lessonCompletedAt: string | null;
   trainings: Training[];
+  /** Le Terrain de cette séance : libre, rejouable, sans XP. */
+  terrain: Training[];
 };
 
 type ThemeGroup = {
@@ -46,6 +50,47 @@ const LEVEL_META: Record<string, { icon: string; color: string; label: string }>
   builder:   { icon: "🔨", color: "#a78bfa", label: "Bâtisseur" },
   architect: { icon: "🏛️", color: "#60a5fa", label: "Architecte" },
 };
+
+const PALIERS = [
+  { n: 1, label: "① Je m'échauffe", color: "#10b981" },
+  { n: 2, label: "② Je m'entraîne", color: "#FDB813" },
+  { n: 3, label: "③ Je me dépasse", color: "#a78bfa" },
+];
+
+/**
+ * La carte d'un exercice. Celle du Terrain ne montre pas d'XP — il n'en donne
+ * pas — mais le nombre de fois où l'enfant y est revenu : c'est ça, sa fierté.
+ */
+function CarteExercice({ t, terrain = false }: { t: Training; terrain?: boolean }) {
+  const f = getFreshness(t.last_completed_at, t.attempts);
+  return (
+    <Link href={`/eleve/entrainement/${t.id}`}
+      className="flex items-center gap-3 rounded-xl px-4 py-3 transition-all hover:scale-[1.005]"
+      style={{ background: "#1e293b", border: `1px solid ${t.attempts > 0 ? "#10b98125" : "#334155"}` }}
+    >
+      <span className="text-lg shrink-0">{f.icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="font-black text-sm text-white truncate">{t.title}</div>
+        {t.description && (
+          <div className="text-[11px] mt-0.5 truncate" style={{ color: "#475569" }}>{t.description}</div>
+        )}
+      </div>
+      <div className="text-right shrink-0 space-y-0.5">
+        {terrain
+          ? t.attempts > 0 && (
+              <div className="text-[10px] font-mono" style={{ color: "#a78bfa" }}>
+                {t.attempts === 1 ? "fait une fois" : `refait ${t.attempts} fois`}
+              </div>
+            )
+          : <div className="text-xs font-mono font-black" style={{ color: "#FDB813" }}>+{t.xp_reward} XP</div>}
+        {t.best_score != null && (
+          <div className="text-[10px] font-mono" style={{ color: "#10b981" }}>⭐ {t.best_score}%</div>
+        )}
+      </div>
+      <span style={{ color: "#334155", fontSize: 12 }}>›</span>
+    </Link>
+  );
+}
 
 export default function TrainingAccordion({ groups, defaultOpenLessonId }: Props) {
   // Thème ouvert si contient la leçon par défaut
@@ -157,30 +202,37 @@ export default function TrainingAccordion({ groups, defaultOpenLessonId }: Props
                       {/* Trainings */}
                       {isLessonOpen && (
                         <div className="px-3 pb-3 pt-1 space-y-2" style={{ background: "#080e1a" }}>
-                          {lesson.trainings.map((t) => {
-                            const f = getFreshness(t.last_completed_at, t.attempts);
-                            return (
-                              <Link key={t.id} href={`/eleve/entrainement/${t.id}`}
-                                className="flex items-center gap-3 rounded-xl px-4 py-3 transition-all hover:scale-[1.005]"
-                                style={{ background: "#1e293b", border: `1px solid ${t.attempts > 0 ? "#10b98125" : "#334155"}` }}
-                              >
-                                <span className="text-lg shrink-0">{f.icon}</span>
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-black text-sm text-white truncate">{t.title}</div>
-                                  {t.description && (
-                                    <div className="text-[11px] mt-0.5 truncate" style={{ color: "#475569" }}>{t.description}</div>
-                                  )}
-                                </div>
-                                <div className="text-right shrink-0 space-y-0.5">
-                                  <div className="text-xs font-mono font-black" style={{ color: "#FDB813" }}>+{t.xp_reward} XP</div>
-                                  {t.best_score != null && (
-                                    <div className="text-[10px] font-mono" style={{ color: "#10b981" }}>⭐ {t.best_score}%</div>
-                                  )}
-                                </div>
-                                <span style={{ color: "#334155", fontSize: 12 }}>›</span>
-                              </Link>
-                            );
-                          })}
+                          {lesson.trainings.map((t) => <CarteExercice key={t.id} t={t} />)}
+
+                          {/* ── Le Terrain ── la seconde porte : libre, rejouable, sans note. */}
+                          {lesson.terrain.length > 0 && (
+                            <div className="mt-4 pt-3 border-t" style={{ borderColor: "#1e293b" }}>
+                              <div className="flex items-center gap-2 px-1 mb-2.5">
+                                <span className="text-sm shrink-0">🏟️</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#a78bfa" }}>
+                                  Le Terrain
+                                </span>
+                                <span className="text-[10px] truncate min-w-0" style={{ color: "#475569" }}>
+                                  autant de fois que tu veux
+                                </span>
+                                <span className="ml-auto text-[10px] font-mono shrink-0" style={{ color: "#475569" }}>
+                                  {lesson.terrain.filter(t => t.attempts > 0).length}/{lesson.terrain.length}
+                                </span>
+                              </div>
+                              {PALIERS.map((p) => {
+                                const lot = lesson.terrain.filter(t => (t.palier ?? 1) === p.n);
+                                if (!lot.length) return null;
+                                return (
+                                  <div key={p.n} className="mb-3 last:mb-0">
+                                    <div className="text-[10px] font-mono px-1 mb-1.5" style={{ color: p.color }}>{p.label}</div>
+                                    <div className="space-y-2">
+                                      {lot.map((t) => <CarteExercice key={t.id} t={t} terrain />)}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

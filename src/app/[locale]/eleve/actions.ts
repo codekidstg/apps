@@ -119,7 +119,22 @@ export async function solveBlockly(lessonId: string, blockId?: string) {
   return { success: true, ...result };
 }
 
-export async function completeTraining(trainingId: string, score: number) {
+/**
+ * Le temps passé sur un exercice, tel que l'enfant l'a vécu.
+ *
+ * Il est mesuré chez lui et peut donc mentir : un onglet oublié pendant le
+ * repas raconterait quarante minutes de concentration. Le compteur s'arrête
+ * déjà quand l'onglet passe en arrière-plan ; ici on plafonne une tentative à
+ * vingt minutes, et la base refuse tout ce qui dépasse. Mieux vaut sous-compter
+ * un enfant appliqué que montrer une fausse assiduité à son parent.
+ */
+const PLAFOND_SECONDES = 1200;
+
+export async function completeTraining(
+  trainingId: string,
+  score: number,
+  mesure?: { secondes?: number; sansIndice?: boolean },
+) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Non authentifié" };
@@ -140,6 +155,8 @@ export async function completeTraining(trainingId: string, score: number) {
   const prevAttempts = existing?.attempts ?? 0;
   const bestScore = Math.max(score, existing?.score ?? 0);
 
+  const secondes = Math.min(Math.max(Math.round(mesure?.secondes ?? 0), 0), PLAFOND_SECONDES);
+
   await (supabase.from("training_progress") as any).upsert({
     student_id:   studentId,
     training_id:  trainingId,
@@ -147,14 +164,29 @@ export async function completeTraining(trainingId: string, score: number) {
     score:        bestScore,
     attempts:     prevAttempts + 1,
     completed_at: new Date().toISOString(),
+    temps_dernier_secondes: secondes,
+    temps_total_secondes:   (existing?.temps_total_secondes ?? 0) + secondes,
+    // Une fois vrai, toujours vrai : un enfant qui a réussi seul une fois l'a
+    // réussi seul, même s'il rejoue plus tard en s'aidant des indices.
+    reussi_sans_indice: (existing?.reussi_sans_indice ?? false) || (mesure?.sansIndice ?? false),
   }, { onConflict: "student_id,training_id" });
 
   // XP uniquement à la première complétion
   if (prevAttempts === 0) {
     const { data: training } = await (supabase.from("trainings") as any)
-      .select("xp_reward")
+      .select("xp_reward, libre_service")
       .eq("id", trainingId)
       .single();
+
+    // Le Terrain ne paie pas en XP. Sans ce garde, chaque exercice en libre
+    // service verserait les 50 XP fixes du moteur — sept exercices sur une
+    // seule séance, et la tranche Bâtisseur (500 à 1 500 XP) sautait. Le
+    // Terrain paie en progression et en ceintures, jamais en niveau.
+    if (training?.libre_service) {
+      revalidatePath("/eleve");
+      return { success: true, xpGained: 0 };
+    }
+
     const xpReward = training?.xp_reward ?? 30;
     const result = await processGamificationEvent(studentId, "lesson_completed", {
       lessonId: trainingId, score, perfect: score === 100,

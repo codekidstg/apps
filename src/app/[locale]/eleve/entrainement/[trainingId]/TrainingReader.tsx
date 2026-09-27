@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 
 /* Mélange déterministe basé sur l'id du bloc (stable entre re-renders) */
 function seededShuffle<T>(arr: T[], seed: string): T[] {
@@ -110,6 +110,36 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
   const [gameStates,   setGameStates]   = useState<Record<string, unknown>>({});
   // Les lancers ratés de chaque labyrinthe : c'est là que « Je bloque ici » se met en avant.
   const [echecs,       setEchecs]       = useState<Record<string, number>>({});
+
+  /**
+   * Le temps passé sur l'exercice, et s'il a été réussi sans aide.
+   *
+   * Le compteur s'arrête quand l'onglet passe derrière : un enfant qui part
+   * manger ne doit pas revenir avec vingt minutes de « concentration ». Ce
+   * temps est lu par son mentor, son parent et l'admin — jamais par lui, et il
+   * n'entre dans la note d'aucun mentor.
+   *
+   * `indiceVu` se lève à la première réponse fausse : c'est à ce moment-là, et
+   * à ce moment-là seulement, que les moteurs affichent leur indice. « Réussi »
+   * ne dit pas si l'enfant a compris ; « réussi sans indice », si.
+   */
+  const departRef  = useRef<number>(Date.now());
+  const cumulRef   = useRef<number>(0);
+  const indiceVu   = useRef<boolean>(false);
+
+  useEffect(() => {
+    function auChangement() {
+      if (document.hidden) cumulRef.current += Date.now() - departRef.current;
+      else departRef.current = Date.now();
+    }
+    document.addEventListener("visibilitychange", auChangement);
+    return () => document.removeEventListener("visibilitychange", auChangement);
+  }, []);
+
+  function secondesPassees() {
+    const total = cumulRef.current + (document.hidden ? 0 : Date.now() - departRef.current);
+    return Math.round(total / 1000);
+  }
 
   const [completed, setCompleted]    = useState(false);
   const [xpGained, setXpGained]     = useState<number | null>(null);
@@ -241,13 +271,19 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
     const score = computeScore();
     setFinalScore(score);
     startTransition(async () => {
-      const res = await completeTraining(trainingId, score) as any;
+      const res = await completeTraining(trainingId, score, {
+        secondes: secondesPassees(),
+        sansIndice: !indiceVu.current,
+      }) as any;
       if (res?.xpGained) setXpGained(res.xpGained);
       setCompleted(true);
     });
   }
 
   function handleRestart() {
+    departRef.current = Date.now();
+    cumulRef.current  = 0;
+    indiceVu.current  = false;
     setQuizAnswers({});
     setQuizResults({});
     setCodeResults({});
@@ -438,6 +474,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                                 onClick={() => {
                                   if (result != null || completed) return;
                                   setQuizAnswers({ ...quizAnswers, [qKey]: ci });
+                                  if (ci !== q.answer) indiceVu.current = true;
                                   setQuizResults({ ...quizResults, [qKey]: ci === q.answer });
                                 }}
                                 disabled={result != null || completed}
@@ -497,7 +534,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
               // avait écrit, et chaque lancer raté est compté.
               return <BlocklyRobot key={block.id} config={cfg} onSolved={resolu}
                 onXmlChange={garder}
-                onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))} />;
+                onEchec={() => { indiceVu.current = true; setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 })); }} />;
             }
             if (cfg.game_type === "pattern_select") {
               return <PatternSelect key={block.id} config={cfg} done={fait} onSolved={resolu}
@@ -511,17 +548,17 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
             }
             if (cfg.game_type === "pattern_build") {
               return <PatternBuild key={block.id} config={cfg} done={fait} onSolved={resolu}
-                onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
+                onEchec={() => { indiceVu.current = true; setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 })); }}
                 savedState={(etat as [number, number, number]) ?? null} onStateChange={garder} />;
             }
             if (cfg.game_type === "plan_builder") {
               return <PlanBuilder key={block.id} blockId={block.id} config={cfg} done={fait} onSolved={resolu}
-                onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
+                onEchec={() => { indiceVu.current = true; setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 })); }}
                 savedState={(etat as string[]) ?? null} onStateChange={garder} />;
             }
             if (cfg.game_type === "deviens_ordinateur") {
               return <DeviensOrdinateur key={block.id} blockId={block.id} config={cfg} done={fait} onSolved={resolu}
-                onEchec={() => setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 }))}
+                onEchec={() => { indiceVu.current = true; setEchecs((e) => ({ ...e, [block.id]: (e[block.id] ?? 0) + 1 })); }}
                 savedState={(etat as number) ?? null} onStateChange={garder} />;
             }
             if (cfg.game_type === "sort") {
@@ -671,6 +708,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                               <button key={oi} onClick={() => {
                                 if (result != null || completed) return;
                                 setFillAnswers(prev => ({ ...prev, [key]: oi }));
+                                if (oi !== s.correct) indiceVu.current = true;
                                 setFillResults(prev => ({ ...prev, [key]: oi === s.correct }));
                               }}
                                 className="px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
@@ -919,6 +957,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                               if (completed) return;
                               const key = `${block.id}-${currentIdx}`;
                               const isCorrect = cat.id === currentItem.correct;
+                              if (!isCorrect) indiceVu.current = true;
                               setSwipeResults(prev => ({ ...prev, [key]: { chosen: cat.id, correct: isCorrect } }));
                               // Ouvre l'aide si mauvaise réponse et helper disponible
                               if (!isCorrect && raw.helper) {
@@ -995,6 +1034,7 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
               const item = raw.items.find(i => i.id === bDragSelected);
               if (!item) return;
               const key = `${block.id}-${bDragSelected}`;
+              if (binId !== item.correct) indiceVu.current = true;
               setDragResults(prev => ({ ...prev, [key]: { chosen: binId, correct: binId === item.correct } }));
               setDragSelected(prev => ({ ...prev, [block.id]: null }));
             }

@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { dureeLisible } from "@/lib/temps-passe";
 
 type Block = { id: string; type: string; content: Record<string, unknown>; order_index: number };
 
@@ -260,7 +261,7 @@ export default async function SuiviTrainingDetailPage({
 
   const { data: progress } = child
     ? await (admin.from("training_progress") as any)
-        .select("score, attempts, completed_at")
+        .select("score, attempts, completed_at, temps_total_secondes, temps_dernier_secondes, reussi_sans_indice")
         .eq("student_id", child.id)
         .eq("training_id", trainingId)
         .maybeSingle()
@@ -304,6 +305,14 @@ export default async function SuiviTrainingDetailPage({
             <div className="text-sm text-slate-400">
               {progress.score != null && <span>Score : <strong className="text-white">{progress.score}/100</strong> · </span>}
               {progress.attempts} essai{progress.attempts > 1 ? "s" : ""}
+              {/* Le temps passé se dit sans jugement : ni moyenne, ni comparaison.
+                  Un enfant lent n'est pas un enfant qui travaille mal. */}
+              {dureeLisible(progress.temps_total_secondes) && (
+                <span> · <strong className="text-white">{dureeLisible(progress.temps_total_secondes)}</strong> passées dessus</span>
+              )}
+              {progress.reussi_sans_indice && (
+                <span className="text-emerald-400"> · ★ réussi sans indice</span>
+              )}
               {progress.completed_at && (
                 <span> · Terminé le {new Date(progress.completed_at).toLocaleDateString("fr-FR")}</span>
               )}
