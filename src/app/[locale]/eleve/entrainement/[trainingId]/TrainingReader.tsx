@@ -26,6 +26,7 @@ const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), {
 const BlocklyKodi  = dynamic(() => import("@/components/eleve/BlocklyKodi"), { ssr: false });
 const PythonMaze   = dynamic(() => import("@/components/eleve/PythonMaze"), { ssr: false });
 const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { ssr: false });
+const PythonTelephone = dynamic(() => import("@/components/eleve/PythonTelephone"), { ssr: false });
 const BlocklyRobot = dynamic(() => import("@/components/eleve/BlocklyRobotLoader"), { ssr: false });
 const PatternSelect = dynamic(() => import("@/components/eleve/PatternSelect"), { ssr: false });
 const PatternBuild  = dynamic(() => import("@/components/eleve/PatternBuild"), { ssr: false });
@@ -38,7 +39,7 @@ import { MemoryGame, AssociationGame, SortGame, BugHuntGame } from "@/components
  * jeux Python voyagent donc sous `blockly_challenge`, distingués par game_type.
  * Cette liste est le seul endroit à compléter quand un jeu s'ajoute.
  */
-const JEUX_PYTHON = ["python_maze", "python_piano", "python_arcade"];
+const JEUX_PYTHON = ["python_maze", "python_piano", "python_arcade", "telephone"];
 const estJeuPython = (b: { type: string; content: unknown }) =>
   b.type === "blockly_challenge" && JEUX_PYTHON.includes((b.content as any)?.game_type);
 
@@ -509,7 +510,14 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
              pas de nouveau type : on le porte par blockly_challenge + game_type,
              comme les leçons le font avec leurs jeux. */
           if (estJeuPython(block)) {
-            const Jeu = (block.content as any).game_type === "python_piano" ? PythonPiano : PythonMaze;
+            // Chaque moteur a sa propre forme de configuration — le contenu
+            // arrive de la base sans type, l'aiguillage l'est aussi.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const MOTEURS: Record<string, React.ComponentType<any>> = {
+              python_piano: PythonPiano,
+              telephone: PythonTelephone,
+            };
+            const Jeu = MOTEURS[(block.content as any).game_type] ?? PythonMaze;
             return (
               <Jeu
                 key={block.id}

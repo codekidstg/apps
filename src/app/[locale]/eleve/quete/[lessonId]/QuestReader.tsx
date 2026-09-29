@@ -30,6 +30,7 @@ const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), {
 const PythonMaze   = dynamic(() => import("@/components/eleve/PythonMaze"), { ssr: false });
 const PythonArcade = dynamic(() => import("@/components/eleve/PythonArcade"), { ssr: false });
 const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { ssr: false });
+const PythonTelephone = dynamic(() => import("@/components/eleve/PythonTelephone"), { ssr: false });
 const PatternSelect = dynamic(() => import("@/components/eleve/PatternSelect"), { ssr: false });
 const PatternBuild  = dynamic(() => import("@/components/eleve/PatternBuild"), { ssr: false });
 const PlanBuilder   = dynamic(() => import("@/components/eleve/PlanBuilder"), { ssr: false });
@@ -498,6 +499,22 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
             if (gameType === "python_arcade") {
               return (
                 <PythonArcade
+                  key={block.id}
+                  config={cfg as any}
+                  done={done}
+                  onSolved={done ? () => {} : markDone}
+                  savedCode={gameStates[block.id] as string | undefined}
+                  onCodeChange={(c) => saveGameState(block.id, c)}
+                />
+              );
+            }
+
+            // Bâtisseur : le carnet s'affiche sur un téléphone. Le jalon se
+            // présente devant un parent — une console noire ne montre rien de
+            // ce que l'enfant a compris.
+            if (gameType === "telephone") {
+              return (
+                <PythonTelephone
                   key={block.id}
                   config={cfg as any}
                   done={done}
