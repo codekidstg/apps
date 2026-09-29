@@ -4,6 +4,7 @@ import Link from "next/link";
 import StudentProfileForm from "@/app/[locale]/admin/utilisateurs/eleves/[studentId]/StudentProfileForm";
 import { chargerParcoursEleve } from "@/lib/backoffice/eleves";
 import EvolutionEleve from "@/components/backoffice/EvolutionEleve";
+import FilEleve from "@/components/backoffice/FilEleve";
 
 const LEVELS = [
   { num: 1, name: "Explorateur 🌱", color: "#10B981" },
@@ -88,6 +89,8 @@ export default async function ManagerStudentDetailPage({
           )}
         </div>
       </div>
+
+      <FilEleve studentId={studentId} />
 
       <EvolutionEleve studentId={studentId} espace="manager" />
 

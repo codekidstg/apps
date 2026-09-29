@@ -13,7 +13,7 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
   return result;
 }
 import dynamic from "next/dynamic";
-import { completeTraining } from "../../actions";
+import { completeTraining, ouvrirTraining } from "../../actions";
 import { Fragment } from "react";
 import JeBloqueIci from "@/components/eleve/JeBloqueIci";
 // Le chargeur est déjà client seul, et affiche « Chargement du studio musical… ».
@@ -127,6 +127,12 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
   const departRef  = useRef<number>(Date.now());
   const cumulRef   = useRef<number>(0);
   const indiceVu   = useRef<boolean>(false);
+
+  // L'ouverture laisse une trace, pour que « commencé, jamais fini » existe
+  // quelque part. Jamais en aperçu : un admin qui regarde n'a rien commencé.
+  useEffect(() => {
+    if (!readOnly) void ouvrirTraining(trainingId);
+  }, [trainingId, readOnly]);
 
   useEffect(() => {
     function auChangement() {

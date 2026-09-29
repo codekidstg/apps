@@ -4,6 +4,8 @@ import { redirect, notFound } from "next/navigation";
 import PageHeader from "@/components/backoffice/PageHeader";
 import GradeForm from "./GradeForm";
 import AvatarSvg from "@/components/eleve/AvatarSvg";
+import { FilDeroulant } from "@/components/backoffice/FilEleve";
+import { filsEleves } from "@/lib/backoffice/fil-eleve";
 import { dureeLisible } from "@/lib/temps-passe";
 
 type StudentRow = {
@@ -147,6 +149,10 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
     gradesMap.set(`${g.student_id}-${g.theme_id}`, g)
   );
 
+  // Le fil de chaque élève : ce qu'il a fait, dans l'ordre. Chargé pour toute
+  // la classe d'un coup — une requête par enfant sur une classe de huit, non.
+  const fils = await filsEleves(studentIds, 8);
+
   return (
     <div>
       <PageHeader
@@ -195,6 +201,10 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                             {t.sansIndice > 0 && <> · {t.sansIndice} sans indice</>}
                           </div>
                         );
+                      })()}
+                      {(() => {
+                        const fil = fils.get(student.id);
+                        return fil ? <div className="mt-1.5"><FilDeroulant fil={fil} /></div> : null;
                       })()}
                     </div>
                   </div>

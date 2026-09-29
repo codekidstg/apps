@@ -130,6 +130,48 @@ export async function solveBlockly(lessonId: string, blockId?: string) {
  */
 const PLAFOND_SECONDES = 1200;
 
+/**
+ * Marque qu'un exercice a été OUVERT, sans rien promettre de plus.
+ *
+ * Jusqu'ici `training_progress` n'était écrit qu'à la réussite : un exercice
+ * ouvert puis abandonné ne laissait aucune trace, et la question « qu'est-ce
+ * qu'il a essayé sans y arriver ? » n'avait pas de réponse en base — c'est
+ * pourtant souvent la ligne la plus parlante pour un mentor.
+ *
+ * Trois précautions :
+ *   · on n'écrit que s'il n'existe rien — une ligne déjà réussie ne doit
+ *     jamais redescendre en « en cours » parce que l'enfant rejoue ;
+ *   · `attempts` reste à 0 : il n'a encore rien tenté, juste ouvert ;
+ *   · l'échec est silencieux. Ouvrir un exercice ne doit jamais empêcher de
+ *     le jouer.
+ */
+export async function ouvrirTraining(trainingId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const studentId = await getStudentId(supabase, user.id);
+  if (!studentId) return;
+
+  const verdict = await accesEntrainement(createAdminClient(), studentId, trainingId);
+  if (!verdict.ok) return;
+
+  const { data: existante } = await (supabase.from("training_progress") as any)
+    .select("id")
+    .eq("student_id", studentId)
+    .eq("training_id", trainingId)
+    .maybeSingle();
+  if (existante) return;
+
+  await (supabase.from("training_progress") as any).insert({
+    student_id:  studentId,
+    training_id: trainingId,
+    status:      "in_progress",
+    score:       0,
+    attempts:    0,
+  });
+}
+
 export async function completeTraining(
   trainingId: string,
   score: number,

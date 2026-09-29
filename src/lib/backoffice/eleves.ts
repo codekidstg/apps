@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { chargerParcours, PARCOURS_VIDE, type Parcours } from "@/lib/progression";
 import { slugFromNum } from "@/lib/levels";
 import { chargerEvolutions } from "./evolution";
+import { filsEleves, type Fil } from "./fil-eleve";
 import type { StatutEleve } from "./statut-eleve";
 
 /**
@@ -25,6 +26,8 @@ export type EleveRow = {
   /** Le statut d'évolution, et ce qui l'explique. */
   statut: StatutEleve;
   raisons: string[];
+  /** Ce qu'il a fait en dernier — pour savoir où il en est sans ouvrir sa fiche. */
+  fil: Fil;
 };
 
 export async function chargerEleves(): Promise<EleveRow[]> {
@@ -51,6 +54,9 @@ export async function chargerEleves(): Promise<EleveRow[]> {
       .select("student_id, parent_id, profiles!parent_id(display_name)"),
     chargerEvolutions((students ?? []).map((s: any) => s.id)),
   ]);
+
+  // Trois événements suffisent pour la liste : on n'y déroule pas le fil.
+  const fils = await filsEleves((students ?? []).map((s: any) => s.id), 3);
   if (erreurLiens) console.error("[eleves] parent_children :", erreurLiens.message);
 
   const parentsParEleve = new Map<string, string[]>();
@@ -72,6 +78,7 @@ export async function chargerEleves(): Promise<EleveRow[]> {
     parents: parentsParEleve.get(s.id) ?? [],
     statut: evolutions.get(s.id)?.statut ?? "demarre",
     raisons: evolutions.get(s.id)?.raisons ?? [],
+    fil: fils.get(s.id) ?? { evenements: [], dernierPassage: null, derniereLecon: null, enCours: null },
   }));
 }
 

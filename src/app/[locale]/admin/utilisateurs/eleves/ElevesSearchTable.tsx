@@ -6,6 +6,7 @@ import Link from "next/link";
 import LevelSelect from "./LevelSelect";
 import type { Parcours } from "@/lib/progression";
 import { STATUT_ELEVE, type StatutEleve } from "@/lib/backoffice/statut-eleve";
+import { quandLisible, type Fil } from "@/lib/backoffice/fil-format";
 
 const LEVELS = [
   { num: 1, name: "Explorateur 🌱", color: "#10B981" },
@@ -24,6 +25,7 @@ type StudentRow = {
   parcours: Parcours;
   parents: string[];
   statut: StatutEleve;
+  fil: Fil;
   raisons: string[];
 };
 
@@ -115,14 +117,14 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              {["Élève", "Évolution", "Niveau", "Progression", "Thème en cours", "Parent(s)"].map((h) => (
+              {["Élève", "Évolution", "Niveau", "Progression", "Dernier passage", "Thème en cours", "Parent(s)"].map((h) => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-black text-gray-400 uppercase tracking-widest">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filtered.length === 0 ? (
-              <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400 font-bold">
+              <tr><td colSpan={7} className="px-5 py-12 text-center text-gray-400 font-bold">
                 Aucun élève pour ce filtre
               </td></tr>
             ) : visibles.map((s) => {
@@ -174,6 +176,35 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
                         )}
                       </>
                     )}
+                  </td>
+                  {/* Ce qu'il a fait en dernier. La colonne suivante dit où il va ;
+                      celle-ci dit d'où il vient — c'est elle qu'on vient chercher. */}
+                  <td className="px-4 py-3">
+                    {(() => {
+                      const f = s.fil;
+                      if (!f.dernierPassage) return <span className="text-xs text-gray-300">jamais venu</span>;
+                      const q = quandLisible(f.dernierPassage, Date.now());
+                      const dernier = f.evenements[0];
+                      return (
+                        <div className="max-w-44">
+                          <div className={`text-xs font-bold ${q.frais ? "text-emerald-700" : "text-gray-500"}`}>
+                            {q.jour} <span className="font-mono font-normal text-gray-400">{q.heure}</span>
+                          </div>
+                          {dernier && (
+                            <div className="text-[11px] text-gray-400 truncate"
+                              title={dernier.type === "lecon" ? `Séance « ${dernier.titre} » terminée` : dernier.titre}>
+                              {dernier.type === "lecon" ? "✅ " : dernier.type === "ouvert" ? "⏳ " : dernier.terrain ? "🏟️ " : "✏️ "}
+                              {dernier.titre}
+                            </div>
+                          )}
+                          {f.derniereLecon && dernier?.type !== "lecon" && (
+                            <div className="text-[11px] text-gray-400 truncate" title={f.derniereLecon.titre}>
+                              ✅ {f.derniereLecon.titre}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     {p.themeCourant ? (
