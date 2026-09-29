@@ -3,17 +3,21 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/backoffice/PageHeader";
 import AdminBlockEditor from "./AdminBlockEditor";
+import SeanceApercu from "@/components/backoffice/SeanceApercu";
+import { apercuSeance } from "@/lib/backoffice/apercu-seance";
 import type { BlockType } from "@/lib/supabase/types";
 
 type Block  = { id: string; type: BlockType; content: Record<string, unknown>; order_index: number };
 type Lesson = { id: string; title: string; xp_reward: number; status?: string; chapter_id: string };
 
 export default async function AdminLessonPage({
-  params,
+  params, searchParams,
 }: {
   params: Promise<{ themeId: string; lessonId: string; locale: string }>;
+  searchParams: Promise<{ eleve?: string }>;
 }) {
   const { themeId, lessonId, locale } = await params;
+  const { eleve } = await searchParams;
   const admin = createAdminClient();
 
   const [lessonRes, themeRes, blocksRes] = await Promise.all([
@@ -39,6 +43,8 @@ export default async function AdminLessonPage({
 
   if (!lesson) notFound();
 
+  const apercu = await apercuSeance(lessonId);
+
   const { data: chapter } = await (admin.from("chapters") as any)
     .select("title")
     .eq("id", lesson.chapter_id)
@@ -53,7 +59,7 @@ export default async function AdminLessonPage({
     <div>
       <PageHeader
         title={lesson.title}
-        subtitle={`${lesson.xp_reward} XP · ${blocks?.length ?? 0} bloc(s) · ${lesson.status}`}
+        subtitle={`${lesson.xp_reward} XP · ${blocks?.length ?? 0} bloc(s) · ${apercu.parcours.length + apercu.terrain.length} exercice(s)`}
         breadcrumb={[
           { label: "Thèmes & Cours",             href: `/${locale}/admin/themes` },
           { label: theme?.title ?? "Thème" },
@@ -72,7 +78,17 @@ export default async function AdminLessonPage({
         }
       />
 
-      <div className="px-8 pb-4">
+      <div className="px-8 pt-6 pb-2">
+        <SeanceApercu
+          apercu={apercu}
+          lessonId={lessonId}
+          locale={locale}
+          eleveChoisi={eleve}
+          hrefBase={`/${locale}/admin/themes/${themeId}/lecons/${lessonId}`}
+        />
+      </div>
+
+      <div className="px-8 pb-4 pt-4">
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 font-medium flex items-center gap-2 max-w-3xl">
           <span className="text-base">⚠️</span>
           <span>Les blocs <strong>Jeu</strong> (Kodi, Labyrinthe…) se configurent dans l'interface Manager. Ici vous pouvez éditer tous les autres types de blocs avec l'éditeur visuel complet.</span>
