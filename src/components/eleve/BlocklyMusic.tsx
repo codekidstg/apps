@@ -35,6 +35,8 @@ type MusicConfig = {
   depart?: Element[];
   /** Exige une boucle rangée dans une autre, chacune d'au moins deux tours. */
   boucle_imbriquee?: boolean;
+  /** Exige un bloc nommé, défini et appelé au moins ce nombre de fois. */
+  bloc_nomme?: number;
   /** L'indice propre à ce défi quand le rythme est juste mais trop long. */
   indice_limite?: string;
 };
@@ -60,6 +62,16 @@ const NOTE_COLOR: Record<Note, string> = {
   Fa: "#22c55e", Sol: "#3b82f6", La: "#8b5cf6", Si: "#ec4899",
 };
 const PERCUS: Percu[] = ["Boum", "Tac", "Clap"];
+
+/**
+ * Les noms qu'un enfant peut donner à son bloc — une liste fermée, pas un champ
+ * de saisie. Un nom tapé se tape de deux façons, et l'appel ne retrouve plus sa
+ * définition sans que rien ne le dise. Trois noms de musicien suffisent, et ils
+ * racontent déjà la structure d'un morceau.
+ */
+const NOMS_BLOCS: [string, string][] = [
+  ["Refrain", "Refrain"], ["Couplet", "Couplet"], ["Intro", "Intro"],
+];
 const PERCU_EMOJI: Record<Percu, string> = { Boum: "🥁", Tac: "✋", Clap: "👏" };
 const PERCU_COLOR: Record<Percu, string> = { Boum: "#b45309", Tac: "#0d9488", Clap: "#db2777" };
 
@@ -110,11 +122,38 @@ function aUneBoucleImbriquee(ws: any): boolean {
   });
 }
 
+/**
+ * Un bloc nommé, défini ET appelé au moins deux fois ?
+ *
+ * Sans cette vérification, un enfant qui recopie ses notes à la main obtient
+ * exactement le même son et serait félicité — alors qu'il n'a rien appris.
+ * C'est le même garde-fou que pour la boucle imbriquée : le rythme juste ne
+ * prouve pas la bonne structure.
+ */
+function utiliseUnBlocNomme(ws: any, appelsMin = 2): boolean {
+  const blocs = ws.getAllBlocks(false);
+  const definis = new Set<string>(
+    blocs.filter((b: any) => b.type === "music_define")
+      .filter((b: any) => b.getInput?.("DO")?.connection?.targetBlock())
+      .map((b: any) => b.getFieldValue("NOM")),
+  );
+  if (!definis.size) return false;
+  const appels = new Map<string, number>();
+  for (const b of blocs) {
+    if (b.type !== "music_call") continue;
+    const n = b.getFieldValue("NOM");
+    if (definis.has(n)) appels.set(n, (appels.get(n) ?? 0) + 1);
+  }
+  return [...appels.values()].some((n) => n >= appelsMin);
+}
+
 const ALL_MUSIC_BLOCKS = [
   { id: "music_play_note",     label: "🎵 Jouer une note", color: "#3b82f6" },
   { id: "music_drum",          label: "🥁 Tambour",        color: "#b45309" },
   { id: "music_pause",         label: "⏸ Silence",         color: "#64748b" },
   { id: "controls_repeat_ext", label: "🔁 Répéter",        color: "#059669", badge: "Clé !" },
+  { id: "music_define",        label: "🎼 Mon bloc",       color: "#9333ea" },
+  { id: "music_call",          label: "▶ Jouer mon bloc",  color: "#9333ea" },
 ];
 const CONFETTI = ["🎵", "🎶", "🎸", "🎹", "🎺", "⭐", "✨", "🎉"];
 // Black key positions: between white-key indices (Do=0…Si=6)
@@ -344,6 +383,25 @@ function buildInterpreter(
         for (let i = 0; i < n; i++) await runChain(body);
         break;
       }
+      // Une définition posée dans un programme ne joue pas : elle se range.
+      // C'est exactement ce qu'on veut faire entendre — écrire un refrain n'est
+      // pas le chanter.
+      case "music_define": break;
+
+      case "music_call": {
+        const nom = block.getFieldValue("NOM") || "";
+        const def = defs.get(nom);
+        if (!def) throw new Error(`BLOC_INCONNU:${nom}`);
+        // Un bloc qui s'appelle lui-même tournerait sans fin et figerait la
+        // page. On refuse, avec un mot qui dit quoi faire.
+        if (pile.includes(nom)) throw new Error(`BLOC_BOUCLE:${nom}`);
+        if (!def.corps) throw new Error(`BLOC_VIDE:${nom}`);
+        allume(block.id);
+        pile.push(nom);
+        await runChain(def.corps);
+        pile.pop();
+        break;
+      }
       default: break;
     }
   }
@@ -356,7 +414,22 @@ function buildInterpreter(
     }
   }
 
+  // Les définitions du programme, par leur nom, relevées avant de jouer : un
+  // bloc peut être appelé avant l'endroit où il est défini, comme une partition
+  // dont le refrain est écrit en bas de page.
+  const defs = new Map<string, { corps: any }>();
+  const pile: string[] = [];
+
   return async (ws: any) => {
+    defs.clear();
+    pile.length = 0;
+    for (const b of ws.getAllBlocks(false) as any[]) {
+      if (b.type !== "music_define") continue;
+      const nom = b.getFieldValue("NOM") || "";
+      const corps = b.getInput?.("DO")?.connection?.targetBlock()
+        ?? b.getInputTargetBlock?.("DO") ?? null;
+      defs.set(nom, { corps });
+    }
     const tops: any[] = ws.getTopBlocks(true);
     for (const top of tops) await runChain(top);
   };
@@ -446,6 +519,36 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         };
         javascriptGenerator.forBlock["music_drum"] = () => "";
       }
+      // Les blocs nommés : « Mon bloc Refrain { … } » et « ▶ Jouer Refrain ».
+      // Blockly a ses propres blocs de fonction, mais ils portent un engrenage
+      // pour les paramètres et un champ de saisie libre — deux choses qu'un
+      // enfant de dix ans n'a pas à affronter pour nommer un refrain.
+      if (!Blocks["music_define"]) {
+        const FD = (Blockly as any).FieldDropdown;
+        Blocks["music_define"] = {
+          init(this: any) {
+            this.appendDummyInput()
+              .appendField("🎼 Mon bloc")
+              .appendField(new FD(NOMS_BLOCS), "NOM");
+            this.appendStatementInput("DO").setCheck(null);
+            // Ni dessus ni dessous : une définition ne se branche pas dans un
+            // programme, elle se pose à côté. C'est ça qu'on veut faire sentir.
+            this.setColour(290);
+          },
+        };
+        Blocks["music_call"] = {
+          init(this: any) {
+            this.appendDummyInput()
+              .appendField("▶ Jouer")
+              .appendField(new FD(NOMS_BLOCS), "NOM");
+            this.setPreviousStatement(true, null);
+            this.setNextStatement(true, null);
+            this.setColour(290);
+          },
+        };
+        javascriptGenerator.forBlock["music_define"] = () => "";
+        javascriptGenerator.forBlock["music_call"]   = () => "";
+      }
 
       const darkTheme = (Blockly as any).Theme.defineTheme("music_dark", {
         base: (Blockly as any).Themes?.Classic,
@@ -475,6 +578,11 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
           kind: "block", type: "controls_repeat_ext",
           inputs: { TIMES: { block: { type: "math_number", fields: { NUM: 4 } } } },
         });
+
+      if (available.includes("music_define"))
+        toolbox.push({ kind: "block", type: "music_define" });
+      if (available.includes("music_call"))
+        toolbox.push({ kind: "block", type: "music_call" });
 
       if (!mounted || !blocklyRef.current) return; // may have unmounted during imports
 
@@ -575,6 +683,12 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         if (e?.message?.startsWith("EMPTY_LOOP:")) {
           const n = e.message.split(":")[1];
           setMsg(`⚠️ Ta boucle ×${n} est vide ! Glisse un son DANS l'espace vert de la boucle.`);
+        } else if (e?.message?.startsWith("BLOC_INCONNU:")) {
+          setMsg(`⚠️ Tu demandes de jouer « ${e.message.split(":")[1]} », mais ce bloc n'existe pas encore. Il faut d'abord le fabriquer avec 🎼 Mon bloc.`);
+        } else if (e?.message?.startsWith("BLOC_VIDE:")) {
+          setMsg(`⚠️ Ton bloc « ${e.message.split(":")[1]} » est vide ! Glisse des sons dedans.`);
+        } else if (e?.message?.startsWith("BLOC_BOUCLE:")) {
+          setMsg(`⚠️ Ton bloc « ${e.message.split(":")[1]} » se joue lui-même : il ne s'arrêterait jamais. Enlève cet appel.`);
         } else {
           setMsg("Erreur dans ton programme 😬");
         }
@@ -606,6 +720,14 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         setStatus("fail");
         setMsg(`${reussi} Mais il manque une boucle rangée DANS une autre boucle — chacune d'au moins 2 tours. 🔁`);
       };
+      // Recopier les notes à la main donne le même son : le rythme juste ne
+      // prouve pas qu'on s'est servi d'un bloc nommé.
+      const appelsVoulus = config.bloc_nomme ?? 0;
+      const manqueBlocNomme = appelsVoulus > 0 && !utiliseUnBlocNomme(ws, appelsVoulus);
+      const refuserPourBlocNomme = (reussi: string) => {
+        setStatus("fail");
+        setMsg(`${reussi} Mais ici on veut un bloc nommé : fabrique-le avec 🎼 Mon bloc, puis joue-le ${appelsVoulus} fois avec ▶ Jouer. 🎼`);
+      };
       const bravo = (texte: string) => {
         setStatus("success"); setMsg(texte);
         setShowConfetti(true);
@@ -625,6 +747,7 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         }
         if (tropDeBlocs) { refuserPourBlocs(`🎵 Joli, ${sons} sons !`); return; }
         if (manqueImbrication) { refuserPourImbrication(`🎵 Joli, ${sons} sons !`); return; }
+        if (manqueBlocNomme)   { refuserPourBlocNomme(`🎵 Joli, ${sons} sons !`); return; }
         bravo("🎉 Superbe ! Tu es compositeur !");
         return;
       }
@@ -650,12 +773,14 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         const juste = enTemps ? "🎵 C'est exactement le bon rythme !" : "🎵 C'est exactement la bonne mélodie !";
         if (tropDeBlocs) { refuserPourBlocs(juste); return; }
         if (manqueImbrication) { refuserPourImbrication(juste); return; }
+        if (manqueBlocNomme)   { refuserPourBlocNomme(juste); return; }
         bravo(enTemps ? "🎉 Parfait ! Le rythme exact, temps par temps !" : "🎉 Parfait ! Mélodie reproduite à la note près !");
         return;
       }
 
       if (tropDeBlocs) { refuserPourBlocs("🎵 Ça joue !"); return; }
       if (manqueImbrication) { refuserPourImbrication("🎵 Ça joue !"); return; }
+      if (manqueBlocNomme)   { refuserPourBlocNomme("🎵 Ça joue !"); return; }
       bravo("🎉 Mélodie jouée !");
     })();
   }, [config, onSolved, tempo]);
