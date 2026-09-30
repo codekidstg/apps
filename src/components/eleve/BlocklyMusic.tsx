@@ -13,8 +13,28 @@ type Percu = "Boum" | "Tac" | "Clap";
  * passaient pour le même rythme.
  */
 type Son = Note | Percu | "silence";
-/** Un programme écrit en abrégé : un son, ou une boucle et ce qu'elle contient. */
-type Element = Son | { rep: number; corps: Element[] };
+/**
+ * Un programme écrit en abrégé. Un son, une boucle et ce qu'elle contient, un
+ * bloc nommé et son contenu, ou l'appel d'un bloc nommé.
+ *
+ * C'est ce format que `depart` utilise pour poser un programme sur l'écran
+ * avant que l'enfant n'y touche — un morceau à transformer, ou un morceau faux
+ * à réparer. Il ne connaissait que les sons et les boucles, ce qui interdisait
+ * tout défi de réparation sur les blocs nommés : le format le plus engageant
+ * de la collection était fermé au thème qui en avait le plus besoin.
+ */
+type Element =
+  | Son
+  | { rep: number; corps: Element[] }
+  | { def: string; corps: Element[] }
+  | { appel: string };
+
+const estBoucle = (e: Element): e is { rep: number; corps: Element[] } =>
+  typeof e === "object" && "rep" in e;
+const estDef = (e: Element): e is { def: string; corps: Element[] } =>
+  typeof e === "object" && "def" in e;
+const estAppel = (e: Element): e is { appel: string } =>
+  typeof e === "object" && "appel" in e;
 
 type MusicConfig = {
   title?: string;
@@ -95,15 +115,28 @@ function versXml(prog: Element[]): string {
     if (!liste.length) return "";
     const [tete, ...reste] = liste;
     const suite = reste.length ? `<next>${chaine(reste)}</next>` : "";
-    if (typeof tete === "object") {
+    if (estBoucle(tete)) {
       return `<block type="controls_repeat_ext"><value name="TIMES"><block type="math_number"><field name="NUM">${tete.rep}</field></block></value>`
         + `<statement name="DO">${chaine(tete.corps)}</statement>${suite}</block>`;
     }
+    if (estAppel(tete)) return `<block type="music_call"><field name="NOM">${tete.appel}</field>${suite}</block>`;
     if (tete === "silence") return `<block type="music_pause">${suite}</block>`;
-    if (estPercu(tete)) return `<block type="music_drum"><field name="PERCU">${tete}</field>${suite}</block>`;
+    if (estPercu(tete as Son)) return `<block type="music_drum"><field name="PERCU">${tete}</field>${suite}</block>`;
     return `<block type="music_play_note"><field name="NOTE">${tete}</field>${suite}</block>`;
   };
-  return `<xml xmlns="https://developers.google.com/blockly/xml">${chaine(prog).replace("<block ", '<block x="24" y="24" ')}</xml>`;
+
+  // Une définition ne se branche sur rien : elle se pose à côté, à sa propre
+  // place. On les sort donc de la chaîne et on les range en colonne à droite,
+  // là où l'enfant les voit sans qu'elles gênent son programme.
+  const defs = prog.filter(estDef);
+  const suite = prog.filter((e) => !estDef(e));
+
+  const colonne = defs.map((d, i) =>
+    `<block type="music_define" x="430" y="${30 + i * 170}"><field name="NOM">${d.def}</field>`
+    + `<statement name="DO">${chaine(d.corps)}</statement></block>`).join("");
+
+  const principal = suite.length ? chaine(suite).replace("<block ", '<block x="24" y="24" ') : "";
+  return `<xml xmlns="https://developers.google.com/blockly/xml">${colonne}${principal}</xml>`;
 }
 
 /** Le nombre de tours d'un bloc Répéter, lu dans sa case. */
@@ -625,6 +658,16 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         try {
           const dom = (Blockly as any).utils.xml.textToDom(aCharger);
           (Blockly as any).Xml.domToWorkspace(dom, ws);
+          // Un programme posé d'avance peut sortir de l'écran — et dans le défi
+          // « change une note », c'est justement le bloc à modifier qui était
+          // hors champ, rangé à droite. On recadre sur ce qui est là.
+          if (typeof ws.zoomToFit === "function") {
+            ws.zoomToFit();
+            // zoomToFit colle au bord et peut grossir démesurément un petit
+            // programme : on replafonne, puis on recentre.
+            if (ws.getScale?.() > 0.8) ws.setScale(0.8);
+            ws.scrollCenter?.();
+          }
         } catch (_) {}
       }
 

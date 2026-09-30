@@ -22,8 +22,11 @@ const db = base(), g = lecteur(db);
 const LECON = "Le plan du compositeur";
 
 // ── Les deux chansons, même plan, notes différentes ───────────────────────
-const A = { intro: ["Fa", "Re"],  couplet: ["La", "Si", "La"],  refrain: ["Do", "Mi", "Sol"] };
-const B = { intro: ["Sol", "La"], couplet: ["Mi", "Fa", "Mi"],  refrain: ["Si", "Sol", "Si"] };
+// Le tambour du Griot et la voix, comme aux séances 1, 2 et 4. La chanson B
+// inverse les rôles — c'est la voix qui porte le refrain — pour que l'enfant
+// sente que le plan ne dit rien des instruments non plus.
+const A = { intro: ["Tac", "Tac"],  couplet: ["Do", "Mi", "Do"],    refrain: ["Boum", "Boum", "Clap"] };
+const B = { intro: ["Boum", "Boum"], couplet: ["Clap", "Tac", "Clap"], refrain: ["Sol", "Mi", "Sol"] };
 
 /** Le plan de la veillée : on commence et on finit par l'intro. */
 const surLePlan = (x) => [x.intro, x.couplet, x.refrain, x.couplet, x.refrain, x.intro].flat();
@@ -35,13 +38,20 @@ if (CHANSON_B.length !== CHANSON_A.length) throw new Error("les deux chansons do
 // Le plan compte 6 moments, mais seulement 3 blocs à fabriquer : c'est le
 // cœur du quiz, et le script refuse que ces nombres se démentent.
 const MOMENTS = 6, A_FABRIQUER = 3;
+
+// Le défi du compte : le plan du chef, Refrain + Couplet en boucle, 24 sons.
+// Six sons par tour, donc quatre tours — et c'est l'enfant qui doit le trouver.
+const TOURS_CHEF = 4;
+const VINGT_QUATRE = Array(TOURS_CHEF).fill([A.refrain, A.couplet]).flat(2);
+if (VINGT_QUATRE.length !== 24)
+  throw new Error(`le plan du chef fait ${VINGT_QUATRE.length} sons, attendu 24`);
 if (surLePlan(A).length !== A.intro.length * 2 + A.couplet.length * 2 + A.refrain.length * 2)
   throw new Error("le plan ne rejoue plus chaque bloc deux fois");
 
 const texte = (html) => ({ type: "text", content: { html } });
 const jeu = (content) => ({ type: "game", content });
 
-const BLOCS_NOMMES = ["music_play_note", "music_define", "music_call"];
+const BLOCS_NOMMES = ["music_play_note", "music_drum", "music_define", "music_call"];
 
 const BLOCS = [
   // ── 0. L'accroche ────────────────────────────────────────────────────────
@@ -96,9 +106,9 @@ const BLOCS = [
     title: "Défi 1 — La veillée du Griot",
     instructions:
       "Suis ton plan. Fabrique les trois blocs :\n" +
-      "· 🎼 Intro → Fa Ré\n" +
-      "· 🎼 Couplet → La Si La\n" +
-      "· 🎼 Refrain → Do Mi Sol\n" +
+      "· 🎼 Intro → Tac Tac\n" +
+      "· 🎼 Couplet → Do Mi Do\n" +
+      "· 🎼 Refrain → Boum Boum Clap\n" +
       "Puis écris : Intro, Couplet, Refrain, Couplet, Refrain, Intro.",
     target_notes: CHANSON_A,
     available_blocks: BLOCS_NOMMES,
@@ -144,9 +154,9 @@ const BLOCS = [
         },
         {
           question: "Tu veux une autre chanson, avec exactement la même forme. Que changes-tu ?",
-          choices: ["Le plan", "Les notes DANS les blocs", "L'ordre des ▶ Jouer"],
+          choices: ["Le plan", "Les sons DANS les blocs", "L'ordre des ▶ Jouer"],
           answer: 1,
-          explanation: "Le plan et l'ordre ne bougent pas. Seules les notes rangées dans chaque bloc changent — et toute la chanson change avec.",
+          explanation: "Le plan et l'ordre ne bougent pas. Seuls les sons rangés dans chaque bloc changent — et toute la chanson change avec.",
         },
       ],
     },
@@ -157,21 +167,40 @@ const BLOCS = [
     game_type: "music",
     title: "Défi 2 — Le même plan, une autre chanson",
     instructions:
-      "Même forme, autres notes. Garde exactement le même ordre :\n" +
+      "Même forme, autres sons — et cette fois c'est la VOIX qui porte le refrain.\nGarde exactement le même ordre :\n" +
       "Intro, Couplet, Refrain, Couplet, Refrain, Intro.\n" +
-      "· 🎼 Intro → Sol La\n" +
-      "· 🎼 Couplet → Mi Fa Mi\n" +
-      "· 🎼 Refrain → Si Sol Si",
+      "· 🎼 Intro → Boum Boum\n" +
+      "· 🎼 Couplet → Clap Tac Clap\n" +
+      "· 🎼 Refrain → Sol Mi Sol",
     target_notes: CHANSON_B,
     available_blocks: BLOCS_NOMMES,
     blocs_distincts: 3,
     tempo: 360,
   }),
 
-  // ── 7. La sienne, du plan jusqu'au son ───────────────────────────────────
+  // ── 7. Le plan impose le compte ─────────────────────────────────────────
   jeu({
     game_type: "music",
-    title: "Défi 3 — Ta veillée à toi 🎨",
+    title: "Défi 3 — Le plan du chef 🧮",
+    instructions:
+      "Le chef de la veillée t'apporte SON plan, et il veut exactement 24 sons.\n" +
+      "Son plan : Refrain, Couplet — encore et encore, et rien d'autre.\n" +
+      "Ton Refrain fait 3 sons, ton Couplet 3 sons.\n" +
+      "Calcule d'abord combien de fois il faut enchaîner les deux. Puis écris-le avec une boucle.",
+    target_notes: VINGT_QUATRE,
+    available_blocks: [...BLOCS_NOMMES, "controls_repeat_ext"],
+    blocs_distincts: 2,
+    // Deux définitions (1 + 3 sons = 8), la boucle et son chiffre (2), les deux
+    // appels dedans (2) = 12. Un bloc de marge.
+    max_blocks: 13,
+    indice_limite: "Un tour = Refrain + Couplet = 6 sons. Combien de tours pour 24 ? 🔁",
+    tempo: 360,
+  }),
+
+  // ── 8. La sienne, du plan jusqu'au son ───────────────────────────────────
+  jeu({
+    game_type: "music",
+    title: "Défi 4 — Ta veillée à toi 🎨",
     instructions:
       "À toi, du plan jusqu'au son.\n" +
       "1. Sur une feuille, écris ta forme : par exemple Intro, Couplet, Refrain, Couplet, Refrain.\n" +
@@ -185,7 +214,7 @@ const BLOCS = [
     tempo: 360,
   }),
 
-  // ── 8. Avec le mentor ────────────────────────────────────────────────────
+  // ── 9. Avec le mentor ────────────────────────────────────────────────────
   texte(
     "<h3>👐 Avec ton mentor — Le plan sur la table</h3>" +
     "<ol>" +
@@ -197,7 +226,7 @@ const BLOCS = [
     "</ol>"
   ),
 
-  // ── 9. Les mots ──────────────────────────────────────────────────────────
+  // ── 10. Les mots ─────────────────────────────────────────────────────────
   jeu({
     game_type: "memory",
     title: "Les mots du plan",
@@ -207,11 +236,11 @@ const BLOCS = [
       { left: "Un moment du plan",  right: "Un ▶ Jouer à écrire" },
       { left: "Un bloc à fabriquer", right: "Un morceau qui revient" },
       { left: "Six moments",        right: "Trois blocs seulement" },
-      { left: "Changer les notes",  right: "Même plan, autre chanson" },
+      { left: "Changer les sons",   right: "Même plan, autre chanson" },
     ],
   }),
 
-  // ── 10. Le thème est prêt, le jalon arrive ───────────────────────────────
+  // ── 11. Le thème est prêt, le jalon arrive ───────────────────────────────
   texte(
     "<h3>🏆 Tu fais le plan avant de coder</h3>" +
     "<p>Tu repères ce qui revient dans un morceau, avant d'avoir posé un seul bloc.</p>" +
@@ -254,8 +283,11 @@ ok(ap.length === BLOCS.length, `${BLOCS.length} blocs écrits (trouvé ${ap.leng
 ok(ap.every((b, i) => b.order_index === i), "numérotation contiguë");
 ok(ap.every((b) => b.content && Object.keys(b.content).length), "aucun bloc vide");
 const musiques = ap.filter((b) => b.content.game_type === "music");
-ok(musiques.length === 3, `3 défis musicaux (trouvé ${musiques.length})`);
-ok(musiques.every((b) => b.content.blocs_distincts === 3), "chaque défi exige les trois blocs");
+ok(musiques.length === 4, `4 défis musicaux (trouvé ${musiques.length})`);
+ok(musiques.some((b) => /[Cc]alcule/.test(b.content.instructions ?? "")), "un défi demande un calcul avant de poser");
+ok(musiques.some((b) => b.content.available_blocks?.includes("music_drum")), "le tambour du Griot est là");
+ok(musiques.some((b) => b.content.max_blocks), "au moins un défi impose une limite de blocs");
+ok(musiques.every((b) => b.content.blocs_distincts >= 2), "chaque défi exige au moins deux blocs nommés");
 const plan = ap.find((b) => b.content.game_type === "plan_builder");
 ok(!!plan, "le plan est là");
 // Un plan à distracteurs doit avouer ses pièges ou annoncer le total de cartes.

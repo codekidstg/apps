@@ -23,9 +23,14 @@ const db = base(), g = lecteur(db);
 const LECON = "Mon refrain a un nom";
 
 // ── Le morceau, écrit une fois et compté par le script ────────────────────
-const REFRAIN  = ["Do", "Mi", "Sol"];
-const COUPLET1 = ["La", "Si"];
-const COUPLET2 = ["Fa", "Re"];
+//
+// Le refrain mêle le tambour et la voix : c'est le Griot, pas un piano. Les
+// séances 1 et 2 frappent Boum, Tac et Clap à chaque défi ; les avoir laissés
+// tomber ici aurait fait disparaître le personnage au moment précis où le
+// thème devient abstrait.
+const REFRAIN  = ["Boum", "Boum", "Clap"];
+const COUPLET1 = ["Do", "Mi"];
+const COUPLET2 = ["Sol", "Mi"];
 
 const morceau = (...parts) => parts.flat();
 const COURT = morceau(REFRAIN, COUPLET1, REFRAIN);                      //  8 sons
@@ -36,17 +41,31 @@ if (COURT.length !== 8)  throw new Error(`le morceau court fait ${COURT.length} 
 if (LONG.length !== 13)  throw new Error(`le morceau long fait ${LONG.length} sons, attendu 13`);
 if (REFRAIN.length * 3 !== 9) throw new Error("trois refrains ne font plus 9 notes");
 
+// Le défi « change une note » : le programme est déjà posé, la chanson joue.
+// L'enfant remplace le Clap du BLOC par un Tac — un seul geste — et entend les
+// trois refrains changer d'un coup. C'est le moment du thème, et il n'était
+// jusqu'ici qu'écrit dans un texte et dans un quiz.
+const REFRAIN_APRES = ["Boum", "Boum", "Tac"];
+const DEPART_TROIS = [
+  { def: "Refrain", corps: REFRAIN },
+  { appel: "Refrain" }, ...COUPLET1, { appel: "Refrain" }, ...COUPLET2, { appel: "Refrain" },
+];
+const APRES_TROIS = [REFRAIN_APRES, COUPLET1, REFRAIN_APRES, COUPLET2, REFRAIN_APRES].flat();
+if (APRES_TROIS.length !== LONG.length) throw new Error("le morceau modifié doit garder sa longueur");
+if (APRES_TROIS.filter((x) => x === "Tac").length !== 3)
+  throw new Error("un seul geste doit changer les TROIS refrains — c'est tout le propos");
+
 const texte = (html) => ({ type: "text", content: { html } });
 const jeu = (content) => ({ type: "game", content });
 
-const NOTES_SEULES = ["music_play_note"];
-const AVEC_BLOCS   = ["music_play_note", "music_define", "music_call"];
+const SANS_BLOCS   = ["music_play_note", "music_drum"];
+const AVEC_BLOCS   = ["music_play_note", "music_drum", "music_define", "music_call"];
 
 const BLOCS = [
   // ── 0. L'accroche : le mur laissé la semaine dernière ────────────────────
   texte(
     "<h3>🎤 Le refrain revient, les couplets changent</h3>" +
-    "<p>Écoute le Griot : il chante <strong>Do&nbsp;Mi&nbsp;Sol</strong>, puis <em>La&nbsp;Si</em>, puis encore <strong>Do&nbsp;Mi&nbsp;Sol</strong>.</p>" +
+    "<p>Écoute le Griot : il frappe <strong>Boum&nbsp;Boum&nbsp;Clap</strong>, puis chante <em>Do&nbsp;Mi</em>, puis refrappe <strong>Boum&nbsp;Boum&nbsp;Clap</strong>.</p>" +
     "<p>Le morceau du milieu change à chaque fois. Le premier et le dernier, non : c'est le <strong>refrain</strong>.</p>" +
     "<p>Une boucle répète toujours la même chose, collée. Ici, il y a quelque chose entre les deux. <strong>Aucune boucle ne sait faire ça.</strong></p>" +
     "<p>Commence par l'écrire à la main. Tu verras vite le problème.</p>"
@@ -57,20 +76,20 @@ const BLOCS = [
     game_type: "music",
     title: "Défi 1 — Le morceau, à la main",
     instructions:
-      "Écoute le modèle, puis joue-le note par note : Do Mi Sol, La Si, Do Mi Sol.\n" +
+      "Écoute le modèle, puis pose-le son par son : Boum Boum Clap, Do Mi, Boum Boum Clap.\n" +
       "Compte tes blocs à la fin — tu en auras besoin dans deux minutes.",
     target_notes: COURT,
-    available_blocks: NOTES_SEULES,
+    available_blocks: SANS_BLOCS,
     tempo: 400,
   }),
 
   // ── 2. L'explication, après l'avoir fait ─────────────────────────────────
   texte(
     "<h3>🎼 Donne un nom à ton refrain</h3>" +
-    "<p>Tu viens d'écrire <strong>Do&nbsp;Mi&nbsp;Sol deux fois</strong>. Et si le Griot en veut cinq&nbsp;? Dix&nbsp;?</p>" +
-    "<p>Pire : s'il change d'avis et veut <em>Do&nbsp;Mi&nbsp;La</em>, il faut aller corriger <strong>partout</strong>. Et en oublier un, c'est fatal.</p>" +
+    "<p>Tu viens de poser <strong>Boum&nbsp;Boum&nbsp;Clap deux fois</strong>. Et si le Griot en veut cinq&nbsp;? Dix&nbsp;?</p>" +
+    "<p>Pire : s'il change d'avis et veut finir par un <em>Tac</em>, il faut aller corriger <strong>partout</strong>. Et en oublier un, c'est fatal.</p>" +
     "<p>Alors on fait autrement. On fabrique un bloc, on lui donne un <strong>nom</strong>, et on le range à côté&nbsp;:</p>" +
-    "<pre>🎼 Mon bloc <b>Refrain</b>\n     🎵 Do\n     🎵 Mi\n     🎵 Sol</pre>" +
+    "<pre>🎼 Mon bloc <b>Refrain</b>\n     🥁 Boum\n     🥁 Boum\n     👏 Clap</pre>" +
     "<p>Ensuite, chaque fois qu'on en a besoin, on écrit juste&nbsp;: <strong>▶ Jouer Refrain</strong>.</p>" +
     "<p>Écrit <strong>une fois</strong>. Joué <strong>autant de fois qu'on veut</strong>.</p>"
   ),
@@ -81,8 +100,8 @@ const BLOCS = [
     title: "Défi 2 — Le même morceau, avec un bloc nommé",
     instructions:
       "Exactement le même morceau qu'au défi 1, mais autrement.\n" +
-      "1. Fabrique 🎼 Mon bloc Refrain, et mets Do Mi Sol dedans.\n" +
-      "2. Écris : ▶ Jouer Refrain, puis La et Si, puis ▶ Jouer Refrain.",
+      "1. Fabrique 🎼 Mon bloc Refrain, et mets Boum Boum Clap dedans.\n" +
+      "2. Écris : ▶ Jouer Refrain, puis Do et Mi, puis ▶ Jouer Refrain.",
     target_notes: COURT,
     available_blocks: AVEC_BLOCS,
     bloc_nomme: 2,
@@ -106,19 +125,19 @@ const BLOCS = [
     content: {
     questions: [
       {
-        question: "Tu poses 🎼 Mon bloc Refrain avec Do Mi Sol dedans, et rien d'autre. Qu'est-ce qu'on entend ?",
-        choices: ["Do Mi Sol", "Do Mi Sol trois fois", "Rien du tout"],
+        question: "Tu poses 🎼 Mon bloc Refrain avec Boum Boum Clap dedans, et rien d'autre. Qu'est-ce qu'on entend ?",
+        choices: ["Boum Boum Clap", "Boum Boum Clap trois fois", "Rien du tout"],
         answer: 2,
         explanation: "Fabriquer n'est pas jouer. Le bloc est rangé, prêt — mais tant que personne n'écrit ▶ Jouer Refrain, il reste muet.",
       },
       {
-        question: "Ton bloc Refrain joue Do Mi Sol. Tu écris ▶ Jouer Refrain trois fois. Combien de notes entend-on ?",
+        question: "Ton bloc Refrain fait Boum Boum Clap. Tu écris ▶ Jouer Refrain trois fois. Combien de sons entend-on ?",
         choices: ["9", "3", "1"],
         answer: 0,
-        explanation: "3 notes dans le bloc, joué 3 fois : 3 × 3 = 9 notes.",
+        explanation: "3 sons dans le bloc, joué 3 fois : 3 × 3 = 9 sons.",
       },
       {
-        question: "Tu remplaces le Sol de ton bloc Refrain par un La. Combien d'endroits as-tu modifiés ?",
+        question: "Tu remplaces le Clap de ton bloc Refrain par un Tac. Combien d'endroits as-tu modifiés ?",
         choices: ["Trois", "Un seul", "Autant que de ▶ Jouer"],
         answer: 1,
         explanation: "Un seul — celui qui est DANS le bloc. C'est tout l'intérêt de lui avoir donné un nom.",
@@ -137,13 +156,13 @@ const BLOCS = [
   jeu({
     game_type: "sort",
     title: "Remets le morceau en ordre",
-    description: "Un bloc Refrain de trois notes, puis le morceau : Refrain, La Si, Refrain.",
+    description: "Un bloc Refrain de trois sons, puis le morceau : Refrain, Do Mi, Refrain.",
     hint: "La définition se pose d'abord — on ne peut pas jouer un bloc qui n'existe pas encore.",
     items: [
       "🎼 Mon bloc Refrain :",
-      "   🎵 Do, Mi, Sol",
+      "   🥁 Boum, Boum, 👏 Clap",
       "▶ Jouer Refrain",
-      "🎵 La, Si",
+      "🎵 Do, Mi",
       "▶ Jouer Refrain",
     ],
   }),
@@ -153,8 +172,8 @@ const BLOCS = [
     game_type: "music",
     title: "Défi 3 — Le Griot en veut trois",
     instructions:
-      "Le Griot ajoute un deuxième couplet : Fa Ré.\n" +
-      "Le morceau devient : Refrain, La Si, Refrain, Fa Ré, Refrain.\n" +
+      "Le Griot ajoute un deuxième couplet : Sol Mi.\n" +
+      "Le morceau devient : Refrain, Do Mi, Refrain, Sol Mi, Refrain.\n" +
       "Ton bloc Refrain ne change pas — tu l'appelles simplement une fois de plus.",
     target_notes: LONG,
     available_blocks: AVEC_BLOCS,
@@ -162,10 +181,29 @@ const BLOCS = [
     tempo: 400,
   }),
 
-  // ── 8. Le sien ───────────────────────────────────────────────────────────
+  // ── 8. Le moment du thème, enfin entendu ─────────────────────────────────
   jeu({
     game_type: "music",
-    title: "Défi 4 — Ton refrain à toi 🎨",
+    title: "Défi 4 — Le Griot change d'avis 🔥",
+    instructions:
+      "Le morceau est déjà écrit, et il joue. Écoute-le.\n" +
+      "Ce soir, le Griot ne veut plus finir son refrain par un Clap 👏, mais par un Tac ✋.\n" +
+      "Change UN SEUL son — celui qui est DANS le bloc — et réécoute.",
+    depart: DEPART_TROIS,
+    target_notes: APRES_TROIS,
+    available_blocks: AVEC_BLOCS,
+    bloc_nomme: 3,
+    // Pas de limite de blocs : le programme est DONNÉ, il en compte déjà onze,
+    // et rien n'est à optimiser. Une limite affichait « 11/8 » en rouge dès
+    // l'arrivée — un enfant croit avoir tout raté avant d'avoir touché à rien.
+    // C'est `bloc_nomme` qui garde la structure ici.
+    tempo: 400,
+  }),
+
+  // ── 9. Le sien ───────────────────────────────────────────────────────────
+  jeu({
+    game_type: "music",
+    title: "Défi 5 — Ton refrain à toi 🎨",
     instructions:
       "À toi de composer. Fabrique ton propre bloc Refrain, avec les notes que tu veux.\n" +
       "Puis écris un morceau où ton refrain revient au moins deux fois, avec autre chose entre les deux.\n" +
@@ -177,7 +215,7 @@ const BLOCS = [
     tempo: 400,
   }),
 
-  // ── 9. Avec le mentor, loin de l'écran ───────────────────────────────────
+  // ── 10. Avec le mentor, loin de l'écran ──────────────────────────────────
   texte(
     "<h3>👐 Avec ton mentor — Le refrain de la classe</h3>" +
     "<ol>" +
@@ -189,7 +227,7 @@ const BLOCS = [
     "</ol>"
   ),
 
-  // ── 10. Les mots ─────────────────────────────────────────────────────────
+  // ── 11. Les mots ─────────────────────────────────────────────────────────
   jeu({
     game_type: "memory",
     title: "Les mots du refrain",
@@ -203,13 +241,13 @@ const BLOCS = [
     ],
   }),
 
-  // ── 11. Ce qu'il sait faire, et le mur suivant ───────────────────────────
+  // ── 12. Ce qu'il sait faire, et le mur suivant ───────────────────────────
   texte(
     "<h3>🏆 Ton refrain a un nom</h3>" +
     "<p>Tu fabriques un bloc et tu lui donnes un nom.</p>" +
     "<p>Tu le joues autant de fois que tu veux, sans jamais le réécrire.</p>" +
     "<p>Tu sais qu'une définition ne sonne pas toute seule — il faut l'appeler.</p>" +
-    "<p>Et tu sais qu'en changeant le bloc à <strong>un seul endroit</strong>, tout le morceau change.</p>" +
+    "<p>Et tu l'as entendu&nbsp;: un seul son changé dans le bloc, et <strong>les trois refrains</strong> changent d'un coup.</p>" +
     "<p class=\"mt-3\">Les grands programmeurs font ça toute la journée. Ça porte un nom&nbsp;: une <strong>fonction</strong>. Tu viens d'en écrire une.</p>" +
     "<h4>La prochaine fois</h4>" +
     "<p>Un seul bloc nommé, c'est bien. Mais un vrai morceau a un refrain <strong>et</strong> des couplets — et les couplets aussi méritent leur nom. Tu vas composer une chanson entière avec deux blocs qui se répondent.</p>"
@@ -247,8 +285,10 @@ ok(ap.length === BLOCS.length, `${BLOCS.length} blocs écrits (trouvé ${ap.leng
 ok(ap.every((b, i) => b.order_index === i), "numérotation contiguë");
 ok(ap.every((b) => b.content && Object.keys(b.content).length), "aucun bloc vide");
 const musiques = ap.filter((b) => b.content.game_type === "music");
-ok(musiques.length === 4, `4 défis musicaux (trouvé ${musiques.length})`);
-ok(musiques.filter((b) => b.content.bloc_nomme).length === 3, "trois défis exigent le bloc nommé");
+ok(musiques.length === 5, `5 défis musicaux (trouvé ${musiques.length})`);
+ok(musiques.filter((b) => b.content.bloc_nomme).length === 4, "quatre défis exigent le bloc nommé");
+ok(musiques.some((b) => b.content.depart), "un défi part d'un programme déjà posé");
+ok(musiques.some((b) => b.content.available_blocks?.includes("music_drum")), "le tambour du Griot est de retour");
 ok(musiques.every((b) => b.content.free_mode || (b.content.target_notes ?? []).length > 0), "chaque défi dirigé a sa mélodie cible");
 const q = ap.find((b) => b.type === "quiz");
 ok(new Set((q?.content.questions ?? []).map((x) => x.answer)).size > 1, "les bonnes réponses du quiz ne sont pas toutes au même rang");

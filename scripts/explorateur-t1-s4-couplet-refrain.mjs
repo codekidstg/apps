@@ -20,9 +20,12 @@ const db = base(), g = lecteur(db);
 const LECON = "Couplet et refrain";
 
 // ── La chanson, écrite une fois et comptée par le script ──────────────────
-const REFRAIN = ["Do", "Mi", "Sol"];
-const COUPLET = ["La", "Si", "La"];
-const INTRO   = ["Fa", "Re"];
+// Le Griot frappe, la voix répond : c'est un appel-réponse, et c'est ce que
+// deux blocs nommés racontent le mieux. Les séances 1 et 2 sont au tambour ;
+// l'avoir laissé au piano faisait disparaître le personnage du thème.
+const REFRAIN = ["Boum", "Boum", "Clap"];
+const COUPLET = ["Do", "Mi", "Do"];
+const INTRO   = ["Tac", "Tac"];
 
 const morceau = (...parts) => parts.flat();
 const CHANSON = morceau(COUPLET, REFRAIN, COUPLET, REFRAIN);                 // 12 sons
@@ -32,19 +35,36 @@ const TOURNE = morceau(REFRAIN, COUPLET, REFRAIN, COUPLET, REFRAIN, COUPLET); //
 if (CHANSON.length !== 12)    throw new Error(`la chanson fait ${CHANSON.length} sons, attendu 12`);
 if (AVEC_INTRO.length !== 14) throw new Error(`avec l'intro : ${AVEC_INTRO.length}, attendu 14`);
 if (TOURNE.length !== 18)     throw new Error(`le tour de chant : ${TOURNE.length}, attendu 18`);
+
+// Le défi du calcul : 21 sons, en alternant et en finissant par un refrain.
+// Trois tours de (Refrain + Couplet), puis un dernier Refrain. L'enfant doit
+// trouver le 3 tout seul — c'est le premier raisonnement chiffré de ces trois
+// séances, et les séances 1 et 2 en avaient un chacune.
+const TOURS = 3;
+const VINGT_ET_UN = [...Array(TOURS).fill([REFRAIN, COUPLET]).flat(2), ...REFRAIN];
+if (VINGT_ET_UN.length !== 21)
+  throw new Error(`le défi du calcul fait ${VINGT_ET_UN.length} sons, attendu 21`);
+
+// La réparation : le Griot a inversé son appel et sa réponse. Le programme
+// joue Refrain, Couplet, Refrain, Couplet — il devait jouer l'inverse.
+const DEPART_INVERSE = [
+  { def: "Refrain", corps: REFRAIN },
+  { def: "Couplet", corps: COUPLET },
+  { appel: "Refrain" }, { appel: "Couplet" }, { appel: "Refrain" }, { appel: "Couplet" },
+];
 if (REFRAIN.length !== COUPLET.length) throw new Error("refrain et couplet doivent faire la même longueur ici");
 
 const texte = (html) => ({ type: "text", content: { html } });
 const jeu = (content) => ({ type: "game", content });
 
-const BLOCS_NOMMES = ["music_play_note", "music_define", "music_call"];
+const BLOCS_NOMMES = ["music_play_note", "music_drum", "music_define", "music_call"];
 
 const BLOCS = [
   // ── 0. L'accroche ────────────────────────────────────────────────────────
   texte(
     "<h3>🎶 Une chanson, c'est deux morceaux qui se répondent</h3>" +
-    "<p>La semaine dernière, tu as donné un nom à ton refrain. Les couplets, eux, étaient tous différents — alors tu les as écrits note à note.</p>" +
-    "<p>Mais écoute le Griot ce soir&nbsp;: son couplet revient <strong>lui aussi</strong>, toujours le même.</p>" +
+    "<p>La semaine dernière, tu as donné un nom au refrain du Griot — son <strong>Boum&nbsp;Boum&nbsp;Clap</strong>. Les couplets, eux, changeaient à chaque fois : tu les as écrits note à note.</p>" +
+    "<p>Mais écoute ce soir&nbsp;: le tambour appelle, et la voix répond <em>toujours la même chose</em>. Le couplet revient <strong>lui aussi</strong>.</p>" +
     "<pre>Couplet · <b>Refrain</b> · Couplet · <b>Refrain</b></pre>" +
     "<p>Deux morceaux qui reviennent. Deux morceaux qui méritent un nom.</p>"
   ),
@@ -55,8 +75,8 @@ const BLOCS = [
     title: "Défi 1 — Deux blocs pour une chanson",
     instructions:
       "Fabrique DEUX blocs :\n" +
-      "· 🎼 Couplet → La Si La\n" +
-      "· 🎼 Refrain → Do Mi Sol\n" +
+      "· 🎼 Refrain → Boum Boum Clap (le tambour)\n" +
+      "· 🎼 Couplet → Do Mi Do (la voix)\n" +
       "Puis écris la chanson : Couplet, Refrain, Couplet, Refrain.",
     target_notes: CHANSON,
     available_blocks: BLOCS_NOMMES,
@@ -67,7 +87,7 @@ const BLOCS = [
   // ── 2. Ce qu'on vient de faire ───────────────────────────────────────────
   texte(
     "<h3>🎼 Chaque bloc a son nom, et son contenu</h3>" +
-    "<p>Tu viens d'écrire douze notes… en n'en tapant que <strong>six</strong>. Les six autres, les blocs les ont rejouées pour toi.</p>" +
+    "<p>Tu viens d'écrire douze sons… en n'en posant que <strong>six</strong>. Les six autres, les blocs les ont rejoués pour toi.</p>" +
     "<p>Et regarde ta chanson&nbsp;: elle se lit à voix haute.</p>" +
     "<pre>▶ Jouer <b>Couplet</b>\n▶ Jouer <b>Refrain</b>\n▶ Jouer <b>Couplet</b>\n▶ Jouer <b>Refrain</b></pre>" +
     "<p>Quatre lignes, et on comprend la chanson sans entendre une seule note. C'est ça qu'on gagne en donnant des noms&nbsp;: <strong>un programme qui se raconte</strong>.</p>"
@@ -78,7 +98,7 @@ const BLOCS = [
     game_type: "music",
     title: "Défi 2 — Le Griot ajoute une intro",
     instructions:
-      "Avant de chanter, le Griot joue deux notes pour donner le ton : Fa Ré.\n" +
+      "Avant de commencer, le Griot frappe deux Tac pour donner le tempo.\n" +
       "Fabrique un troisième bloc 🎼 Intro, et place-le tout au début.\n" +
       "La chanson devient : Intro, Couplet, Refrain, Couplet, Refrain.",
     target_notes: AVEC_INTRO,
@@ -90,7 +110,7 @@ const BLOCS = [
   // ── 4. Le piège de la séance ─────────────────────────────────────────────
   texte(
     "<h3>⚠️ Deux blocs, deux vies séparées</h3>" +
-    "<p>Change une note dans ton <strong>Refrain</strong>&nbsp;: tous les refrains changent. Normal.</p>" +
+    "<p>Change une frappe dans ton <strong>Refrain</strong>&nbsp;: tous les refrains changent. Tu l'as déjà entendu la semaine dernière.</p>" +
     "<p>Mais le <strong>Couplet</strong>, lui, ne bouge pas d'un poil. Ils portent des noms différents, ils vivent chacun de leur côté.</p>" +
     "<p>C'est exactement ce qu'on veut&nbsp;: pouvoir retoucher le refrain sans abîmer le reste de la chanson.</p>" +
     "<p class=\"mt-2\">Et attention à l'ordre de ta liste&nbsp;: <em>Couplet, Refrain</em> ne s'entend pas comme <em>Refrain, Couplet</em>. Les mêmes blocs, une autre chanson.</p>"
@@ -102,13 +122,13 @@ const BLOCS = [
     content: {
       questions: [
         {
-          question: "Ton bloc Couplet joue 3 notes, ton bloc Refrain aussi. Tu écris : Couplet, Refrain, Couplet, Refrain. Combien de notes en tout ?",
+          question: "Ton bloc Couplet fait 3 sons, ton bloc Refrain aussi. Tu écris : Couplet, Refrain, Couplet, Refrain. Combien de sons en tout ?",
           choices: ["6", "12", "4"],
           answer: 1,
-          explanation: "Quatre appels, 3 notes chacun : 4 × 3 = 12. Tu n'as tapé que 6 notes — les blocs ont fait le reste.",
+          explanation: "Quatre appels, 3 sons chacun : 4 × 3 = 12. Tu n'as posé que 6 blocs de son — les blocs nommés ont fait le reste.",
         },
         {
-          question: "Tu changes une note DANS ton bloc Refrain. Qu'est-ce qui change dans la chanson ?",
+          question: "Tu changes le Clap de ton bloc Refrain en Tac. Qu'est-ce qui change dans la chanson ?",
           choices: ["Tous les refrains", "Tous les couplets", "Toute la chanson"],
           answer: 0,
           explanation: "Seulement les refrains. Le Couplet est un autre bloc, avec son propre nom : il ne bouge pas.",
@@ -140,38 +160,53 @@ const BLOCS = [
     description: "Deux blocs fabriqués, puis la chanson : Couplet, Refrain, Couplet.",
     hint: "Les deux blocs se fabriquent d'abord. On ne joue pas un bloc qui n'existe pas encore.",
     items: [
-      "🎼 Mon bloc Couplet : La, Si, La",
-      "🎼 Mon bloc Refrain : Do, Mi, Sol",
+      "🎼 Mon bloc Couplet : Do, Mi, Do",
+      "🎼 Mon bloc Refrain : Boum, Boum, Clap",
       "▶ Jouer Couplet",
       "▶ Jouer Refrain",
       "▶ Jouer Couplet",
     ],
   }),
 
-  // ── 7. Les deux outils du thème, réunis ──────────────────────────────────
+  // ── 7. Réparer, pas construire : le format le plus engageant du moteur ───
   jeu({
     game_type: "music",
-    title: "Défi 3 — Le tour de chant 🔁",
+    title: "Défi 3 — Le Griot s'est trompé 🔧",
     instructions:
-      "Le Griot enchaîne Refrain, Couplet — et il le fait TROIS fois de suite.\n" +
-      "Tu connais deux outils maintenant : le bloc nommé et la boucle.\n" +
-      "Sers-toi des deux : une boucle de 3 tours, et dedans tes deux ▶ Jouer.",
-    target_notes: TOURNE,
-    available_blocks: [...BLOCS_NOMMES, "controls_repeat_ext"],
+      "Le programme est déjà écrit, et il joue. Mais le Griot a inversé l'appel et la réponse !\n" +
+      "Il commence par frapper alors qu'il devait commencer par chanter.\n" +
+      "Écoute, puis remets les ▶ Jouer dans le bon ordre : Couplet, Refrain, Couplet, Refrain.",
+    depart: DEPART_INVERSE,
+    target_notes: CHANSON,
+    available_blocks: BLOCS_NOMMES,
     blocs_distincts: 2,
-    // La solution minimale en fait exactement 12 : deux définitions (1 + 3 notes
-    // chacune), la boucle et son chiffre, et les deux appels. Sans la boucle il
-    // en faudrait 14. On laisse un bloc de marge — 12 pile refuserait un enfant
-    // qui a bien compris mais a laissé traîner une note.
-    max_blocks: 13,
-    indice_limite: "Une boucle autour de tes deux appels ferait les trois tours toute seule 🔁",
     tempo: 380,
   }),
 
-  // ── 8. La sienne ─────────────────────────────────────────────────────────
+  // ── 8. Compter d'abord, poser ensuite ───────────────────────────────────
   jeu({
     game_type: "music",
-    title: "Défi 4 — Ta chanson à toi 🎨",
+    title: "Défi 4 — Les 21 sons de la veillée 🧮",
+    instructions:
+      "Ce soir le Griot veut exactement 21 sons.\n" +
+      "Il alterne Refrain (3 sons) et Couplet (3 sons), et il FINIT par un Refrain.\n" +
+      "Calcule d'abord : combien de fois faut-il enchaîner Refrain puis Couplet, avant le dernier Refrain ?\n" +
+      "Puis écris-le avec une boucle — 14 blocs au plus.",
+    target_notes: VINGT_ET_UN,
+    available_blocks: [...BLOCS_NOMMES, "controls_repeat_ext"],
+    blocs_distincts: 2,
+    // Le compte : deux définitions (1 + 3 sons chacune = 8), la boucle et son
+    // chiffre (2), les deux appels dedans (2), le dernier appel (1) = 13.
+    // Un bloc de marge, comme partout ailleurs.
+    max_blocks: 14,
+    indice_limite: "Une boucle autour de Refrain + Couplet ferait les tours toute seule — et il reste un Refrain à la fin 🔁",
+    tempo: 380,
+  }),
+
+  // ── 9. La sienne ─────────────────────────────────────────────────────────
+  jeu({
+    game_type: "music",
+    title: "Défi 5 — Ta chanson à toi 🎨",
     instructions:
       "Compose ta propre chanson, avec DEUX blocs nommés : ton couplet et ton refrain.\n" +
       "Choisis leurs notes, puis fais-les se répondre comme tu veux.\n" +
@@ -183,7 +218,7 @@ const BLOCS = [
     tempo: 380,
   }),
 
-  // ── 9. Avec le mentor ────────────────────────────────────────────────────
+  // ── 10. Avec le mentor ───────────────────────────────────────────────────
   texte(
     "<h3>👐 Avec ton mentor — La chanson sans écran</h3>" +
     "<ol>" +
@@ -195,7 +230,7 @@ const BLOCS = [
     "</ol>"
   ),
 
-  // ── 10. Les mots ─────────────────────────────────────────────────────────
+  // ── 11. Les mots ─────────────────────────────────────────────────────────
   jeu({
     game_type: "memory",
     title: "Les mots de la chanson",
@@ -209,7 +244,7 @@ const BLOCS = [
     ],
   }),
 
-  // ── 11. Ce qu'il sait faire, et le mur suivant ───────────────────────────
+  // ── 12. Ce qu'il sait faire, et le mur suivant ───────────────────────────
   texte(
     "<h3>🏆 Tu composes avec tes propres blocs</h3>" +
     "<p>Tu fabriques plusieurs blocs nommés, chacun avec son contenu.</p>" +
@@ -253,7 +288,11 @@ ok(ap.length === BLOCS.length, `${BLOCS.length} blocs écrits (trouvé ${ap.leng
 ok(ap.every((b, i) => b.order_index === i), "numérotation contiguë");
 ok(ap.every((b) => b.content && Object.keys(b.content).length), "aucun bloc vide");
 const musiques = ap.filter((b) => b.content.game_type === "music");
-ok(musiques.length === 4, `4 défis musicaux (trouvé ${musiques.length})`);
+ok(musiques.length === 5, `5 défis musicaux (trouvé ${musiques.length})`);
+ok(musiques.some((b) => b.content.depart), "un défi part d'un programme déjà posé — la réparation");
+ok(musiques.some((b) => /[Cc]alcule/.test(b.content.instructions ?? "")), "un défi demande un calcul avant de poser");
+ok(musiques.some((b) => b.content.available_blocks?.includes("music_drum")), "le tambour du Griot est de retour");
+ok(musiques.filter((b) => b.content.max_blocks).length >= 1, "au moins un défi impose une limite de blocs");
 ok(musiques.every((b) => b.content.blocs_distincts >= 2), "chaque défi exige au moins deux blocs nommés");
 ok(musiques.every((b) => b.content.free_mode || (b.content.target_notes ?? []).length > 0), "chaque défi dirigé a sa mélodie cible");
 const q = ap.find((b) => b.type === "quiz");
