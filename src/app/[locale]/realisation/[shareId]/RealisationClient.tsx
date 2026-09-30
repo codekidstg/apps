@@ -5,6 +5,7 @@ import AvatarSvg from "@/components/eleve/AvatarSvg";
 import { programmeLisible } from "@/lib/questions/programme";
 
 const BlocklyRobot = dynamic(() => import("@/components/eleve/BlocklyRobotLoader"), { ssr: false });
+const BlocklyMusic = dynamic(() => import("@/components/eleve/BlocklyMusic"), { ssr: false });
 
 /**
  * Ce que le parent voit.
@@ -23,6 +24,8 @@ type Props = {
     plan: string[];
     program_xml: string | null;
     maze: Record<string, unknown> | null;
+    /** La chanson composée par l'enfant : la configuration du défi, et son programme. */
+    musique: { config: Record<string, unknown>; xml: string } | null;
     created_at: string;
   };
   /** Déjà formatée côté serveur, fuseau fixé : voir le commentaire dans page.tsx. */
@@ -30,7 +33,7 @@ type Props = {
 };
 
 export default function RealisationClient({ realisation, dateTexte }: Props) {
-  const { first_name: prenom, avatar, plan, program_xml, maze } = realisation;
+  const { first_name: prenom, avatar, plan, program_xml, maze, musique } = realisation;
 
   /**
    * `programmeLisible` s'appuie sur DOMParser, qui n'existe pas sur le serveur :
@@ -61,12 +64,17 @@ export default function RealisationClient({ realisation, dateTexte }: Props) {
               size={96}
             />
           </div>
-          <h1 className="text-2xl font-black">{prenom} a programmé ça</h1>
+          <h1 className="text-2xl font-black">{musique ? `${prenom} a composé ça` : `${prenom} a programmé ça`}</h1>
           <p className="text-sm" style={{ color: "#94a3b8" }}>
-            Séance terminée le {dateTexte} — thème « Je guide un robot dans un labyrinthe »
+            {/* Le thème était écrit en dur : une chanson s'annonçait comme un
+                labyrinthe. On dit ce que la page contient vraiment. */}
+            Séance terminée le {dateTexte}{musique ? " — thème « Je compose de la musique »" : maze ? " — thème « Je guide un robot dans un labyrinthe »" : ""}
           </p>
         </header>
 
+        {/* Une leçon de musique n'a pas toujours de plan : la section disparaît
+            au lieu d'afficher une liste vide. */}
+        {plan.length > 0 && (
         <section className="rounded-2xl p-5 space-y-3" style={{ background: "#1e293b", border: "1px solid #334155" }}>
           <h2 className="text-xs font-black uppercase tracking-widest" style={{ color: "#FDB813" }}>
             {/* Pas d'élision : « qu'Ryshawn » était faux, et aucune règle en dur
@@ -87,6 +95,7 @@ export default function RealisationClient({ realisation, dateTexte }: Props) {
             logiciels chaque jour. On appelle ça le pseudocode.
           </p>
         </section>
+        )}
 
         {programme && (
           <section className="rounded-2xl p-5 space-y-3" style={{ background: "#1e293b", border: "1px solid #334155" }}>
@@ -97,6 +106,35 @@ export default function RealisationClient({ realisation, dateTexte }: Props) {
               style={{ background: "#0f172a", border: "1px solid #334155", color: "#6ee7b7" }}>
               {programme}
             </pre>
+          </section>
+        )}
+
+        {/* Le moment de la page : le parent appuie sur ▶ et entend la chanson
+            que son enfant a écrite. C'est ça qu'on vient chercher ici. */}
+        {musique && (
+          <section className="space-y-3">
+            <h2 className="text-xs font-black uppercase tracking-widest" style={{ color: "#10b981" }}>
+              {/* Pas de « de {prenom} » : « de ABBEY » sonne faux et l'élision
+                  n'a pas de règle sûre. On tourne la phrase, comme au-dessus. */}
+              La chanson composée par {prenom}{" — appuyez sur ▶ Jouer pour l'écouter"}
+            </h2>
+            {hydrate ? (
+              <BlocklyMusic
+                config={musique.config as never}
+                savedXml={musique.xml}
+                onSolved={() => {}}
+              />
+            ) : (
+              <div className="rounded-2xl flex items-center justify-center"
+                style={{ height: 400, background: "#0f172a", border: "1px solid #334155" }}>
+                <span className="text-sm font-bold" style={{ color: "#64748b" }}>🎵 Chargement de la chanson…</span>
+              </div>
+            )}
+            <p className="text-xs italic" style={{ color: "#64748b" }}>
+              {/* « que ABBEY » sonne faux, et l'élision n'a pas de règle sûre :
+                  on met le prénom en tête de phrase. */}
+              Les blocs violets, c&apos;est {prenom}{" qui les a fabriqués et nommés. Un programmeur appelle ça des fonctions — et c'est ce qu'il écrira encore dans dix ans."}
+            </p>
           </section>
         )}
 
@@ -125,7 +163,9 @@ export default function RealisationClient({ realisation, dateTexte }: Props) {
           <div className="text-2xl">🏗️</div>
           <p className="font-black">{prenom} n&apos;a pas joué à un jeu : {prenom} a écrit un programme.</p>
           <p className="text-sm" style={{ color: "#94a3b8" }}>
-            Planifier, découper un problème, repérer ce qui se répète — ce sont les gestes du métier.
+            {musique
+              ? "Repérer ce qui revient, lui donner un nom, s'en servir plusieurs fois — ce sont les gestes du métier."
+              : "Planifier, découper un problème, repérer ce qui se répète — ce sont les gestes du métier."}
           </p>
         </footer>
 

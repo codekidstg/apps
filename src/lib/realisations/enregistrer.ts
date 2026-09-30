@@ -43,8 +43,12 @@ export type Realisation = {
  * Enregistre (ou met à jour) la réalisation d'un élève pour une leçon.
  *
  * Ne lève jamais : l'échec ne doit pas empêcher un enfant de terminer sa
- * leçon. Rend `null` quand il n'y a rien à montrer — leçon sans plan, ou plan
- * jamais composé.
+ * leçon. Rend `null` quand il n'y a rien à montrer.
+ *
+ * Depuis le 30 septembre 2026, une leçon de MUSIQUE en produit une aussi : la
+ * chanson que l'enfant a composée librement. Le plan n'est donc plus
+ * obligatoire — le thème du Griot n'en a qu'à sa cinquième séance, et les
+ * compositions des séances 3 et 4 méritaient déjà d'être entendues.
  */
 export async function enregistrerRealisation(
   studentId: string,
@@ -61,12 +65,20 @@ export async function enregistrerRealisation(
 
     const jeu = (b: Bloc) => (b.content?.game_type as string | undefined);
     const blocPlan = blocs.find((b) => jeu(b) === "plan_builder");
-    if (!blocPlan) return null; // Cette leçon ne produit pas de réalisation.
 
     // Le labyrinthe qui DESSINE d'abord : c'est lui qui impressionne un parent.
     // À défaut, le dernier labyrinthe de la leçon.
     const mazes = blocs.filter((b) => jeu(b) === "maze");
     const blocMaze = mazes.find((b) => b.content?.trail === true) ?? mazes[mazes.length - 1];
+
+    // La composition LIBRE d'abord : c'est la chanson que l'enfant a inventée,
+    // pas celle qu'on lui a demandé de reproduire. À défaut, le dernier défi
+    // musical de la leçon.
+    const musiques = blocs.filter((b) => jeu(b) === "music");
+    const blocMusique = musiques.find((b) => b.content?.free_mode === true) ?? musiques[musiques.length - 1];
+
+    // Une leçon qui n'a ni plan ni musique ne produit rien à montrer.
+    if (!blocPlan && !blocMusique) return null;
 
     const { data: prog } = await (admin.from("lesson_progress") as any)
       .select("block_progress")
@@ -76,10 +88,23 @@ export async function enregistrerRealisation(
 
     const etats = ((prog?.block_progress as any)?.gameStates ?? {}) as Record<string, unknown>;
 
-    const plan = etats[blocPlan.id];
-    if (!Array.isArray(plan) || plan.length === 0) return null; // Plan jamais composé.
+    const planBrut = blocPlan ? etats[blocPlan.id] : null;
+    const plan = Array.isArray(planBrut) ? (planBrut as string[]) : [];
 
     const programme = blocMaze ? etats[blocMaze.id] : null;
+
+    // La chanson telle que l'enfant l'a laissée, avec la configuration du défi :
+    // sans elle, la page publique ne saurait ni à quel tempo jouer ni quels
+    // blocs montrer.
+    const chansonXml = blocMusique ? etats[blocMusique.id] : null;
+    const musique = typeof chansonXml === "string" && chansonXml.includes("<block")
+      ? { config: blocMusique!.content, xml: chansonXml }
+      : null;
+
+    // Rien à montrer : ni plan composé, ni chanson écrite. On ne fabrique pas
+    // une page vide pour un parent — c'est aussi ce que dit la contrainte de
+    // la migration 041.
+    if (!plan.length && !musique && !programme) return null;
 
     const [{ data: eleve }, { data: avatar }] = await Promise.all([
       (admin.from("students") as any)
@@ -94,9 +119,10 @@ export async function enregistrerRealisation(
       lesson_id:   lessonId,
       first_name:  prenomSeul(eleve?.profiles?.display_name),
       avatar:      avatar ?? null,
-      plan:        plan as string[],
+      plan,
       program_xml: typeof programme === "string" ? programme : null,
       maze:        blocMaze?.content ?? null,
+      musique,
       updated_at:  new Date().toISOString(),
     };
 

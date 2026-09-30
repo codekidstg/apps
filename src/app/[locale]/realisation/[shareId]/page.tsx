@@ -21,7 +21,7 @@ export default async function RealisationPage({
   const supabase = await createClient();
 
   const { data } = await (supabase.from("lesson_shares") as any)
-    .select("first_name, avatar, plan, program_xml, maze, created_at")
+    .select("first_name, avatar, plan, program_xml, maze, musique, created_at")
     .eq("share_id", shareId)
     .maybeSingle();
 
