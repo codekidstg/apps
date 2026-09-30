@@ -37,6 +37,8 @@ type MusicConfig = {
   boucle_imbriquee?: boolean;
   /** Exige un bloc nommé, défini et appelé au moins ce nombre de fois. */
   bloc_nomme?: number;
+  /** Exige ce nombre de blocs nommés DIFFÉRENTS, chacun défini et appelé. */
+  blocs_distincts?: number;
   /** L'indice propre à ce défi quand le rythme est juste mais trop long. */
   indice_limite?: string;
 };
@@ -130,21 +132,35 @@ function aUneBoucleImbriquee(ws: any): boolean {
  * C'est le même garde-fou que pour la boucle imbriquée : le rythme juste ne
  * prouve pas la bonne structure.
  */
-function utiliseUnBlocNomme(ws: any, appelsMin = 2): boolean {
+function blocsNommesUtilises(ws: any): Map<string, number> {
   const blocs = ws.getAllBlocks(false);
   const definis = new Set<string>(
     blocs.filter((b: any) => b.type === "music_define")
       .filter((b: any) => b.getInput?.("DO")?.connection?.targetBlock())
       .map((b: any) => b.getFieldValue("NOM")),
   );
-  if (!definis.size) return false;
   const appels = new Map<string, number>();
   for (const b of blocs) {
     if (b.type !== "music_call") continue;
     const n = b.getFieldValue("NOM");
     if (definis.has(n)) appels.set(n, (appels.get(n) ?? 0) + 1);
   }
-  return [...appels.values()].some((n) => n >= appelsMin);
+  return appels;
+}
+
+function utiliseUnBlocNomme(ws: any, appelsMin = 2): boolean {
+  return [...blocsNommesUtilises(ws).values()].some((n) => n >= appelsMin);
+}
+
+/**
+ * Combien de blocs nommés DIFFÉRENTS sont vraiment utilisés ?
+ *
+ * La séance « Couplet et refrain » tient tout entière là-dessus : deux blocs
+ * qui se répondent. Un enfant qui n'en nomme qu'un et laisse l'autre en notes
+ * libres obtiendrait le même son, et passerait à côté.
+ */
+function combienDeBlocsNommes(ws: any): number {
+  return [...blocsNommesUtilises(ws).values()].filter((n) => n >= 1).length;
 }
 
 const ALL_MUSIC_BLOCKS = [
@@ -728,6 +744,13 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         setStatus("fail");
         setMsg(`${reussi} Mais ici on veut un bloc nommé : fabrique-le avec 🎼 Mon bloc, puis joue-le ${appelsVoulus} fois avec ▶ Jouer. 🎼`);
       };
+      const distinctsVoulus = config.blocs_distincts ?? 0;
+      const combienDistincts = distinctsVoulus > 0 ? combienDeBlocsNommes(ws) : 0;
+      const manqueDistincts = distinctsVoulus > 0 && combienDistincts < distinctsVoulus;
+      const refuserPourDistincts = (reussi: string) => {
+        setStatus("fail");
+        setMsg(`${reussi} Mais il faut ${distinctsVoulus} blocs nommés différents — tu n'en utilises que ${combienDistincts}. Donne aussi un nom à l'autre morceau ! 🎼`);
+      };
       const bravo = (texte: string) => {
         setStatus("success"); setMsg(texte);
         setShowConfetti(true);
@@ -748,6 +771,7 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         if (tropDeBlocs) { refuserPourBlocs(`🎵 Joli, ${sons} sons !`); return; }
         if (manqueImbrication) { refuserPourImbrication(`🎵 Joli, ${sons} sons !`); return; }
         if (manqueBlocNomme)   { refuserPourBlocNomme(`🎵 Joli, ${sons} sons !`); return; }
+        if (manqueDistincts)   { refuserPourDistincts(`🎵 Joli, ${sons} sons !`); return; }
         bravo("🎉 Superbe ! Tu es compositeur !");
         return;
       }
@@ -774,6 +798,7 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
         if (tropDeBlocs) { refuserPourBlocs(juste); return; }
         if (manqueImbrication) { refuserPourImbrication(juste); return; }
         if (manqueBlocNomme)   { refuserPourBlocNomme(juste); return; }
+        if (manqueDistincts)   { refuserPourDistincts(juste); return; }
         bravo(enTemps ? "🎉 Parfait ! Le rythme exact, temps par temps !" : "🎉 Parfait ! Mélodie reproduite à la note près !");
         return;
       }
@@ -781,6 +806,7 @@ export default function BlocklyMusic({ config, onSolved, savedXml, onXmlChange }
       if (tropDeBlocs) { refuserPourBlocs("🎵 Ça joue !"); return; }
       if (manqueImbrication) { refuserPourImbrication("🎵 Ça joue !"); return; }
       if (manqueBlocNomme)   { refuserPourBlocNomme("🎵 Ça joue !"); return; }
+      if (manqueDistincts)   { refuserPourDistincts("🎵 Ça joue !"); return; }
       bravo("🎉 Mélodie jouée !");
     })();
   }, [config, onSolved, tempo]);
