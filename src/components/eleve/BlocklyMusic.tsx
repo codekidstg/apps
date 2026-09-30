@@ -88,11 +88,12 @@ const PERCUS: Percu[] = ["Boum", "Tac", "Clap"];
 /**
  * Les noms qu'un enfant peut donner à son bloc — une liste fermée, pas un champ
  * de saisie. Un nom tapé se tape de deux façons, et l'appel ne retrouve plus sa
- * définition sans que rien ne le dise. Trois noms de musicien suffisent, et ils
- * racontent déjà la structure d'un morceau.
+ * définition sans que rien ne le dise. Quatre noms de musicien suffisent, et ils
+ * racontent déjà la structure d'un morceau. Le quatrième est arrivé avec le
+ * jalon : Frère Jacques a quatre phrases, chacune chantée deux fois.
  */
 const NOMS_BLOCS: [string, string][] = [
-  ["Refrain", "Refrain"], ["Couplet", "Couplet"], ["Intro", "Intro"],
+  ["Refrain", "Refrain"], ["Couplet", "Couplet"], ["Intro", "Intro"], ["Final", "Final"],
 ];
 const PERCU_EMOJI: Record<Percu, string> = { Boum: "🥁", Tac: "✋", Clap: "👏" };
 const PERCU_COLOR: Record<Percu, string> = { Boum: "#b45309", Tac: "#0d9488", Clap: "#db2777" };
