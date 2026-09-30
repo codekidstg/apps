@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import type { Attente } from "./attente-format";
 
 /**
  * Les leçons préparées par un enfant et pas encore validées par son mentor.
@@ -9,15 +10,7 @@ import { createAdminClient } from "@/lib/supabase/server";
  * personne ne le verrait — et c'est Roland qui recevrait l'appel du parent.
  */
 
-export type Attente = {
-  studentId: string;
-  eleve: string;
-  lessonId: string;
-  lecon: string;
-  depuis: string;        // ISO
-  jours: number;         // arrondi au jour entier, 0 = aujourd'hui
-  mentorId: string | null;
-};
+export type { Attente } from "./attente-format";
 
 /**
  * `mentorId` restreint aux élèves de ce mentor ; sans lui, toute la plateforme.
@@ -48,11 +41,4 @@ export async function leconsEnAttente(mentorId?: string): Promise<Attente[]> {
       : 0,
     mentorId:  r.students?.teacher_id ?? null,
   }));
-}
-
-/** « depuis 3 jours », « hier », « aujourd'hui » — dit à un mentor pressé. */
-export function depuisLisible(jours: number): string {
-  if (jours <= 0) return "aujourd'hui";
-  if (jours === 1) return "depuis hier";
-  return `depuis ${jours} jours`;
 }

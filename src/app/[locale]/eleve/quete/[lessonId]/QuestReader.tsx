@@ -289,9 +289,9 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
           <div>
             <div className="font-black text-lg" style={{ color: "#FDB813" }}>Tu as tout fait — bravo !</div>
             <div className="text-sm mt-1" style={{ color: "#cbd5e1" }}>
-              ⏳ <strong>{enAttente.xp} XP t&apos;attendent</strong>. Montre-le à ton mentor
-              {enAttente.jour ? <> <strong>{enAttente.jour}</strong></> : null} : c&apos;est lui qui
-              ouvre la suite.
+              ⏳ <strong>{enAttente.xp} XP t&apos;attendent</strong>. Ton mentor validera
+              {enAttente.jour ? <> <strong>{enAttente.jour}</strong></> : <> à votre prochaine séance</>} :
+              c&apos;est lui qui ouvre la suite.
             </div>
             <Link href="/eleve/salle-de-jeu" className="inline-block text-xs font-black mt-2 hover:underline"
               style={{ color: "#a78bfa" }}>
