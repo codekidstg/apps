@@ -44,8 +44,14 @@ export function verifier(EXOS, { interdits = [], paliers = [1, 1, 2, 2, 2, 3, 3]
   let ko = 0;
   const mauvais = (m) => { console.log(`⛔ ${m}`); ko++; };
 
-  if (EXOS.length !== paliers.length) mauvais(`${EXOS.length} exercices, ${paliers.length} paliers attendus`);
-  EXOS.forEach((e, i) => { if (e.palier !== paliers[i]) mauvais(`[${i}] ${e.title} : palier ${e.palier}, attendu ${paliers[i]}`); });
+  // `paliers: null` : ce lot n'est pas du Terrain (exercices de parcours). On
+  // vérifie alors qu'aucun ne porte de palier, plutôt que leur ordre.
+  if (paliers === null) {
+    EXOS.forEach((e) => { if (e.palier !== undefined) mauvais(`[${e.title}] porte un palier alors que ce n'est pas du Terrain`); });
+  } else {
+    if (EXOS.length !== paliers.length) mauvais(`${EXOS.length} exercices, ${paliers.length} paliers attendus`);
+    EXOS.forEach((e, i) => { if (e.palier !== paliers[i]) mauvais(`[${i}] ${e.title} : palier ${e.palier}, attendu ${paliers[i]}`); });
+  }
 
   for (const e of EXOS) {
     for (const b of e.blocs) {
@@ -111,6 +117,30 @@ export function verifier(EXOS, { interdits = [], paliers = [1, 1, 2, 2, 2, 3, 3]
         if (!Number.isInteger(c.bug_index) || !c.instructions?.[c.bug_index]) mauvais(`${e.title} / ${c.title} : bug_index hors des lignes`);
         else if (c.instructions[c.bug_index] === c.fix) mauvais(`${e.title} / ${c.title} : la réparation répète la ligne fautive`);
         if (!c.explanation) mauvais(`${e.title} / ${c.title} : sans explication`);
+      }
+
+      // Les défis musicaux. Le moteur juge sur ce qui est JOUÉ : une mélodie
+      // cible vide rend l'exercice impossible sans rien dire, et un bloc exigé
+      // qui n'est pas dans la boîte enferme l'enfant dans un refus perpétuel.
+      if (c.game_type === "music") {
+        const dispo = c.available_blocks ?? [];
+        if (!c.free_mode && !(c.target_notes ?? []).length)
+          mauvais(`${e.title} / ${c.title} : ni mélodie cible ni mode libre — rien à réussir`);
+        if (c.free_mode && !c.min_notes)
+          mauvais(`${e.title} / ${c.title} : composition libre sans nombre de sons minimum`);
+        if ((c.bloc_nomme || c.blocs_distincts) && !(dispo.includes("music_define") && dispo.includes("music_call")))
+          mauvais(`${e.title} / ${c.title} : un bloc nommé est exigé, mais music_define/music_call ne sont pas dans la boîte`);
+        if (c.blocs_distincts > 4)
+          mauvais(`${e.title} / ${c.title} : ${c.blocs_distincts} blocs nommés exigés, la liste n'en propose que 4`);
+        // Un son demandé mais absent de la boîte : l'enfant ne peut pas le poser.
+        const percus = ["Boum", "Tac", "Clap"];
+        const cible = c.target_notes ?? [];
+        if (cible.some((x) => percus.includes(x)) && !dispo.includes("music_drum"))
+          mauvais(`${e.title} / ${c.title} : la mélodie contient une percussion, mais le tambour n'est pas dans la boîte`);
+        if (cible.some((x) => !percus.includes(x) && x !== "silence") && !dispo.includes("music_play_note"))
+          mauvais(`${e.title} / ${c.title} : la mélodie contient des notes, mais le bloc note n'est pas dans la boîte`);
+        if (cible.includes("silence") && !dispo.includes("music_pause"))
+          mauvais(`${e.title} / ${c.title} : la mélodie contient un silence, mais le bloc silence n'est pas dans la boîte`);
       }
 
       if (c.game_type === "maze" || c.game_type === "python_maze") {
@@ -255,7 +285,9 @@ export function verifier(EXOS, { interdits = [], paliers = [1, 1, 2, 2, 2, 3, 3]
   // En mode banc, la sortie standard ne doit contenir que du JSON : les
   // félicitations passent par la sortie d'erreur.
   const dire = process.argv.includes("--banc") ? console.error : console.log;
-  dire(`✓ ${EXOS.length} exercices, paliers ${paliers.join("-")}`);
+  dire(paliers === null
+    ? `✓ ${EXOS.length} exercices de parcours`
+    : `✓ ${EXOS.length} exercices, paliers ${paliers.join("-")}`);
   dire("✓ vocabulaire, bacs, indices, paires, questions, plans et amorces : vérifiés");
 }
 
@@ -307,6 +339,69 @@ export async function appliquer(db, g, LECON, EXOS, { ecrire, refaire }) {
   ok(ap.map((e) => e.order_index).every((v, i) => v === DEPART + i), "numérotation contiguë");
   const restes = await g("trainings", "id", (q) => q.eq("lesson_id", L.id).eq("libre_service", false));
   ok(restes.length === parcours, `les ${parcours} exercices du parcours sont intacts`);
+  for (const e of ap) {
+    const tb = await g("training_blocks", "order_index,type,content", (q) => q.eq("training_id", e.id).order("order_index"));
+    ok(tb.length > 0 && tb.map((b) => b.order_index).every((v, i) => v === i) && tb.every((b) => b.content && Object.keys(b.content).length),
+       `${e.title} — ${tb.length} blocs contigus et remplis`);
+  }
+  console.log(pb === 0 ? "\n✅ TOUT EST BON" : `\n⛔ ${pb} PROBLÈME(S)`);
+  if (pb) process.exit(1);
+}
+
+/**
+ * Écrit les exercices de PARCOURS d'une séance — ceux qui paient en XP et que
+ * le mentor suit, par opposition au Terrain qui est en libre service.
+ *
+ * Même moule que `appliquer`, trois différences : ils portent une XP
+ * croissante, ils n'ont pas de palier, et ils se rangent avant le Terrain dans
+ * l'ordre d'affichage. Le Terrain de la séance n'est jamais touché.
+ */
+export async function appliquerParcours(db, g, LECON, EXOS, { ecrire, refaire }) {
+  const lecons = await g("lessons", "id,title", (q) => q.eq("title", LECON));
+  if (lecons.length !== 1) throw new Error(`${lecons.length} leçon(s) « ${LECON} »`);
+  const L = lecons[0];
+
+  const toutes = await g("trainings", "id,libre_service", (q) => q.eq("lesson_id", L.id));
+  const deja = toutes.filter((t) => !t.libre_service);
+  if (deja.length && !refaire) throw new Error(`${deja.length} exercice(s) de parcours existent déjà — --refaire pour les remplacer`);
+  if (deja.length) {
+    const joues = await g("training_progress", "id,training_id", (q) => q.in("training_id", deja.map((t) => t.id)));
+    if (joues.length) throw new Error(`${joues.length} progression(s) d'élève sur ce lot — --refaire refusé`);
+    if (ecrire) {
+      const { error } = await db.from("trainings").delete().in("id", deja.map((t) => t.id));
+      if (error) throw new Error(`suppression : ${error.message}`);
+      console.log(`  ⟲ ${deja.length} exercices remplacés (personne n'y avait joué)`);
+    }
+  }
+  const terrain = toutes.filter((t) => t.libre_service).length;
+
+  console.log(`\n${ecrire ? "ÉCRITURE" : "APERÇU (--ecrire pour appliquer)"} — ${EXOS.length} exercices de parcours`);
+  console.log(`Séance « ${L.title} » — ${terrain} exercices de Terrain conservés\n`);
+  EXOS.forEach((e) => console.log(`  ${String(e.xp).padStart(2)} XP  ${e.title.padEnd(34)} ${e.blocs.map((b) => b.content.game_type ?? b.type).join(", ")}`));
+  if (!ecrire) { console.log("\nRien n'a été écrit."); return; }
+
+  for (const [i, e] of EXOS.entries()) {
+    const { data, error } = await db.from("trainings").insert({
+      lesson_id: L.id, title: e.title, description: e.description,
+      xp_reward: e.xp, libre_service: false, order_index: i,
+    }).select("id").single();
+    if (error) throw new Error(`${e.title} : ${error.message}`);
+    const { error: eb } = await db.from("training_blocks").insert(
+      e.blocs.map((b, j) => ({ training_id: data.id, type: b.type, content: b.content, order_index: j })),
+    );
+    if (eb) throw new Error(`${e.title} (blocs) : ${eb.message}`);
+    console.log(`  ✓ ${e.xp} XP · ${e.title}`);
+  }
+
+  let pb = 0; const ok = (c, m) => { console.log(`  ${c ? "✓" : "⛔"} ${m}`); if (!c) pb++; };
+  console.log("\n── RELECTURE ──");
+  const ap = await g("trainings", "id,title,palier,xp_reward,order_index", (q) => q.eq("lesson_id", L.id).eq("libre_service", false).order("order_index"));
+  ok(ap.length === EXOS.length, `${EXOS.length} exercices de parcours (trouvé ${ap.length})`);
+  ok(ap.every((e) => e.xp_reward > 0), "chacun paie en XP");
+  ok(ap.every((e) => e.palier === null), "aucun ne porte de palier — ce n'est pas du Terrain");
+  ok(ap.map((e) => e.order_index).every((v, i) => v === i), "numérotation contiguë");
+  const restes = await g("trainings", "id", (q) => q.eq("lesson_id", L.id).eq("libre_service", true));
+  ok(restes.length === terrain, `les ${terrain} exercices du Terrain sont intacts`);
   for (const e of ap) {
     const tb = await g("training_blocks", "order_index,type,content", (q) => q.eq("training_id", e.id).order("order_index"));
     ok(tb.length > 0 && tb.map((b) => b.order_index).every((v, i) => v === i) && tb.every((b) => b.content && Object.keys(b.content).length),

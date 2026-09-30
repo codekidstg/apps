@@ -163,7 +163,7 @@ const BLOCS = [
       "   🥁 Boum, Boum, 👏 Clap",
       "▶ Jouer Refrain",
       "🎵 Do, Mi",
-      "▶ Jouer Refrain",
+      "▶ Jouer Refrain (une seconde fois)",
     ],
   }),
 
