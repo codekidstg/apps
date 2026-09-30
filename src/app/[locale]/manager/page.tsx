@@ -9,6 +9,7 @@ import { getSeancesAVenir } from "@/lib/planning/seances-a-venir";
 import { ListeSeances } from "@/components/backoffice/ProchainesSeances";
 import AlerteParents from "@/components/backoffice/AlerteParents";
 import AlerteSuiviMentors from "@/components/backoffice/AlerteSuiviMentors";
+import AlerteValidations from "@/components/backoffice/AlerteValidations";
 
 export default async function ManagerDashboard() {
   const supabase = await createClient();
@@ -56,6 +57,9 @@ export default async function ManagerDashboard() {
       <PageHeader title="Tableau de bord" subtitle="Vue d'ensemble de votre espace" />
       <div className="p-8 space-y-8">
 
+        {/* Un enfant qui a préparé sa leçon est bloqué tant que personne ne l'a
+            validée. Vous pouvez valider vous-même : le mentor n'est pas seul. */}
+        <AlerteValidations href="/manager/utilisateurs/eleves" />
         <AlerteBoiteDirection href="/manager/messages" />
         <AlerteParents espace="manager" />
         <AlerteSuiviMentors espace="manager" />

@@ -32,7 +32,11 @@ export async function salleDeJeuPour(studentId: string): Promise<SeanceSalle[]> 
 
   const themesOuverts = new Set((accessRows ?? []).map((r: any) => r.theme_id));
   const seancesFinies = new Set((lessonProgress ?? [])
-    .filter((lp: any) => lp.status === "completed").map((lp: any) => lp.lesson_id));
+    // Préparée ou validée : dans les deux cas l'enfant a parcouru la séance,
+    // et sa salle de jeu doit s'ouvrir — c'est même là qu'on l'envoie pendant
+    // qu'il attend son mentor.
+    .filter((lp: any) => lp.status === "completed" || lp.status === "prepared")
+    .map((lp: any) => lp.lesson_id));
   const progres = new Map((trainingProgress ?? []).map((tp: any) => [tp.training_id, tp]));
 
   const parSeance = new Map<string, SeanceSalle>();

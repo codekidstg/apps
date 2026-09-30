@@ -14,6 +14,7 @@ type PastSession = {
   time: string;
   duration: number;
   studentName: string | null;
+  lecons?: { id: string; titre: string; theme: string; rang: number; etat: string; suggeree: boolean }[];
   recurring: boolean;
 };
 
@@ -57,6 +58,7 @@ export default function PastSessionsList({ sessions }: { sessions: PastSession[]
           occurrenceDate={openReport.occurrenceDate}
           sessionTitle={openReport.title}
           sessionDate={`${openReport.dateStr} à ${openReport.time}`}
+          lecons={openReport.lecons}
           onClose={() => setOpenReport(null)}
         />
       )}

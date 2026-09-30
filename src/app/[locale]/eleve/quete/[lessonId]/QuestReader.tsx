@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState, useTransition, useEffect, useCallback, useRef } from "react";
 
 /* Mélange déterministe basé sur une clé stable (même principe que TrainingReader) */
@@ -93,6 +94,10 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
   const [quizAnswers, setQuizAnswers]       = useState<Record<string, number | null>>({});
   const [quizResults, setQuizResults]       = useState<Record<string, boolean | null>>({});
   const [solvedBlockly, setSolvedBlockly]   = useState<Record<string, boolean>>({});
+  // La leçon n'est plus « terminée » par l'enfant, elle est PRÉPARÉE : son
+  // mentor la valide en séance. On garde donc ce que la réponse rapporte —
+  // l'XP qui l'attend et le jour de sa prochaine séance — pour le lui dire.
+  const [enAttente, setEnAttente] = useState<{ xp: number; jour: string | null } | null>(null);
   const [completed, setCompleted]           = useState(alreadyCompleted);
   const [xpGained, setXpGained]            = useState<number | null>(null);
   const [isPending, startTransition]        = useTransition();
@@ -258,6 +263,7 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
     });
     startTransition(async () => {
       const res = await completeLesson(lessonId, perfect ? 100 : 70, perfect) as any;
+      if (res?.prepare) setEnAttente({ xp: res.xpEnAttente ?? 0, jour: res.prochaineSeance ?? null });
       if (res?.xpGained) setXpGained(res.xpGained);
       if (res?.newBadges?.length) {
         (res.newBadges as BadgeId[]).forEach((id) => {
@@ -273,7 +279,29 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
   return (
     <div className="max-w-4xl mx-auto">
       {/* Completed banner */}
-      {completed && xpGained != null && (
+      {/* Ce que l'enfant lit quand il a tout fait. Le ton décide de tout : une
+          attente qui a une date et une récompense annoncée se supporte ; un
+          « bloqué » se subit. Il a travaillé, on le lui dit d'abord. */}
+      {completed && enAttente && (
+        <div className="mb-8 rounded-2xl px-8 py-5 flex items-center gap-5"
+          style={{ background: "#FDB81315", border: "1.5px solid #FDB81340", boxShadow: "0 0 30px #FDB81310" }}>
+          <div className="text-4xl">🎯</div>
+          <div>
+            <div className="font-black text-lg" style={{ color: "#FDB813" }}>Tu as tout fait — bravo !</div>
+            <div className="text-sm mt-1" style={{ color: "#cbd5e1" }}>
+              ⏳ <strong>{enAttente.xp} XP t&apos;attendent</strong>. Montre-le à ton mentor
+              {enAttente.jour ? <> <strong>{enAttente.jour}</strong></> : null} : c&apos;est lui qui
+              ouvre la suite.
+            </div>
+            <Link href="/eleve/salle-de-jeu" className="inline-block text-xs font-black mt-2 hover:underline"
+              style={{ color: "#a78bfa" }}>
+              🏟️ En attendant, ta salle de jeu t&apos;attend →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {completed && !enAttente && xpGained != null && (
         <div className="mb-8 rounded-2xl px-8 py-5 flex items-center gap-5"
           style={{ background: "#10b98115", border: "1.5px solid #10b98140", boxShadow: "0 0 30px #10b98110" }}>
           <div className="text-4xl">🎉</div>
@@ -761,7 +789,9 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
                 : { background: "#1e293b", color: "#334155", border: "1px solid #1e293b" }
               }
             >
-              {isPending ? "Enregistrement…" : canFinish ? `✅ Terminer la quête  ·  +${xpReward} XP` : "Quête en cours…"}
+              {isPending ? "Enregistrement…"
+                : canFinish ? `✅ J'ai tout fait !  ·  ${xpReward} XP à débloquer avec ton mentor`
+                : "Quête en cours…"}
             </button>
           </div>
         )}

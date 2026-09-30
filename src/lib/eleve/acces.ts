@@ -149,8 +149,12 @@ export async function accesLecon(admin: any, studentId: string, lessonId: string
 
 /**
  * Un entraînement est la pratique qui vient après le cours : il s'ouvre quand
- * sa leçon est terminée. La page les listait dès la leçon *commencée*, et
- * Samuel a fini sept entraînements de leçons qu'il n'a jamais bouclées.
+ * l'enfant a parcouru sa leçon. La page les listait dès la leçon *commencée*,
+ * et Samuel a fini sept entraînements de leçons qu'il n'a jamais bouclées.
+ *
+ * « Parcourue » vaut `prepared` autant que `completed` : l'enfant qui a préparé
+ * sa leçon attend la validation de son mentor, parfois six jours. Lui fermer sa
+ * pratique pendant ce temps, ce serait punir sa vitesse — l'inverse du but.
  */
 export async function accesEntrainement(admin: any, studentId: string, trainingId: string): Promise<Verdict> {
   const { data, error } = await admin
@@ -170,7 +174,10 @@ export async function accesEntrainement(admin: any, studentId: string, trainingI
     .from("lesson_progress").select("status")
     .eq("student_id", studentId).eq("lesson_id", lessonId).maybeSingle();
   if (eProgres) console.error("[acces] lesson_progress :", eProgres.message);
-  return (progres as any)?.status === "completed" ? verdict : { ok: false, raison: "entrainement_verrouille" };
+  const etat = (progres as any)?.status;
+  return etat === "completed" || etat === "prepared"
+    ? verdict
+    : { ok: false, raison: "entrainement_verrouille" };
 }
 
 /**

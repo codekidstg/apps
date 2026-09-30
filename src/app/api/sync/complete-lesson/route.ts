@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { processGamificationEvent } from "@/lib/gamification/process-event";
 import { syncLimiter, checkRateLimit } from "@/lib/ratelimit";
 import { accesLecon, MESSAGE_REFUS } from "@/lib/eleve/acces";
 
@@ -36,28 +35,36 @@ export async function POST(req: NextRequest) {
 
   // Merge optimiste : on récupère le score existant et on garde le MAX
   const { data: existingRaw } = await (admin.from("lesson_progress") as any)
-    .select("score, status")
+    .select("score, status, prepare_sans_faute")
     .eq("student_id", student.id)
     .eq("lesson_id", lessonId)
     .maybeSingle();
-  const existing = existingRaw as { score: number; status: string } | null;
+  const existing = existingRaw as { score: number; status: string; prepare_sans_faute: boolean } | null;
 
   const mergedScore = existing ? Math.max(existing.score ?? 0, score) : score;
-  const alreadyCompleted = existing?.status === "completed";
+
+  // Cette file est la deuxième porte de l'enfant, et elle écrivait `completed`
+  // comme son bouton. L'oublier ici aurait suffi à contourner tout le
+  // dispositif : il suffisait de travailler hors ligne. Elle prépare, comme
+  // l'autre — seul le mentor valide (voir `validerLecon`).
+  if (existing?.status === "completed") {
+    return NextResponse.json({ ok: true, mergedScore, deja: true });
+  }
 
   await (admin.from("lesson_progress") as any).upsert({
     student_id:   student.id,
     lesson_id:    lessonId,
-    status:       "completed",
+    status:       "prepared",
     score:        mergedScore,
     attempts:     1,
-    completed_at: new Date().toISOString(),
+    prepared_at:  new Date().toISOString(),
+    prepare_sans_faute: (existing?.prepare_sans_faute ?? false) || perfect,
   }, { onConflict: "student_id,lesson_id" });
 
-  // Gamification uniquement si pas déjà complété (évite double XP)
-  if (!alreadyCompleted) {
-    await processGamificationEvent(student.id, "lesson_completed", { lessonId, score: mergedScore, perfect });
-  }
+  // Sa série ne doit pas casser pendant qu'il attend la validation.
+  await (admin.from("students") as any)
+    .update({ last_activity: new Date().toISOString().slice(0, 10) })
+    .eq("id", student.id);
 
   return NextResponse.json({ ok: true, mergedScore });
 }

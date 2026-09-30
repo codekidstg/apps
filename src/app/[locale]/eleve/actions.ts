@@ -3,9 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processGamificationEvent } from "@/lib/gamification/process-event";
-import { checkThemeCompletion, issueCertificate } from "@/lib/certificates/generate";
+import { XP_REWARDS } from "@/lib/gamification/levels";
 import { enregistrerRealisation } from "@/lib/realisations/enregistrer";
-import { prevenirParentsCertificat } from "@/lib/certificates/prevenir";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 import { accesLecon, accesEntrainement, MESSAGE_REFUS } from "@/lib/eleve/acces";
@@ -29,6 +28,23 @@ async function refusLecon(studentId: string, lessonId: string): Promise<string |
   return verdict.ok ? null : MESSAGE_REFUS[verdict.raison];
 }
 
+/**
+ * L'enfant a tout fait : la leçon est PRÉPARÉE, pas terminée.
+ *
+ * Elle l'était jusqu'au 30 septembre 2026, et c'est ce qui emballait la
+ * machine : finir ouvrait la suivante, que l'enfant finissait le soir même.
+ * Les quatre élèves actifs avaient 2 à 3 leçons d'avance sur leurs séances.
+ *
+ * Un enfant peut dire « j'ai tout fait ». Il ne peut pas dire « j'ai
+ * compris » — c'est le mentor qui l'atteste, en séance, et c'est sa validation
+ * qui verse la prime et ouvre la leçon suivante (voir `validerLecon`).
+ *
+ * Ce que la préparation garde quand même, pour ne pas punir l'enfant rapide :
+ *   · les 40 XP de chaque défi, déjà versés au moment où il l'a réussi ;
+ *   · sa réalisation partageable, qui est son travail à lui ;
+ *   · son activité du jour, pour que sa série ne casse pas pendant l'attente ;
+ *   · « sans faute », gagné maintenant et payé à la validation.
+ */
 export async function completeLesson(lessonId: string, score: number, perfect: boolean) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -40,64 +56,85 @@ export async function completeLesson(lessonId: string, score: number, perfect: b
   const refus = await refusLecon(studentId, lessonId);
   if (refus) return { error: refus };
 
-  // Upsert lesson progress
-  await (supabase.from("lesson_progress") as any).upsert({
-    student_id:   studentId,
-    lesson_id:    lessonId,
-    status:       "completed",
-    score,
-    attempts:     1,
-    completed_at: new Date().toISOString(),
-  }, { onConflict: "student_id,lesson_id" });
+  const admin = createAdminClient();
+  const { data: ligne } = await (admin.from("lesson_progress") as any)
+    .select("id, status, score, prepare_sans_faute")
+    .eq("student_id", studentId).eq("lesson_id", lessonId).maybeSingle();
 
-  // Process gamification
-  const result = await processGamificationEvent(studentId, "lesson_completed", { lessonId, score, perfect });
+  // Rejouer une leçon déjà validée ne la fait pas redescendre : le
+  // déverrouillage de la suivante dépend de son statut.
+  const dejaValidee = ligne?.status === "completed";
 
-  // Auto-certificat si thème 100% complété
-  try {
-    const admin = createAdminClient();
-    const { data: lesson } = await admin.from("lessons").select("chapter_id").eq("id", lessonId).single<{ chapter_id: string }>();
-    if (lesson) {
-      const { data: chapter } = await admin.from("chapters").select("theme_id").eq("id", lesson.chapter_id).single<{ theme_id: string }>();
-      if (chapter?.theme_id) {
-        const done = await checkThemeCompletion(studentId, chapter.theme_id);
-        if (done) {
-          // Vérifier que le certificat n'existe pas déjà
-          const { data: existing } = await (admin.from("certificates") as any)
-            .select("id").eq("student_id", studentId).eq("theme_id", chapter.theme_id).eq("cert_type", "theme").maybeSingle();
-          if (!existing) {
-            const emis = await issueCertificate({
-              studentId,
-              type:     "theme",
-              themeId:  chapter.theme_id,
-              score,
-              totalXp:  result.xpGained ?? 0,
-              validatedBy: user.id, // auto-validé par le système (prof devra confirmer)
-            });
+  if (!dejaValidee) {
+    await (supabase.from("lesson_progress") as any).upsert({
+      student_id:   studentId,
+      lesson_id:    lessonId,
+      status:       "prepared",
+      score:        Math.max(score, ligne?.score ?? 0),
+      attempts:     1,
+      prepared_at:  new Date().toISOString(),
+      // Une fois vrai, toujours vrai : il l'a bien réussie sans faute une fois.
+      prepare_sans_faute: (ligne?.prepare_sans_faute ?? false) || perfect,
+    }, { onConflict: "student_id,lesson_id" });
 
-            // Le certificat part déjà validé, donc téléchargeable aussitôt par
-            // le parent — mais rien ne le lui disait : la seule notification
-            // existante venait du bouton du professeur. Le moment le plus fort
-            // du parcours arrivait en silence.
-            if (emis && !("error" in emis)) {
-              const { data: theme } = await admin
-                .from("themes").select("title").eq("id", chapter.theme_id)
-                .single<{ title: string }>();
-              await prevenirParentsCertificat(studentId, theme?.title ?? null);
-            }
-          }
-        }
-      }
-    }
-  } catch (_) { /* non bloquant */ }
+    // La série se met à jour dans le moteur de gamification, que la préparation
+    // n'appelle plus. Sans cette ligne, un enfant qui prépare perdrait sa série.
+    await (admin.from("students") as any)
+      .update({ last_activity: new Date().toISOString().slice(0, 10) })
+      .eq("id", studentId);
+  }
 
   // Les leçons qui contiennent un plan produisent une réalisation partageable :
   // le plan écrit par l'enfant, son programme, et le dessin tracé. Rend `null`
-  // pour toutes les autres leçons, et n'empêche jamais de terminer la séance.
+  // pour toutes les autres leçons, et n'empêche jamais de finir la séance.
   const realisation = await enregistrerRealisation(studentId, lessonId);
 
+  // Le jour de la prochaine séance : une attente qui a une date se supporte,
+  // « quand ton mentor validera » ne se supporte pas.
+  const prochaineSeance = dejaValidee ? null : await jourProchaineSeance(admin, studentId);
+
   revalidatePath("/eleve");
-  return { success: true, ...result, realisation };
+  return {
+    success: true,
+    prepare: !dejaValidee,
+    xpEnAttente: dejaValidee ? 0 : XP_REWARDS.lesson_completed,
+    prochaineSeance,
+    realisation,
+  };
+}
+
+const JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+
+/**
+ * Le prochain jour de séance de cet élève, en toutes lettres. Ses séances sont
+ * hebdomadaires (`weekday`) ou datées (`scheduled_at`) : on rend la plus proche.
+ */
+async function jourProchaineSeance(admin: any, studentId: string): Promise<string | null> {
+  const { data } = await (admin.from("teacher_sessions") as any)
+    .select("weekday, scheduled_at, active_until")
+    .eq("student_id", studentId);
+
+  const aujourdhui = new Date();
+  let meilleur: number | null = null;
+  let libelle: string | null = null;
+
+  for (const s of (data ?? []) as any[]) {
+    if (s.active_until && new Date(s.active_until) < aujourdhui) continue;
+
+    if (typeof s.weekday === "number") {
+      // 0 = dimanche, comme getDay(). Le jour même compte pour la semaine
+      // suivante : quand l'enfant travaille le soir, la séance est passée.
+      const dans = ((s.weekday - aujourdhui.getDay()) + 7) % 7 || 7;
+      if (meilleur === null || dans < meilleur) { meilleur = dans; libelle = JOURS[s.weekday]; }
+    } else if (s.scheduled_at) {
+      const quand = new Date(s.scheduled_at);
+      const dans = Math.ceil((quand.getTime() - aujourdhui.getTime()) / 86_400_000);
+      if (dans >= 0 && (meilleur === null || dans < meilleur)) {
+        meilleur = dans; libelle = JOURS[quand.getDay()];
+      }
+    }
+  }
+  return libelle;
 }
 
 export async function solveBlockly(lessonId: string, blockId?: string) {
@@ -264,9 +301,13 @@ export async function syncBlockProgress(lessonId: string, blockProgress: Record<
       lesson_id:      lessonId,
       block_progress: blockProgress,
     };
-    // Relire une leçon déjà terminée ne doit pas la rétrograder : le déverrouillage
-    // des leçons suivantes dépend du statut "completed" de la précédente.
-    if (existing?.status !== "completed") payload.status = "in_progress";
+    // Relire ne doit rétrograder ni une leçon validée, ni une leçon préparée :
+    // le déverrouillage dépend du premier statut, et l'attente de validation du
+    // second. Sans ce garde, rouvrir sa leçon la veille de la séance effaçait
+    // le « j'ai tout fait » que le mentor devait voir.
+    if (existing?.status !== "completed" && existing?.status !== "prepared") {
+      payload.status = "in_progress";
+    }
 
     await (supabase.from("lesson_progress") as any)
       .upsert(payload, { onConflict: "student_id,lesson_id" });

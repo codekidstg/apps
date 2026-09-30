@@ -1,5 +1,6 @@
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import PastSessionsList from "./PlanningClient";
+import { leconsPourSeance } from "@/lib/rapports-lecons";
 
 const WEEKDAY_FULL  = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const WEEKDAY_SHORT = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
@@ -11,6 +12,7 @@ type Occurrence = {
   duration_min: number;
   notes: string | null;
   recurring: boolean;
+  studentId: string | null;
   studentName: string | null;
 };
 
@@ -39,6 +41,7 @@ function buildOccurrences(sessions: any[], from: Date, to: Date): Occurrence[] {
           duration_min: s.duration_min,
           notes: s.notes,
           recurring: true,
+          studentId: s.students?.id ?? null,
           studentName: s.students?.profiles?.display_name ?? null,
         });
       }
@@ -56,6 +59,7 @@ function buildOccurrences(sessions: any[], from: Date, to: Date): Occurrence[] {
         duration_min: s.duration_min,
         notes: s.notes,
         recurring: false,
+        studentId: s.students?.id ?? null,
         studentName: s.students?.profiles?.display_name ?? null,
       });
     }
@@ -105,6 +109,14 @@ export default async function ProfPlanningPage() {
 
   const nextSession = upcoming[0] ?? null;
   const nextSessionDateStr = nextSession?.at.toDateString();
+
+  // Les leçons de chaque élève dont une séance est passée : sans elles, le
+  // compte rendu écrit depuis le planning ne peut pas proposer la validation —
+  // et c'est elle qui ouvre la leçon suivante depuis le 30 septembre 2026.
+  const elevesPasses = [...new Set(past.map((o) => o.studentId).filter(Boolean) as string[])];
+  const leconsParEleve = new Map(
+    await Promise.all(elevesPasses.map(async (id) => [id, await leconsPourSeance(id)] as const)),
+  );
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -321,8 +333,12 @@ export default async function ProfPlanningPage() {
         dateStr:        occ.at.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
         time:           occ.at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
         duration:       occ.duration_min,
-        studentId:      undefined,
+        // Il valait `undefined` en dur : le compte rendu écrit depuis le
+        // planning ne pouvait donc pas valider la leçon, faute de savoir de
+        // quel enfant il parlait. L'identifiant était pourtant déjà chargé.
+        studentId:      occ.studentId ?? undefined,
         studentName:    occ.studentName,
+        lecons:         occ.studentId ? (leconsParEleve.get(occ.studentId) ?? []) : [],
         recurring:      occ.recurring,
       }))} />
     </div>

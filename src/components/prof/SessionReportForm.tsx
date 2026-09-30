@@ -78,11 +78,13 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
   const [lecon2Id, setLecon2Id] = useState("");
   const [deuxieme, setDeuxieme] = useState(false);
   const [leconFinie, setLeconFinie] = useState(false);
+  const [lecon2Finie, setLecon2Finie] = useState(false);
   const laLecon = lecons.find((l) => l.id === leconId) ?? null;
   // « On l'a terminée ensemble » : l'écran de fin le propose, il ne le fait
   // jamais tout seul (voir migration 038).
-  const [aProposer, setAProposer] = useState(false);
-  const [valide, setValide] = useState<"non" | "en_cours" | "fait">("non");
+  const [aValider, setAValider] = useState<string[]>([]);
+  const [valides, setValides] = useState<string[]>([]);
+  const [enCoursId, setEnCoursId] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -121,6 +123,7 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
       data.set("lesson_id", leconId);
       data.set("lesson_2_id", deuxieme ? lecon2Id : "");
       data.set("lecon_finie", leconFinie ? "1" : "0");
+      data.set("lecon_2_finie", deuxieme && lecon2Id && lecon2Finie ? "1" : "0");
       data.delete("help_methods");
       helpMethods.forEach(v => data.append("help_methods", v));
     }
@@ -129,7 +132,7 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
       const result = await submitSessionReport(data);
       if (result?.error) setError(result.error);
       else {
-        setAProposer(Boolean(result?.aProposer) && !!studentId);
+        setAValider(studentId ? ((result?.aValider as string[]) ?? []) : []);
         setSuccess(true);
       }
     });
@@ -147,38 +150,46 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
             {tenue === false ? "Elle ne compte plus comme un compte rendu à faire." : "Merci pour ce retour pédagogique."}
           </p>
 
-          {aProposer && laLecon && valide !== "fait" && (
-            <div className="rounded-2xl p-4 mb-4 text-left" style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}>
-              <p className="text-sm font-bold" style={{ color: "#1B2D5E" }}>
-                Vous avez terminé « {laLecon.titre} » ensemble.
-              </p>
-              <p className="text-xs mt-1" style={{ color: "#92400E" }}>
-                La marquer comme faite pour l&apos;élève ? Il gagnera ses points et la leçon suivante s&apos;ouvrira.
-              </p>
-              <div className="flex gap-2 mt-3">
-                <button type="button" disabled={valide === "en_cours"}
-                  onClick={() => {
-                    setValide("en_cours");
-                    startTransition(async () => {
-                      const r = await marquerLeconTerminee(laLecon.id, studentId!, occurrenceDate);
-                      setValide(r?.error ? "non" : "fait");
-                      if (r?.error) setError(r.error);
-                    });
-                  }}
-                  className="flex-1 py-2.5 rounded-2xl font-black text-sm text-white disabled:opacity-50"
-                  style={{ background: "#1B2D5E" }}>
-                  {valide === "en_cours" ? "Un instant…" : "Oui, la marquer faite"}
-                </button>
-                <button type="button" onClick={() => setAProposer(false)}
-                  className="px-4 py-2.5 rounded-2xl font-bold text-sm" style={{ color: "#94A3B8" }}>
-                  Non
-                </button>
+          {/* La validation n'est plus une gentillesse : sans elle, l'enfant
+              ne peut pas continuer. L'écran doit le dire — un mentor qui clique
+              « Non » doit savoir ce qu'il décide. */}
+          {aValider.filter((id) => !valides.includes(id)).map((id) => {
+            const lec = lecons.find((l) => l.id === id);
+            if (!lec) return null;
+            return (
+              <div key={id} className="rounded-2xl p-4 mb-3 text-left" style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}>
+                <p className="text-sm font-bold" style={{ color: "#1B2D5E" }}>
+                  Vous avez terminé « {lec.titre} » ensemble.
+                </p>
+                <p className="text-xs mt-1" style={{ color: "#92400E" }}>
+                  Sans cette validation, <strong>votre élève ne pourra pas continuer</strong> avant votre
+                  prochaine séance. Elle lui verse ses points et ouvre la leçon suivante.
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <button type="button" disabled={enCoursId !== null}
+                    onClick={() => {
+                      setEnCoursId(id);
+                      startTransition(async () => {
+                        const r = await marquerLeconTerminee(id, studentId!, occurrenceDate);
+                        if (r?.error) setError(r.error); else setValides((v) => [...v, id]);
+                        setEnCoursId(null);
+                      });
+                    }}
+                    className="flex-1 py-2.5 rounded-2xl font-black text-sm text-white disabled:opacity-50"
+                    style={{ background: "#1B2D5E" }}>
+                    {enCoursId === id ? "Un instant…" : "Oui, la valider"}
+                  </button>
+                  <button type="button" onClick={() => setAValider((v) => v.filter((x) => x !== id))}
+                    className="px-4 py-2.5 rounded-2xl font-bold text-sm text-left leading-tight" style={{ color: "#94A3B8" }}>
+                    Pas encore —<br />on la reprend
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-          {valide === "fait" && (
+            );
+          })}
+          {valides.length > 0 && (
             <p className="text-sm font-bold mb-4" style={{ color: "#059669" }}>
-              ✅ Leçon marquée faite — ses points sont versés.
+              ✅ {valides.length === 1 ? "Leçon validée" : `${valides.length} leçons validées`} — ses points sont versés.
             </p>
           )}
           <button onClick={onClose} className="w-full py-3 rounded-2xl font-black text-white text-sm" style={{ background: "#1B2D5E" }}>
@@ -280,7 +291,7 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
                   <option value="">Pas de leçon — on a repris les bases, ou autre chose</option>
                   {lecons.map((l) => (
                     <option key={l.id} value={l.id}>
-                      {l.rang}. {l.titre}{l.etat === "terminee" ? " (déjà terminée)" : ""}
+                      {l.rang}. {l.titre}{l.etat === "terminee" ? " (déjà validée)" : l.etat === "preparee" ? " — il l'a préparée ✋" : ""}
                     </option>
                   ))}
                 </select>
@@ -297,14 +308,30 @@ export default function SessionReportForm({ sessionId, studentId, sessionTitle, 
                     </label>
 
                     {deuxieme ? (
-                      <select name="lesson_2_id" value={lecon2Id} onChange={(e) => setLecon2Id(e.target.value)}
-                        className="w-full mt-2 rounded-2xl border text-sm p-3 outline-none focus:border-yellow-400"
-                        style={{ borderColor: "#E2E8F0", color: "#1B2D5E" }}>
-                        <option value="">Et une deuxième leçon…</option>
-                        {lecons.filter((l) => l.id !== leconId).map((l) => (
-                          <option key={l.id} value={l.id}>{l.rang}. {l.titre}</option>
-                        ))}
-                      </select>
+                      <>
+                        <select name="lesson_2_id" value={lecon2Id} onChange={(e) => setLecon2Id(e.target.value)}
+                          className="w-full mt-2 rounded-2xl border text-sm p-3 outline-none focus:border-yellow-400"
+                          style={{ borderColor: "#E2E8F0", color: "#1B2D5E" }}>
+                          <option value="">Et une deuxième leçon…</option>
+                          {lecons.filter((l) => l.id !== leconId).map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.rang}. {l.titre}{l.etat === "preparee" ? " — il l'a préparée ✋" : ""}
+                            </option>
+                          ))}
+                        </select>
+                        {/* Deux leçons en une séance : autorisé quand tout est
+                            juste, jamais suggéré. L'idéal reste une par séance. */}
+                        {lecon2Id && (
+                          <label className={`${CHOIX} mt-2 ${lecon2Finie ? CHOISI : NON_CHOISI}`}>
+                            <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border-2 ${lecon2Finie ? "border-yellow-400 bg-yellow-400" : "border-gray-300"}`}>
+                              {lecon2Finie && <span className="text-white text-[10px]">✓</span>}
+                            </div>
+                            <input type="checkbox" name="lecon_2_finie" value="1" checked={lecon2Finie}
+                              onChange={() => setLecon2Finie((v) => !v)} className="sr-only" />
+                            <span className="text-sm font-bold" style={{ color: "#1B2D5E" }}>Celle-là aussi, on l&apos;a terminée</span>
+                          </label>
+                        )}
+                      </>
                     ) : (
                       <button type="button" onClick={() => setDeuxieme(true)}
                         className="text-xs font-bold mt-2 underline" style={{ color: "#94A3B8" }}>

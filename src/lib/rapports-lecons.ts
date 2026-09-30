@@ -20,7 +20,7 @@ export type LeconProposee = {
   theme: string;
   /** Rang dans le parcours du thème, pour que « #4 » situe la leçon. */
   rang: number;
-  etat: "terminee" | "en_cours" | "a_faire";
+  etat: "terminee" | "preparee" | "en_cours" | "a_faire";
   /** La proposition par défaut : là où l'enfant en est. */
   suggeree: boolean;
 };
@@ -78,7 +78,9 @@ export async function leconsPourSeance(studentId: string | null | undefined): Pr
     .filter((l) => l.theme)
     .sort((a, b) => compare(a.cle, b.cle));
 
-  // Là où il en est : la première leçon non terminée de son parcours.
+  // Là où il en est : la première leçon non validée de son parcours. Une leçon
+  // que l'enfant a PRÉPARÉE est justement celle qu'il attend de montrer — c'est
+  // donc elle que le compte rendu propose, et pas celle d'après.
   const indexSuggere = Math.max(0, ordonnees.findIndex((l) => etatDe.get(l.id) !== "completed"));
 
   return ordonnees.map((l, i) => ({
@@ -86,7 +88,9 @@ export async function leconsPourSeance(studentId: string | null | undefined): Pr
     titre: l.title,
     theme: l.theme.title,
     rang: i + 1,
-    etat: etatDe.get(l.id) === "completed" ? "terminee" : etatDe.has(l.id) ? "en_cours" : "a_faire",
+    etat: etatDe.get(l.id) === "completed" ? "terminee"
+        : etatDe.get(l.id) === "prepared"  ? "preparee"
+        : etatDe.has(l.id) ? "en_cours" : "a_faire",
     suggeree: i === indexSuggere,
   }));
 }

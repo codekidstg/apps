@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { jourTogo, minuit, jourSemaine, libelleEcart, semaineDe } from "@/lib/planning/dates";
 import { compterQuestionsMentor } from "@/lib/questions/donnees";
+import AlerteValidations from "@/components/backoffice/AlerteValidations";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function buildNextSession(sessions: any[]): { title: string; at: Date; studentName: string | null } | null {
@@ -171,6 +172,10 @@ export default async function ProfDashboard() {
         <h1 className="text-xl font-black" style={{ color: "#1B2D5E" }}>Tableau de bord</h1>
         <p className="text-xs font-bold mt-0.5" style={{ color: "#94A3B8" }}>Vue d'ensemble de votre activité pédagogique</p>
       </div>
+
+      {/* Un enfant qui a préparé sa leçon est bloqué tant que son mentor ne l'a
+          pas validée : ça passe avant les compteurs. */}
+      <AlerteValidations mentorId={user.id} href="/prof/rapports" />
 
       {/* KPIs — 3 colonnes */}
       <div className="grid grid-cols-3 gap-3">

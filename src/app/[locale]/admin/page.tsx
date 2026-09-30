@@ -4,6 +4,7 @@ import AlerteBoiteDirection from "@/components/backoffice/AlerteBoiteDirection";
 import ProchainesSeances from "@/components/backoffice/ProchainesSeances";
 import AlerteParents from "@/components/backoffice/AlerteParents";
 import AlerteSuiviMentors from "@/components/backoffice/AlerteSuiviMentors";
+import AlerteValidations from "@/components/backoffice/AlerteValidations";
 
 async function getStats() {
   const supabase = await createClient();
@@ -51,6 +52,9 @@ export default async function AdminDashboard() {
       <PageHeader title="Tableau de bord" subtitle="Vue d'ensemble de la plateforme" />
       <div className="p-8 space-y-8">
 
+        {/* Un enfant qui a préparé sa leçon est bloqué tant que personne ne l'a
+            validée. Vous pouvez valider vous-même : le mentor n'est pas seul. */}
+        <AlerteValidations href="/admin/utilisateurs/eleves" />
         <AlerteBoiteDirection href="/admin/messages" />
         <AlerteParents espace="admin" />
         <AlerteSuiviMentors espace="admin" />

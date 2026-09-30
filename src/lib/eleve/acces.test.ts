@@ -53,6 +53,7 @@ const base = (progres: { lesson_id: string; status: string }[]) => fausseBase({
 
 const fini = (id: string) => ({ lesson_id: id, status: "completed" });
 const enCours = (id: string) => ({ lesson_id: id, status: "in_progress" });
+const preparee = (id: string) => ({ lesson_id: id, status: "prepared" });
 
 describe("l'ordre du programme, appliqué côté serveur", () => {
   it("la première leçon du thème est toujours ouverte", async () => {
@@ -63,6 +64,22 @@ describe("l'ordre du programme, appliqué côté serveur", () => {
     expect(await accesLecon(base([fini("l1")]), ELEVE, "l2")).toEqual({ ok: true, themeId: THEME });
     // L'ordre traverse les chapitres : l3 vient après l2.
     expect(await accesLecon(base([fini("l1"), fini("l2")]), ELEVE, "l3")).toEqual({ ok: true, themeId: THEME });
+  });
+
+  // Le verrou du 30 septembre 2026 : l'enfant PRÉPARE, le mentor VALIDE. Une
+  // leçon préparée n'ouvre donc rien — et c'est de là que vient le plafond
+  // d'une seule leçon d'avance, sans qu'aucune règle ne l'écrive.
+  it("une leçon seulement préparée n'ouvre pas la suivante", async () => {
+    expect(await accesLecon(base([preparee("l1")]), ELEVE, "l2"))
+      .toEqual({ ok: false, raison: "lecon_verrouillee" });
+  });
+
+  it("l'avance ne peut jamais dépasser une leçon", async () => {
+    // l1 validée en séance, l2 préparée le soir même : l3 reste fermée.
+    expect(await accesLecon(base([fini("l1"), preparee("l2")]), ELEVE, "l2"))
+      .toEqual({ ok: true, themeId: THEME });
+    expect(await accesLecon(base([fini("l1"), preparee("l2")]), ELEVE, "l3"))
+      .toEqual({ ok: false, raison: "lecon_verrouillee" });
   });
 
   it("elle reste fermée tant que la précédente n'est pas finie", async () => {
@@ -85,6 +102,13 @@ describe("l'ordre du programme, appliqué côté serveur", () => {
 describe("l'entraînement vient après le cours", () => {
   it("il s'ouvre quand sa leçon est terminée", async () => {
     expect(await accesEntrainement(base([fini("l1"), fini("l2"), fini("l3")]), ELEVE, "t3"))
+      .toEqual({ ok: true, themeId: THEME });
+  });
+
+  // L'enfant qui a préparé sa leçon attend son mentor, parfois six jours. Lui
+  // fermer sa pratique pendant ce temps reviendrait à punir sa vitesse.
+  it("une leçon préparée ouvre sa pratique, même sans validation", async () => {
+    expect(await accesEntrainement(base([fini("l1"), fini("l2"), preparee("l3")]), ELEVE, "t3"))
       .toEqual({ ok: true, themeId: THEME });
   });
 

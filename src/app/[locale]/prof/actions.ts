@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { processGamificationEvent } from "@/lib/gamification/process-event";
+import { validerLecon } from "@/lib/lecons/valider";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { NON_TENUE } from "@/lib/rapports";
@@ -42,6 +42,10 @@ export async function submitSessionReport(formData: FormData) {
   const lesson_id   = (formData.get("lesson_id") as string | null) || null;
   const lesson_2_id = (formData.get("lesson_2_id") as string | null) || null;
   const lecon_finie = formData.get("lecon_finie") === "1";
+  // La seconde leçon n'a pas sa colonne dans `session_reports` : elle pilote la
+  // proposition de validation, et la vérité vit dans `lesson_progress`, qui est
+  // le seul endroit qui commande le déverrouillage.
+  const lecon_2_finie = formData.get("lecon_2_finie") === "1";
 
   // Une séance qui n'a pas eu lieu se déclare aussi : elle ne laisse ni
   // avancement ni engagement, seulement sa raison.
@@ -86,7 +90,14 @@ export async function submitSessionReport(formData: FormData) {
   // Le mentor dit qu'ils l'ont terminée ensemble : l'écran le lui proposera,
   // il ne se décide pas ici. L'enfant valide ce qu'il a fait, le mentor dit ce
   // qui a été travaillé — deux vérités différentes (voir migration 038).
-  return { success: true, aProposer: tenue && lecon_finie && lesson_id ? lesson_id : null };
+  // Les leçons à proposer à la validation, dans l'ordre. Deux, c'est permis
+  // quand tout était juste ; ce n'est jamais suggéré.
+  const aValider = [
+    tenue && lecon_finie   && lesson_id   ? lesson_id   : null,
+    tenue && lecon_2_finie && lesson_2_id && lesson_2_id !== lesson_id ? lesson_2_id : null,
+  ].filter(Boolean) as string[];
+
+  return { success: true, aProposer: aValider[0] ?? null, aValider };
 }
 
 export async function upsertGrade(formData: FormData) {
@@ -127,13 +138,23 @@ export async function upsertGrade(formData: FormData) {
  * L'XP passe par le moteur du jeu, qui tient le compte de ce qui a déjà été
  * payé : refaire la leçon ensuite ne la paiera pas une seconde fois.
  */
+/**
+ * Le mentor valide la leçon travaillée en séance.
+ *
+ * C'est la SEULE porte qui écrit `completed` depuis le 30 septembre 2026 :
+ * l'enfant, lui, ne fait plus que préparer. Cette validation verse la prime de
+ * fin de leçon et ouvre la leçon suivante.
+ *
+ * La direction peut valider aussi — un mentor qui oublie de cocher bloquerait
+ * sinon son élève jusqu'à la semaine suivante, et c'est Roland qui reçoit
+ * l'appel.
+ */
 export async function marquerLeconTerminee(lessonId: string, studentId: string, leJour?: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Non authentifié" };
 
   const admin = createAdminClient();
-  // Le mentor de cet élève, ou la direction.
   const [{ data: profil }, { data: eleve }] = await Promise.all([
     supabase.from("profiles").select("role").eq("id", user.id).single<{ role: string }>(),
     (admin.from("students") as any).select("id, teacher_id").eq("id", studentId).maybeSingle(),
@@ -141,19 +162,12 @@ export async function marquerLeconTerminee(lessonId: string, studentId: string, 
   const autorise = profil?.role === "admin" || profil?.role === "manager" || eleve?.teacher_id === user.id;
   if (!eleve || !autorise) return { error: "Seul le mentor de cet élève peut valider sa leçon." };
 
-  const { data: ligne } = await (admin.from("lesson_progress") as any)
-    .select("id, status").eq("student_id", studentId).eq("lesson_id", lessonId).maybeSingle();
-  if (ligne?.status === "completed") return { success: true, deja: true };
+  const r = await validerLecon(studentId, lessonId, user.id, leJour);
+  if ("error" in r) return { error: r.error };
 
-  // Terminée le jour de la séance, pas aujourd'hui : l'historique doit dire
-  // quand le travail a été fait.
-  const quand = leJour ? new Date(`${leJour}T12:00:00Z`).toISOString() : new Date().toISOString();
-  const { error } = ligne
-    ? await (admin.from("lesson_progress") as any).update({ status: "completed", completed_at: quand }).eq("id", ligne.id)
-    : await (admin.from("lesson_progress") as any).insert({ student_id: studentId, lesson_id: lessonId, status: "completed", completed_at: quand });
-  if (error) return { error: error.message };
-
-  const { xpGained } = await processGamificationEvent(studentId, "lesson_completed", { lessonId, enSeance: true });
   revalidatePath("/prof/rapports");
-  return { success: true, xp: xpGained };
+  revalidatePath("/eleve");
+  return { success: true, xp: r.xp, deja: r.deja };
 }
+
+

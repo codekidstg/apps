@@ -102,6 +102,9 @@ export default async function EleveDashboard({
     )
   );
   const nextLesson = lessonsDuProgramme.find((l) => progressMap.get(l.id) !== "completed");
+  // Préparée : il a tout fait et attend son mentor. La carte ne doit plus lui
+  // promettre des XP « maintenant » — elle lui dit où il en est.
+  const prochaineEnAttente = nextLesson ? progressMap.get(nextLesson.id) === "prepared" : false;
 
   // Entraînements disponibles (leçon commencée) et non encore faits
   const startedLessonIds = new Set(progress.map((p: any) => p.lesson_id));
@@ -239,10 +242,14 @@ export default async function EleveDashboard({
           }}
         >
           <div className="absolute top-0 right-0 w-32 h-32 opacity-10 text-8xl flex items-center justify-center select-none">⚔️</div>
-          <div className="text-xs font-mono font-black uppercase tracking-widest mb-2" style={{ color: "#FDB813" }}>◈ Prochaine quête</div>
+          <div className="text-xs font-mono font-black uppercase tracking-widest mb-2" style={{ color: "#FDB813" }}>
+            {prochaineEnAttente ? "◈ Tu as tout fait" : "◈ Prochaine quête"}
+          </div>
           <div className="text-xl font-black text-white">{nextLesson.title}</div>
           <div className="text-sm mt-2 font-bold" style={{ color: "#FDB813" }}>
-            +{nextLesson.xp_reward} XP → Commencer maintenant
+            {prochaineEnAttente
+              ? `⏳ ${nextLesson.xp_reward} XP t'attendent — ton mentor validera en séance`
+              : `+${nextLesson.xp_reward} XP → Commencer maintenant`}
           </div>
         </Link>
       )}
@@ -302,15 +309,20 @@ export default async function EleveDashboard({
                     {!locked && (
                       <div className="flex flex-wrap gap-1.5">
                         {tl.slice(0, 4).map((l) => {
-                          const isDone = progressMap.get(l.id) === "completed";
+                          const etat = progressMap.get(l.id);
+                          const isDone = etat === "completed";
+                          // Préparée : le sablier dit qu'il a fait sa part et
+                          // que la suite ne dépend plus de lui.
+                          const enAttente = etat === "prepared";
+                          const teinte = isDone ? "#10b981" : enAttente ? "#FDB813" : null;
                           return (
                             <span key={l.id} className="text-xs font-bold px-2 py-0.5 rounded-lg"
                               style={{
-                                background: isDone ? "#10b98120" : "#0f172a",
-                                color: isDone ? "#10b981" : "#475569",
-                                border: isDone ? "1px solid #10b98140" : "1px solid #1e293b",
+                                background: teinte ? `${teinte}20` : "#0f172a",
+                                color: teinte ?? "#475569",
+                                border: `1px solid ${teinte ? `${teinte}40` : "#1e293b"}`,
                               }}>
-                              {isDone ? "✓" : ""} {l.title.length > 10 ? l.title.slice(0, 10) + "…" : l.title}
+                              {isDone ? "✓" : enAttente ? "⏳" : ""} {l.title.length > 10 ? l.title.slice(0, 10) + "…" : l.title}
                             </span>
                           );
                         })}
