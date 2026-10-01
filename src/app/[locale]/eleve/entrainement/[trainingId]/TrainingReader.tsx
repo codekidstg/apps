@@ -14,6 +14,7 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
 }
 import dynamic from "next/dynamic";
 import { completeTraining, ouvrirTraining } from "../../actions";
+import { avecRepli } from "@/lib/offlineQueue";
 import { Fragment } from "react";
 import JeBloqueIci from "@/components/eleve/JeBloqueIci";
 // Le chargeur est déjà client seul, et affiche « Chargement du studio musical… ».
@@ -131,7 +132,11 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
   // L'ouverture laisse une trace, pour que « commencé, jamais fini » existe
   // quelque part. Jamais en aperçu : un admin qui regarde n'a rien commencé.
   useEffect(() => {
-    if (!readOnly) void ouvrirTraining(trainingId);
+    // `void` n'attrape rien : hors ligne, cet appel faisait mourir la page à
+    // l'OUVERTURE de l'exercice, avant que l'enfant ait touché à quoi que ce
+    // soit. Et une ouverture non enregistrée ne vaut pas la peine d'être
+    // rejouée plus tard — on l'oublie simplement.
+    if (!readOnly) ouvrirTraining(trainingId).catch(() => {});
   }, [trainingId, readOnly]);
 
   useEffect(() => {
@@ -278,10 +283,11 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
     const score = computeScore();
     setFinalScore(score);
     startTransition(async () => {
-      const res = await completeTraining(trainingId, score, {
-        secondes: secondesPassees(),
-        sansIndice: !indiceVu.current,
-      }) as any;
+      const mesure = { secondes: secondesPassees(), sansIndice: !indiceVu.current };
+      const res = await avecRepli(
+        () => completeTraining(trainingId, score, mesure),
+        { type: "completeTraining", trainingId, score, ...mesure },
+      ) as any;
       if (res?.xpGained) setXpGained(res.xpGained);
       setCompleted(true);
     });

@@ -47,11 +47,22 @@ export function useOfflineSync() {
               perfect: action.perfect,
             }),
           });
-        } else {
+        } else if (action.type === "solveBlockly") {
           res = await fetch("/api/sync/solve-blockly", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ lessonId: action.lessonId, blockId: action.blockId }),
+          });
+        } else {
+          res = await fetch("/api/sync/complete-training", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              trainingId: action.trainingId,
+              score:      action.score,
+              secondes:   action.secondes,
+              sansIndice: action.sansIndice,
+            }),
           });
         }
         if (res.ok) { await deleteAction(action.id); synced++; }

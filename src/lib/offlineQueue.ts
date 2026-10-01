@@ -9,7 +9,33 @@ export type OfflineAction =
   | { type: "completeLesson"; lessonId: string; score: number; perfect: boolean }
   // `blockId` identifie le defi resolu : c'est la cle d'idempotence cote
   // serveur, un meme defi ne se paie qu'une fois.
-  | { type: "solveBlockly"; lessonId: string; blockId?: string };
+  | { type: "solveBlockly"; lessonId: string; blockId?: string }
+  // Un exercice fini hors ligne : score, temps passe et « sans indice »
+  // voyagent avec, sinon la mesure serait perdue au retour du reseau.
+  | { type: "completeTraining"; trainingId: string; score: number; secondes?: number; sansIndice?: boolean };
+
+/**
+ * Appelle le serveur, et met l'action de cote s'il est injoignable.
+ *
+ * C'etait LE trou : les actions serveur etaient appelees sans filet. Hors
+ * ligne, la promesse echouait, personne ne l'attrapait, et l'erreur remontait
+ * jusqu'a la frontiere par defaut de Next.js — qui remplace la page entiere.
+ * Un enfant qui cliquait sur un jeu sans reseau voyait son ecran disparaitre.
+ *
+ * Rend `null` quand l'appel n'a pas abouti : l'appelant continue son chemin
+ * sans XP ni badge, et la file rejouera l'action au retour de la connexion.
+ */
+export async function avecRepli<T>(
+  appel: () => Promise<T>,
+  repli: OfflineAction,
+): Promise<T | null> {
+  try {
+    return await appel();
+  } catch {
+    try { await enqueueAction(repli); } catch { /* IndexedDB ferme : tant pis */ }
+    return null;
+  }
+}
 
 let db: IDBDatabase | null = null;
 

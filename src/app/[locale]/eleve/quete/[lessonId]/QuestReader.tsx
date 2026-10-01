@@ -14,6 +14,7 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
   return result;
 }
 import { completeLesson, solveBlockly, syncBlockProgress } from "../../actions";
+import { avecRepli } from "@/lib/offlineQueue";
 import { Fragment } from "react";
 import JeBloqueIci from "@/components/eleve/JeBloqueIci";
 import { indiceDuBloc } from "@/lib/questions/raisons";
@@ -243,7 +244,13 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
     markGameDone(blockId);
     if (readOnly) return;
     startTransition(async () => {
-      const res = await solveBlockly(lessonId, blockId) as any;
+      // Hors ligne, cet appel échouait sans que personne ne l'attrape, et
+      // l'erreur remontait jusqu'à la frontière par défaut de Next.js : l'écran
+      // de l'enfant disparaissait au moment précis où il venait de réussir.
+      const res = await avecRepli(
+        () => solveBlockly(lessonId, blockId),
+        { type: "solveBlockly", lessonId, blockId },
+      ) as any;
       if (res?.newBadges?.length) {
         (res.newBadges as BadgeId[]).forEach((id) => {
           const b = BADGES[id];
@@ -262,7 +269,10 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
       return Array.from({ length: count }, (_, qi) => `${b.id}-${qi}`).every((k) => quizResults[k] === true);
     });
     startTransition(async () => {
-      const res = await completeLesson(lessonId, perfect ? 100 : 70, perfect) as any;
+      const res = await avecRepli(
+        () => completeLesson(lessonId, perfect ? 100 : 70, perfect),
+        { type: "completeLesson", lessonId, score: perfect ? 100 : 70, perfect },
+      ) as any;
       if (res?.prepare) setEnAttente({ xp: res.xpEnAttente ?? 0, jour: res.prochaineSeance ?? null });
       if (res?.xpGained) setXpGained(res.xpGained);
       if (res?.newBadges?.length) {
