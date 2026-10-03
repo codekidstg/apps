@@ -49,6 +49,18 @@ export default function AtelierLibre({ codeInitial, amorces, modifieLe }: {
   const [etat, setEtat] = useState<"repos" | "en_cours" | "garde" | "echec">("repos");
   const [appareil, setAppareil] = useState<Appareil>("telephone");
   const [theme, setTheme] = useState<ThemeId>(THEME_DEFAUT);
+  /**
+   * L'éditeur garde son texte lui-même : lui passer un nouveau code ne suffit
+   * pas à le changer sous les doigts de l'enfant. Choisir une autre amorce le
+   * remonte donc à neuf — c'est à ça que sert ce compteur.
+   */
+  const [graine, setGraine] = useState(0);
+
+  function charger(nouveau: string) {
+    setCode(nouveau);
+    setGraine((g) => g + 1);
+    setCommence(true);
+  }
 
   // Relus après le premier rendu : le serveur ne connaît pas le navigateur.
   useEffect(() => {
@@ -58,9 +70,11 @@ export default function AtelierLibre({ codeInitial, amorces, modifieLe }: {
   const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dernierSauve = useRef(codeInitial);
 
-  // La sauvegarde suit la frappe, de loin : deux secondes de silence.
+  // La sauvegarde suit la frappe, de loin : deux secondes de silence. Elle ne
+  // regarde pas l'écran affiché : retourner au choix des amorces ne doit pas
+  // annuler l'enregistrement des dernières lettres tapées.
   useEffect(() => {
-    if (!commence || code === dernierSauve.current) return;
+    if (!code.trim() || code === dernierSauve.current) return;
     setEtat("en_cours");
     if (minuteur.current) clearTimeout(minuteur.current);
     minuteur.current = setTimeout(async () => {
@@ -69,18 +83,34 @@ export default function AtelierLibre({ codeInitial, amorces, modifieLe }: {
       setEtat(r?.error ? "echec" : "garde");
     }, DELAI_SAUVEGARDE);
     return () => { if (minuteur.current) clearTimeout(minuteur.current); };
-  }, [code, commence]);
+  }, [code]);
 
   if (!commence) {
+    // Il n'y a qu'un seul établi : prendre une autre amorce remplace ce qui est
+    // dessus. On le dit avant, et on laisse la porte de sortie bien visible.
+    const aDejaUnProgramme = Boolean(code.trim());
     return (
       <div className="space-y-4">
         <p className="text-sm" style={{ color: "#94a3b8" }}>
           Choisis un programme qui marche déjà. Tu le modifies comme tu veux — ici, rien n&apos;est noté.
         </p>
+        {aDejaUnProgramme && (
+          <div className="rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+            style={{ background: "rgba(249,115,22,0.10)", border: "1px solid rgba(249,115,22,0.35)" }}>
+            <span className="text-xs font-bold" style={{ color: "#fdba74" }}>
+              ⚠️ Si tu en choisis un, il prendra la place de ton programme d&apos;aujourd&apos;hui.
+            </span>
+            <button type="button" onClick={() => setCommence(true)}
+              className="text-xs font-black px-3 py-1.5 rounded-xl shrink-0"
+              style={{ background: "#1e293b", border: "1px solid #10b981", color: "#6ee7b7" }}>
+              ← Revenir à mon programme
+            </button>
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-3">
           {amorces.map((a) => (
             <button key={a.id} type="button"
-              onClick={() => { setCode(a.code); setCommence(true); }}
+              onClick={() => charger(a.code)}
               className="text-left rounded-2xl p-4 transition-colors hover:border-emerald-600"
               style={{ background: "#1e293b", border: "1px solid #334155" }}>
               <div className="text-2xl">{a.emoji}</div>
@@ -89,7 +119,7 @@ export default function AtelierLibre({ codeInitial, amorces, modifieLe }: {
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => { setCode("# Écris ton programme ici\n"); setCommence(true); }}
+        <button type="button" onClick={() => charger("# Écris ton programme ici\n")}
           className="text-xs font-bold underline" style={{ color: "#64748b" }}>
           Je préfère partir de rien
         </button>
@@ -107,13 +137,20 @@ export default function AtelierLibre({ codeInitial, amorces, modifieLe }: {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs" style={{ color: "#64748b" }}>
-          Ton programme s&apos;enregistre tout seul. Rien n&apos;est noté ici.
-        </p>
+        {/* La seule porte vers le choix des programmes : elle était en bas,
+            repliée, et ne changeait rien à l'éditeur. */}
+        <button type="button" onClick={() => setCommence(false)}
+          className="text-xs font-black px-3 py-1.5 rounded-xl transition-colors hover:border-emerald-600"
+          style={{ background: "#1e293b", border: "1px solid #334155", color: "#94a3b8" }}>
+          ← Changer de programme
+        </button>
         <span className="text-xs font-bold" style={{ color: etat === "echec" ? "#fca5a5" : "#64748b" }}>
           {motEtat}
         </span>
       </div>
+      <p className="text-xs" style={{ color: "#64748b" }}>
+        Ton programme s&apos;enregistre tout seul. Rien n&apos;est noté ici.
+      </p>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ChoixAppareil appareil={appareil} onChange={(a) => { setAppareil(a); garder("atelier.appareil", a); }} />
@@ -134,7 +171,7 @@ export default function AtelierLibre({ codeInitial, amorces, modifieLe }: {
       </div>
 
       <PythonRunner
-        key="atelier"
+        key={`atelier-${graine}`}
         starterCode={code}
         initialCode={code}
         onCodeChange={setCode}
@@ -143,20 +180,6 @@ export default function AtelierLibre({ codeInitial, amorces, modifieLe }: {
         rendreSortie={(stdout) => <EcranSortie appareil={appareil} sortie={stdout} />}
       />
 
-      <details className="rounded-2xl" style={{ background: "#0f172a", border: "1px solid #1e293b" }}>
-        <summary className="cursor-pointer list-none px-4 py-3 text-xs font-black" style={{ color: "#94a3b8" }}>
-          💡 Repartir d&apos;un autre programme
-        </summary>
-        <div className="px-4 pb-4 grid gap-2 sm:grid-cols-3">
-          {amorces.map((a) => (
-            <button key={a.id} type="button" onClick={() => setCode(a.code)}
-              className="text-left rounded-xl px-3 py-2 text-xs font-bold transition-colors hover:border-emerald-600"
-              style={{ background: "#1e293b", border: "1px solid #334155", color: "#e2e8f0" }}>
-              {a.emoji} {a.titre}
-            </button>
-          ))}
-        </div>
-      </details>
     </div>
   );
 }

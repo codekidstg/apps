@@ -252,12 +252,17 @@ export default function PythonRunner({
           </button>
         )}
 
-        <button
-          onClick={() => setCode(starterCode)}
-          className="text-xs font-bold text-slate-500 hover:text-slate-300 transition-colors"
-        >
-          ↺ Réinitialiser
-        </button>
+        {/* « Réinitialiser » veut dire « revenir au code de départ de l'exercice ».
+            Dans l'atelier il n'y a pas d'exercice : le code de départ est celui
+            que l'enfant est en train d'écrire, et le bouton ne faisait rien. */}
+        {!libre && (
+          <button
+            onClick={() => setCode(starterCode)}
+            className="text-xs font-bold text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            ↺ Réinitialiser
+          </button>
+        )}
 
         {!libre && status === "success" && passed && (
           <span className="text-xs font-black text-emerald-400 animate-pulse">✅ Bravo !</span>
