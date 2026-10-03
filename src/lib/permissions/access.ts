@@ -13,8 +13,18 @@ async function seedRoleDefaults(role: string) {
   });
 }
 
-const getRoleConfig = unstable_cache(
-  async (role: string): Promise<Record<string, boolean>> => {
+/**
+ * Les lignes de la base, et elles seules.
+ *
+ * Ce cache survit aux déploiements : sur Vercel, le Data Cache n'est pas vidé
+ * quand on met le code à jour. Il ne doit donc contenir que ce qui vient de la
+ * base — jamais le résultat d'un calcul fait avec le registre, sinon une page
+ * ajoutée au registre reste absente du menu tant que l'entrée n'a pas expiré.
+ * C'est exactement ce qui est arrivé à « Mon atelier » : le code était en
+ * ligne, la page n'apparaissait nulle part.
+ */
+const getRoleRows = unstable_cache(
+  async (role: string): Promise<{ page_key: string; allowed: boolean }[]> => {
     const admin = createAdminClient();
     const { data } = await (admin.from("role_nav_config") as any)
       .select("page_key, allowed")
@@ -26,19 +36,27 @@ const getRoleConfig = unstable_cache(
 
     // Une page ajoutée au registre après coup n'a pas encore de ligne en base.
     // On la sème (ignoreDuplicates préserve les choix existants) pour qu'elle
-    // apparaisse dans /admin/droits avec un vrai toggle.
+    // apparaisse dans /admin/droits avec un vrai toggle. Le menu, lui, n'attend
+    // pas cette ligne : le défaut est appliqué plus bas, à chaque requête.
     if (pages.some(p => !known.has(p.key))) await seedRoleDefaults(role);
 
-    // Défaut « activé », puis la base a le dernier mot. Sans ce défaut, toute
-    // nouvelle page resterait invisible partout jusqu'à activation manuelle —
-    // et l'UI de /admin/droits, elle, l'affiche déjà comme activée (`?? true`).
-    const config: Record<string, boolean> = Object.fromEntries(pages.map(p => [p.key, true]));
-    for (const r of rows) config[r.page_key] = r.allowed;
-    return config;
+    return rows;
   },
-  ["role-nav-config"],
+  ["role-nav-rows"],
   { revalidate: 300, tags: ["nav-permissions"] }
 );
+
+async function getRoleConfig(role: string): Promise<Record<string, boolean>> {
+  const rows  = await getRoleRows(role);
+  const pages = PAGES_BY_ROLE[role] ?? [];
+
+  // Défaut « activé », puis la base a le dernier mot. Sans ce défaut, toute
+  // nouvelle page resterait invisible partout jusqu'à activation manuelle —
+  // et l'UI de /admin/droits, elle, l'affiche déjà comme activée (`?? true`).
+  const config: Record<string, boolean> = Object.fromEntries(pages.map(p => [p.key, true]));
+  for (const r of rows) config[r.page_key] = r.allowed;
+  return config;
+}
 
 const getUserOverrides = unstable_cache(
   async (userId: string): Promise<Record<string, boolean>> => {
