@@ -107,15 +107,22 @@ export default function AtelierLibre({ codeInitial, amorces, modifieLe }: {
             </button>
           </div>
         )}
-        <div className="grid gap-3 sm:grid-cols-3">
+        {/* Huit amorces : deux colonnes sur tablette, quatre sur ordinateur.
+            Chacune annonce la notion qu'elle fait rencontrer — sans ça, un
+            enfant les ouvre au hasard et retombe trois fois sur la même. */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {amorces.map((a) => (
             <button key={a.id} type="button"
               onClick={() => charger(a.code)}
-              className="text-left rounded-2xl p-4 transition-colors hover:border-emerald-600"
+              className="text-left rounded-2xl p-4 flex flex-col gap-1.5 transition-colors hover:border-emerald-600"
               style={{ background: "#1e293b", border: "1px solid #334155" }}>
               <div className="text-2xl">{a.emoji}</div>
-              <div className="font-black text-white text-sm mt-1.5">{a.titre}</div>
-              <div className="text-xs mt-1 leading-relaxed" style={{ color: "#94a3b8" }}>{a.quoi}</div>
+              <div className="font-black text-white text-sm">{a.titre}</div>
+              <span className="text-[10px] font-black uppercase tracking-wide self-start px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(16,185,129,0.12)", color: "#6ee7b7" }}>
+                {a.notion}
+              </span>
+              <div className="text-xs leading-relaxed" style={{ color: "#94a3b8" }}>{a.quoi}</div>
             </button>
           ))}
         </div>

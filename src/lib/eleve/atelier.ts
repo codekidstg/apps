@@ -23,8 +23,27 @@ export function atelierOuvertA(niveau: string | null | undefined, levelNum?: num
   return NIVEAUX_AUTORISES.includes(slug);
 }
 
-/** Une amorce : du code qui tourne déjà, et qu'on a envie de modifier. */
-export type Amorce = { id: string; titre: string; emoji: string; quoi: string; code: string };
+/**
+ * Une amorce : du code qui tourne déjà, et qu'on a envie de modifier.
+ *
+ * Règle de la liste : chaque amorce ouvre une notion qu'aucune autre n'ouvre,
+ * et porte une mission en une phrase. C'est la mission qui fait qu'un enfant
+ * modifie au lieu de simplement lancer — les trois premières se ressemblaient
+ * toutes (un `input`, un `if`, un `print`), et aucune ne contenait de boucle,
+ * la notion précise sur laquelle un Bâtisseur a bloqué en séance.
+ *
+ * Elles sont rangées de la plus simple à la plus exigeante.
+ */
+export type Amorce = {
+  id: string;
+  titre: string;
+  emoji: string;
+  /** La mission, en mots d'enfant : ce qu'il y a à changer. */
+  quoi: string;
+  /** Ce que le programme lui fait rencontrer, en trois mots. */
+  notion: string;
+  code: string;
+};
 
 export const AMORCES: Amorce[] = [
   {
@@ -32,6 +51,7 @@ export const AMORCES: Amorce[] = [
     titre: "La calculatrice",
     emoji: "🧮",
     quoi: "Elle demande deux nombres et les additionne. À toi de lui apprendre à multiplier.",
+    notion: "Demander et calculer",
     code: `# Une calculatrice qui ne sait qu'additionner.
 a = int(input("Premier nombre : "))
 b = int(input("Deuxième nombre : "))
@@ -44,6 +64,7 @@ print("Résultat :", a + b)
     titre: "Le compte en banque",
     emoji: "🏦",
     quoi: "Tu as 1000 F. Dépose, retire — et empêche le compte de passer en négatif.",
+    notion: "Choisir avec si",
     code: `# Ton compte, et ce que tu peux en faire.
 solde = 1000
 print("Ton solde :", solde, "F")
@@ -64,6 +85,7 @@ print("Nouveau solde :", solde, "F")
     titre: "Le quiz",
     emoji: "❓",
     quoi: "Une question, une réponse, un score. Ajoute-lui tes propres questions.",
+    notion: "Garder un score",
     code: `# Un quiz d'une seule question. Pour l'instant.
 score = 0
 
@@ -75,6 +97,78 @@ else:
     print("Non, c'était Lomé.")
 
 print("Ton score :", score)
+`,
+  },
+  {
+    id: "table",
+    titre: "La table de 7",
+    emoji: "🔢",
+    quoi: "Python la récite tout seul. Change le 7 — puis fais-la s'arrêter à 5.",
+    notion: "Répéter avec une boucle",
+    code: `# Une boucle répète la même ligne, en changeant juste le nombre.
+for n in range(1, 11):
+    print(7, "x", n, "=", 7 * n)
+`,
+  },
+  {
+    id: "decollage",
+    titre: "Le décollage",
+    emoji: "🚀",
+    quoi: "5, 4, 3… Fais-le partir de 10, et dis quelque chose à chaque étape.",
+    notion: "Compter à l'envers",
+    code: `# Le compte à rebours : la boucle descend au lieu de monter.
+for n in range(5, 0, -1):
+    print(n, "...")
+
+print("Décollage !")
+`,
+  },
+  {
+    id: "courses",
+    titre: "La liste des courses",
+    emoji: "🛒",
+    quoi: "Ajoute ce qu'il te faut au marché. Puis fais-lui dire combien ça fait d'articles.",
+    notion: "Ranger dans une liste",
+    code: `# Une liste garde plusieurs choses sous un seul nom.
+courses = ["riz", "tomates", "huile"]
+
+for article in courses:
+    print("-", article)
+
+print("Il y a", len(courses), "choses à acheter.")
+`,
+  },
+  {
+    id: "motdepasse",
+    titre: "Le mot de passe",
+    emoji: "🔐",
+    quoi: "Il redemande tant que ce n'est pas le bon. À toi de ne lui laisser que 3 essais.",
+    notion: "Recommencer tant que",
+    code: `# "while" veut dire : recommence tant que c'est faux.
+secret = "codekids"
+essai = input("Mot de passe : ")
+
+while essai != secret:
+    print("Non, ce n'est pas ça.")
+    essai = input("Mot de passe : ")
+
+print("C'est ouvert !")
+`,
+  },
+  {
+    id: "pyramide",
+    titre: "La pyramide",
+    emoji: "⭐",
+    quoi: "Fais-la plus haute. Puis remplace les étoiles par autre chose.",
+    notion: "Une boucle dans une boucle",
+    code: `# Une boucle pour les lignes, une autre pour les étoiles de la ligne.
+hauteur = 5
+
+for ligne in range(1, hauteur + 1):
+    dessin = ""
+    for etoile in range(ligne):
+        dessin = dessin + "*"
+    print(dessin)
 `,
   },
 ];

@@ -43,6 +43,14 @@ function getWorker(): Worker {
 }
 
 /**
+ * L'avertissement « ~6 Mo » ne concerne que le premier téléchargement, et il
+ * n'y en a qu'un par page ouverte. Dans l'atelier, changer de programme remonte
+ * l'éditeur à neuf : l'enfant le revoyait à chaque fois, alors que Python était
+ * déjà là et que rien n'allait être téléchargé. Hors du composant, donc.
+ */
+let avertissementVu = false;
+
+/**
  * Arrêter pour de bon.
  *
  * Le message « cancel » oublie le contexte du run, mais il n'interrompt pas un
@@ -81,7 +89,7 @@ export default function PythonRunner({
   const [hintMsg, setHintMsg]   = useState("");
   const [passed, setPassed]     = useState(false);
   const [swReady, setSwReady]   = useState(false);
-  const [dataWarning, setDataWarning] = useState(true); // show on first run
+  const [dataWarning, setDataWarning] = useState(!avertissementVu); // une fois par page
   const pendingRun = useRef(false);
   // Saisie interactive : le programme est suspendu tant que l'enfant n'a pas répondu
   const [inputPrompt, setInputPrompt] = useState<string | null>(null);
@@ -172,6 +180,7 @@ export default function PythonRunner({
 
   function handleRunClick() {
     if (dataWarning) {
+      avertissementVu = true;
       setDataWarning(false);
       pendingRun.current = true;
       return;
@@ -202,7 +211,7 @@ export default function PythonRunner({
             </div>
           </div>
           <button
-            onClick={() => { setDataWarning(false); pendingRun.current = true; }}
+            onClick={() => { avertissementVu = true; setDataWarning(false); pendingRun.current = true; }}
             className="text-xs font-black text-amber-300 bg-amber-800/60 hover:bg-amber-700/60 px-3 py-1.5 rounded-lg transition-colors shrink-0"
           >
             OK, lancer
