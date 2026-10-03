@@ -10,6 +10,7 @@ import BadgeToast from "@/components/eleve/BadgeToast";
 import SwRegistrar from "@/components/eleve/SwRegistrar";
 import OfflineBanner from "@/components/eleve/OfflineBanner";
 import BoutonDeconnexion from "@/components/BoutonDeconnexion";
+import { atelierOuvertA } from "@/lib/eleve/atelier";
 import { getEffectiveNavPermissions } from "@/lib/permissions/access";
 
 type StudentData = {
@@ -79,6 +80,11 @@ export default async function EleveLayout({ children, params }: { children: Reac
     { href: "/eleve/badges",       label: "Badges",            icon: "⭐", cle: "student.badges" },
     { href: "/eleve/avatar",       label: "Mon robot",         icon: "🤖", cle: "student.avatar" },
     { href: "/eleve/questions",    label: "Mes questions",     icon: "🙋", cle: "student.questions" },
+    // L'atelier libre n'a de sens qu'à partir du Bâtisseur : l'Explorateur
+    // travaille en blocs, un éditeur de texte vide ne lui dirait rien.
+    ...(atelierOuvertA(null, student?.level_num)
+      ? [{ href: "/eleve/atelier", label: "Mon atelier", icon: "🛠️", cle: "student.atelier" }]
+      : []),
     // La séance offerte n'est pas une page du registre : elle s'ouvre et se
     // ferme par `atelier_active`, élève par élève, et pas par les droits.
     ...(student?.atelier_active

@@ -16,6 +16,11 @@ type Props = {
   onSuccess?: () => void;
   language?: "python" | "javascript" | "html";
   readOnly?: boolean;
+  /**
+   * Atelier libre : aucun verdict, et un bouton pour arrêter. Dans un éditeur
+   * où l'enfant décide, `while True:` arrive le premier jour.
+   */
+  libre?: boolean;
 };
 
 let workerInstance: Worker | null = null;
@@ -28,6 +33,20 @@ function getWorker(): Worker {
   return workerInstance;
 }
 
+/**
+ * Arrêter pour de bon.
+ *
+ * Le message « cancel » oublie le contexte du run, mais il n'interrompt pas un
+ * programme déjà parti : Pyodide exécute le code d'un seul tenant, et une
+ * boucle sans fin ne rend jamais la main. Seul l'arrêt du worker la coupe. Le
+ * suivant sera recréé au prochain lancement — Python se recharge depuis le
+ * cache, sans nouvelle consommation de données.
+ */
+function arreterWorker() {
+  workerInstance?.terminate();
+  workerInstance = null;
+}
+
 export default function PythonRunner({
   starterCode,
   initialCode,
@@ -37,6 +56,7 @@ export default function PythonRunner({
   onSuccess,
   language = "python",
   readOnly = false,
+  libre = false,
 }: Props) {
   const [code, setCode] = useState(initialCode ?? starterCode);
 
@@ -205,6 +225,21 @@ export default function PythonRunner({
           )}
         </button>
 
+        {isLoading && (
+          <button
+            onClick={() => {
+              arreterWorker();
+              runIdRef.current = null;
+              setInputPrompt(null);
+              setStatus("idle");
+              setErrMsg("Programme arrêté.");
+            }}
+            className="text-xs font-black text-red-300 bg-red-900/50 hover:bg-red-800/60 px-3 py-2 rounded-xl transition-colors"
+          >
+            ■ Arrêter
+          </button>
+        )}
+
         <button
           onClick={() => setCode(starterCode)}
           className="text-xs font-bold text-slate-500 hover:text-slate-300 transition-colors"
@@ -212,13 +247,13 @@ export default function PythonRunner({
           ↺ Réinitialiser
         </button>
 
-        {status === "success" && passed && (
+        {!libre && status === "success" && passed && (
           <span className="text-xs font-black text-emerald-400 animate-pulse">✅ Bravo !</span>
         )}
-        {status === "success" && !passed && expectedOutput && (
+        {!libre && status === "success" && !passed && expectedOutput && (
           <span className="text-xs font-black text-amber-400">⚠ Résultat inattendu</span>
         )}
-        {status === "test_failed" && (
+        {!libre && status === "test_failed" && (
           <span className="text-xs font-black text-amber-400">💡 Pas encore…</span>
         )}
       </div>
@@ -233,10 +268,28 @@ export default function PythonRunner({
             : "bg-slate-900 border-slate-700 text-slate-200"
         }`}>
           {errMsg ? (
-            <>
-              <span className="text-red-400 font-black block mb-1">❌ Erreur Python</span>
-              {errMsg}
-            </>
+            // La phrase française d'abord, la trace Python repliée dessous :
+            // « SyntaxError: unterminated string literal » ne dit rien à un
+            // enfant de douze ans, et c'est pourtant ce qu'il lisait en premier.
+            (() => {
+              const [brut, francais] = errMsg.split("\n\n💡 ");
+              return (
+                <>
+                  <span className="text-red-400 font-black block mb-1">❌ Ton programme s&apos;est arrêté</span>
+                  {francais ? (
+                    <>
+                      <p className="font-sans text-base text-red-200 mb-2">{francais}</p>
+                      <details>
+                        <summary className="cursor-pointer list-none text-xs font-sans font-bold text-red-400/70 hover:text-red-300">
+                          Voir ce que Python a répondu
+                        </summary>
+                        <div className="mt-2 text-xs text-red-300/80">{brut}</div>
+                      </details>
+                    </>
+                  ) : brut}
+                </>
+              );
+            })()
           ) : hintMsg ? (
             <>
               {stdout && <div className="text-slate-400 mb-3 pb-3 border-b border-amber-900">{stdout}</div>}
