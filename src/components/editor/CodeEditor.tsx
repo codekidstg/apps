@@ -8,6 +8,7 @@ import { python } from "@codemirror/lang-python";
 import { javascript } from "@codemirror/lang-javascript";
 import { html } from "@codemirror/lang-html";
 import { oneDark } from "@codemirror/theme-one-dark";
+import { CSS_HABITS, THEME_DEFAUT, type ThemeId } from "./themes";
 import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
 
 type Language = "python" | "javascript" | "html";
@@ -25,9 +26,11 @@ type Props = {
   language?: Language;
   readOnly?: boolean;
   minHeight?: string;
+  /** L'habit de l'éditeur — l'enfant le choisit dans son atelier. */
+  theme?: ThemeId;
 };
 
-export default function CodeEditor({ value, onChange, language = "python", readOnly = false, minHeight = "160px" }: Props) {
+export default function CodeEditor({ value, onChange, language = "python", readOnly = false, minHeight = "160px", theme = THEME_DEFAUT }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef      = useRef<EditorView | null>(null);
 
@@ -47,13 +50,13 @@ export default function CodeEditor({ value, onChange, language = "python", readO
           closeBrackets(),
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           EditorState.readOnly.of(readOnly),
-          EditorView.updateListener.of((update) => {
-            if (update.docChanged) onChange(update.state.doc.toString());
-          }),
           EditorView.theme({
             "&": { borderRadius: "12px", overflow: "hidden", minHeight },
-            ".cm-scroller": { fontFamily: "'JetBrains Mono', 'Fira Code', monospace", fontSize: "14px", lineHeight: "1.6" },
+            ".cm-scroller": { fontFamily: "'JetBrains Mono', 'Fira Code', monospace", lineHeight: "1.6" },
             ".cm-content": { padding: "12px 0" },
+          }),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) onChange(update.state.doc.toString());
           }),
         ],
       }),
@@ -77,5 +80,13 @@ export default function CodeEditor({ value, onChange, language = "python", readO
     }
   }, [value]);
 
-  return <div ref={containerRef} className="rounded-xl overflow-hidden border border-slate-700" />;
+  // L'habit est une classe sur le conteneur : il passe devant les règles de
+  // CodeMirror, et en changer ne détruit pas l'éditeur — le texte reste.
+  return (
+    <>
+      <style>{CSS_HABITS}</style>
+      <div ref={containerRef} data-habit={theme}
+        className="cm-habit rounded-xl overflow-hidden border border-slate-700" />
+    </>
+  );
 }

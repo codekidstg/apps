@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
+import type { ThemeId } from "./themes";
 
 const CodeEditor = dynamic(() => import("./CodeEditor"), { ssr: false });
 
@@ -21,6 +22,14 @@ type Props = {
    * où l'enfant décide, `while True:` arrive le premier jour.
    */
   libre?: boolean;
+  /** L'habit de l'éditeur, choisi par l'enfant dans son atelier. */
+  theme?: ThemeId;
+  /**
+   * Comment afficher ce que le programme écrit. L'atelier y glisse un écran de
+   * téléphone ou d'ordinateur ; les erreurs et les questions restent en clair,
+   * en dessous, là où elles se lisent.
+   */
+  rendreSortie?: (stdout: string) => React.ReactNode;
 };
 
 let workerInstance: Worker | null = null;
@@ -57,6 +66,8 @@ export default function PythonRunner({
   language = "python",
   readOnly = false,
   libre = false,
+  theme,
+  rendreSortie,
 }: Props) {
   const [code, setCode] = useState(initialCode ?? starterCode);
 
@@ -206,6 +217,7 @@ export default function PythonRunner({
         language={language}
         readOnly={readOnly}
         minHeight="180px"
+        theme={theme}
       />
 
       {/* Barre d'actions */}
@@ -258,8 +270,11 @@ export default function PythonRunner({
         )}
       </div>
 
+      {/* L'écran de l'atelier : il ne montre que ce que le programme affiche. */}
+      {rendreSortie && !errMsg && !hintMsg && rendreSortie(stdout)}
+
       {/* Console output */}
-      {(stdout || errMsg || hintMsg) && (
+      {((stdout && !rendreSortie) || errMsg || hintMsg) && (
         <div className={`rounded-xl border font-mono text-sm p-4 whitespace-pre-wrap ${
           status === "error"
             ? "bg-red-950/40 border-red-800 text-red-300"
