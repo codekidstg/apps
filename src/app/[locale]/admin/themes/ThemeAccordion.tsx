@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useMemo } from "react";
 import Link from "next/link";
 import StatusBadge from "@/components/backoffice/StatusBadge";
 import type { ContentStatus } from "@/lib/supabase/types";
@@ -34,7 +34,7 @@ const STATUS_OPTIONS: LessonStatus[] = ["draft", "validated", "published", "arch
  * pour une ligne de texte. Vide, il se montre quand même : une leçon sans
  * phrase prive le parent de la seule chose qu'il comprend.
  */
-function AcquisLecon({ lessonId, initial }: { lessonId: string; initial: string | null }) {
+function AcquisLecon({ lessonId, initial, atteinte }: { lessonId: string; initial: string | null; atteinte: boolean }) {
   const [texte, setTexte] = useState(initial ?? "");
   const [etat, setEtat] = useState<"repos" | "garde" | "echec">("repos");
   const [message, setMessage] = useState<string | null>(null);
@@ -63,7 +63,9 @@ function AcquisLecon({ lessonId, initial }: { lessonId: string; initial: string 
         disabled={enCours}
         placeholder="…à écrire : ce que l'enfant sait faire, en mots de parent"
         className={`flex-1 min-w-0 text-[11px] bg-transparent border-b px-1 py-0.5 outline-none transition-colors
-          ${texte ? "border-gray-200 text-ink focus:border-brand-orange" : "border-dashed border-amber-300 text-ink placeholder-amber-600/60 focus:border-brand-orange"}`}
+          ${texte || !atteinte
+            ? "border-gray-200 text-ink placeholder-gray-300 focus:border-brand-orange"
+            : "border-dashed border-amber-300 text-ink placeholder-amber-600/60 focus:border-brand-orange"}`}
       />
       <span className="text-[11px] shrink-0 w-4">
         {etat === "garde" ? "✓" : etat === "echec" ? "⚠" : ""}
@@ -108,11 +110,13 @@ type DragProps = {
 };
 
 export function ThemeRows({
-  theme, onDelete, drag,
+  theme, onDelete, drag, atteintes = new Set<string>(),
 }: {
   theme: ThemeRow;
   onDelete: (id: string) => void;
   drag: DragProps;
+  /** Les leçons qu'au moins un enfant a terminées. */
+  atteintes?: Set<string>;
 }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -227,7 +231,7 @@ export function ThemeRows({
                       {/* La phrase que lira un parent. Elle est posée là,
                           toujours visible : celles qui manquent se voient d'un
                           coup d'œil, et s'écrivent sans changer de page. */}
-                      <AcquisLecon lessonId={lesson.id} initial={lesson.acquis} />
+                      <AcquisLecon lessonId={lesson.id} initial={lesson.acquis} atteinte={atteintes.has(lesson.id)} />
                     </div>
                   );
                 })}
@@ -241,8 +245,13 @@ export function ThemeRows({
 }
 
 // ── Liste réordonnabe par niveau ────────────────────────────────────────────
-export function SortableThemeList({ themes: initial }: { themes: ThemeRow[] }) {
+export function SortableThemeList({ themes: initial, atteintes: atteintesIds = [] }: {
+  themes: ThemeRow[];
+  /** Les leçons qu'au moins un enfant a terminées — les seules où une phrase manque vraiment. */
+  atteintes?: string[];
+}) {
   const [themes, setThemes] = useState(initial);
+  const atteintes = useMemo(() => new Set(atteintesIds), [atteintesIds]);
   const [, startTransition] = useTransition();
   const dragIdx = useRef<number | null>(null);
   const overIdx = useRef<number | null>(null);
@@ -283,6 +292,7 @@ export function SortableThemeList({ themes: initial }: { themes: ThemeRow[] }) {
         <ThemeRows
           key={t.id}
           theme={t}
+          atteintes={atteintes}
           onDelete={handleDelete}
           drag={{
             onDragStart: onDragStart(idx),

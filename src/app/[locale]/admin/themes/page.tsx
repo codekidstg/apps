@@ -30,6 +30,18 @@ export default async function AdminThemesPage({
 
   const { data: rawThemes } = await query as { data: any[] | null };
 
+  /**
+   * Les leçons qu'au moins un enfant a terminées.
+   *
+   * C'est la seule liste où une phrase « en mots de parent » manque vraiment :
+   * pour les autres, aucun message de relance ne peut s'en servir. Signaler
+   * les 99 transformait une dégradation élégante en quatre-vingt-neuf corvées
+   * affichées.
+   */
+  const { data: terminees } = await (supabase.from("lesson_progress") as any)
+    .select("lesson_id").eq("status", "completed");
+  const atteintes = new Set<string>(((terminees ?? []) as { lesson_id: string }[]).map((r) => r.lesson_id));
+
   // Fetch chapters + lessons for each theme
   const themes: ThemeRow[] = await Promise.all(
     (rawThemes ?? []).map(async (t) => {
@@ -155,7 +167,7 @@ export default async function AdminThemesPage({
                       <th className="w-[160px]" />
                     </tr>
                   </thead>
-                  <SortableThemeList themes={lvlThemes} />
+                  <SortableThemeList themes={lvlThemes} atteintes={[...atteintes]} />
                 </table>
               </div>
             </div>
