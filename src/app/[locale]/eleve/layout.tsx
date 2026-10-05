@@ -72,26 +72,62 @@ export default async function EleveLayout({ children, params }: { children: Reac
 
   const avatar = avatarRaw as StudentData["avatar"];
 
-  const nav = ([
-    { href: "/eleve",              label: "Ma Cité",           icon: "🏙️", cle: "student.apprendre" },
-    { href: "/eleve/entrainement", label: "Mon Entraînement",  icon: "💪", cle: "student.entrainement" },
-    { href: "/eleve/salle-de-jeu", label: "Ma salle de jeu",   icon: "🏟️", cle: "student.salle_de_jeu" },
-    { href: "/eleve/classement",   label: "Classement",        icon: "🏆", cle: "student.classement" },
-    { href: "/eleve/badges",       label: "Badges",            icon: "⭐", cle: "student.badges" },
-    { href: "/eleve/avatar",       label: "Mon robot",         icon: "🤖", cle: "student.avatar" },
-    { href: "/eleve/questions",    label: "Mes questions",     icon: "🙋", cle: "student.questions" },
-    // L'atelier libre n'a de sens qu'à partir du Bâtisseur : l'Explorateur
-    // travaille en blocs, un éditeur de texte vide ne lui dirait rien.
-    ...(atelierOuvertA(null, student?.level_num)
-      ? [{ href: "/eleve/atelier", label: "Mon atelier", icon: "🛠️", cle: "student.atelier" }]
-      : []),
-    // La séance offerte n'est pas une page du registre : elle s'ouvre et se
-    // ferme par `atelier_active`, élève par élève, et pas par les droits.
-    ...(student?.atelier_active
-      ? [{ href: "/atelier/lecon", label: "Séance offerte", icon: "🎟️", special: true }]
-      : []),
-  ] as { href: string; label: string; icon: string; special?: boolean; cle?: string }[])
-    .filter((item) => !item.cle || droits.has(item.cle));
+  /**
+   * Le menu de l'enfant, en trois familles.
+   *
+   * Rien n'est replié : à douze ans, ce qui est caché n'existe pas, et un
+   * sous-menu enterrerait les pastilles — or ce sont elles qui le ramènent.
+   * Des titres suffisent à ranger, en laissant les neuf entrées visibles d'un
+   * seul coup d'œil.
+   *
+   * Les familles ne sont pas des tiroirs mais des états d'esprit : ce qui est
+   * suivi par le mentor, ce qui n'est jamais noté, et ce qu'il a gagné. La
+   * deuxième est la seule qui compte vraiment pour lui — le dire à voix haute
+   * enlève la peur de mal faire.
+   *
+   * À l'intérieur d'une famille, l'ordre suit la fréquence réelle, pas la
+   * logique : on ouvre sa Cité tous les jours, son robot une fois par mois.
+   */
+  const familles = ([
+    {
+      titre: "J'apprends",
+      entrees: [
+        { href: "/eleve",              label: "Ma Cité",           icon: "🏙️", cle: "student.apprendre" },
+        { href: "/eleve/entrainement", label: "Mon Entraînement",  icon: "💪", cle: "student.entrainement" },
+        { href: "/eleve/questions",    label: "Mes questions",     icon: "🙋", cle: "student.questions" },
+      ],
+    },
+    {
+      titre: "Je m'amuse",
+      entrees: [
+        { href: "/eleve/salle-de-jeu", label: "Ma salle de jeu",   icon: "🏟️", cle: "student.salle_de_jeu" },
+        // L'atelier libre n'a de sens qu'à partir du Bâtisseur : l'Explorateur
+        // travaille en blocs, un éditeur de texte vide ne lui dirait rien.
+        ...(atelierOuvertA(null, student?.level_num)
+          ? [{ href: "/eleve/atelier", label: "Je code ici", icon: "🛠️", cle: "student.atelier" }]
+          : []),
+      ],
+    },
+    {
+      titre: "Mes trophées",
+      entrees: [
+        { href: "/eleve/badges",     label: "Badges",     icon: "⭐", cle: "student.badges" },
+        { href: "/eleve/classement", label: "Classement", icon: "🏆", cle: "student.classement" },
+        { href: "/eleve/avatar",     label: "Mon robot",  icon: "🤖", cle: "student.avatar" },
+      ],
+    },
+  ] as { titre: string; entrees: { href: string; label: string; icon: string; cle?: string }[] }[])
+    .map((f) => ({ ...f, entrees: f.entrees.filter((e) => !e.cle || droits.has(e.cle)) }))
+    // Une famille dont toutes les pages sont éteintes ne laisse pas son titre
+    // orphelin dans le menu.
+    .filter((f) => f.entrees.length > 0);
+
+  // La séance offerte n'est d'aucune famille : c'est une offre, pas une
+  // rubrique. Elle s'ouvre et se ferme par `atelier_active`, élève par élève,
+  // et pas par les droits.
+  const seanceOfferte = student?.atelier_active
+    ? { href: "/atelier/lecon", label: "Séance offerte", icon: "🎟️" }
+    : null;
 
   return (
     <div className="min-h-screen flex bg-slate-950 text-white">
@@ -141,58 +177,61 @@ export default async function EleveLayout({ children, params }: { children: Reac
         <XPBar xp={xp} niveauNum={student?.level_num ?? 1} />
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-3 space-y-1">
-          {nav.map((item) => {
-            const isTraining = item.href === "/eleve/entrainement";
-            if (item.special) {
-              return (
+        <nav className="flex-1 px-3 py-3 space-y-4">
+          {familles.map((famille) => (
+            <div key={famille.titre} className="space-y-1">
+              <div className="px-3 pb-0.5 text-[10px] font-black uppercase tracking-widest"
+                style={{ color: "#475569" }}>
+                {famille.titre}
+              </div>
+              {famille.entrees.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-black transition-all mt-2 border border-orange-500/40 hover:border-orange-400"
-                  style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all hover:bg-slate-800"
+                  style={{ color: "#94a3b8" }}
                 >
                   <span className="text-base">{item.icon}</span>
                   <span className="flex-1">{item.label}</span>
-                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none animate-pulse"
-                    style={{ background: "#f97316", color: "white" }}>
-                    NEW
-                  </span>
+                  {item.href === "/eleve/entrainement" && trainingBadgeCount > 0 && (
+                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
+                      style={{ background: "#FDB813", color: "#0f172a" }}>
+                      {trainingBadgeCount}
+                    </span>
+                  )}
+                  {item.href === "/eleve/salle-de-jeu" && salleBadgeCount > 0 && (
+                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
+                      style={{ background: "#a78bfa", color: "#1e1b4b" }}
+                      aria-label={`${salleBadgeCount} exercice${salleBadgeCount > 1 ? "s" : ""} jamais joué${salleBadgeCount > 1 ? "s" : ""}`}>
+                      {salleBadgeCount}
+                    </span>
+                  )}
+                  {item.href === "/eleve/questions" && reponsesNonVues > 0 && (
+                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
+                      style={{ background: "#10b981", color: "#022c22" }}
+                      aria-label={`${reponsesNonVues} réponse${reponsesNonVues > 1 ? "s" : ""} de ton mentor`}>
+                      {reponsesNonVues}
+                    </span>
+                  )}
                 </Link>
-              );
-            }
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all hover:bg-slate-800"
-                style={{ color: "#94a3b8" }}
-              >
-                <span className="text-base">{item.icon}</span>
-                <span className="flex-1">{item.label}</span>
-                {isTraining && trainingBadgeCount > 0 && (
-                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
-                    style={{ background: "#FDB813", color: "#0f172a" }}>
-                    {trainingBadgeCount}
-                  </span>
-                )}
-                {item.href === "/eleve/salle-de-jeu" && salleBadgeCount > 0 && (
-                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
-                    style={{ background: "#a78bfa", color: "#1e1b4b" }}
-                    aria-label={`${salleBadgeCount} exercice${salleBadgeCount > 1 ? "s" : ""} jamais joué${salleBadgeCount > 1 ? "s" : ""}`}>
-                    {salleBadgeCount}
-                  </span>
-                )}
-                {item.href === "/eleve/questions" && reponsesNonVues > 0 && (
-                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none"
-                    style={{ background: "#10b981", color: "#022c22" }}
-                    aria-label={`${reponsesNonVues} réponse${reponsesNonVues > 1 ? "s" : ""} de ton mentor`}>
-                    {reponsesNonVues}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+              ))}
+            </div>
+          ))}
+
+          {seanceOfferte && (
+            <Link
+              href={seanceOfferte.href}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-black transition-all border border-orange-500/40 hover:border-orange-400"
+              style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}
+            >
+              <span className="text-base">{seanceOfferte.icon}</span>
+              <span className="flex-1">{seanceOfferte.label}</span>
+              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none animate-pulse"
+                style={{ background: "#f97316", color: "white" }}>
+                NEW
+              </span>
+            </Link>
+          )}
         </nav>
 
       </aside>

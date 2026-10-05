@@ -8,7 +8,7 @@ import { atelierOuvertA, listerProgrammes, AMORCES } from "@/lib/eleve/atelier";
 import MesProgrammes, { type Carte } from "@/components/eleve/MesProgrammes";
 
 /**
- * Mon atelier — l'endroit où l'enfant écrit ses propres programmes.
+ * Je code ici — l'endroit où l'enfant écrit ses propres programmes.
  *
  * Demandé par le mentor de Samuel le 3 octobre : « est-ce que pour le niveau
  * bâtisseur on peut leur faire une partie éditeur de code… écrire et run du
@@ -63,7 +63,7 @@ function Page({ locale, programmes, apercu = false }: {
 }) {
   return (
     <div className="p-6 lg:p-10 max-w-5xl">
-      <h1 className="text-2xl font-black text-white">🛠️ Mon atelier</h1>
+      <h1 className="text-2xl font-black text-white">🛠️ Je code ici</h1>
       <p className="text-sm mt-1 mb-6" style={{ color: "#94a3b8" }}>
         Ici, c&apos;est toi qui décides. Écris un programme, lance-le, recommence.
       </p>

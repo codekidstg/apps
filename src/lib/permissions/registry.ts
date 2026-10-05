@@ -36,7 +36,7 @@ export const NAV_PAGES: NavPageDef[] = [
   { role: "student", key: "student.badges",       label: "Badges",                 href: "/eleve/badges",          icon: "⭐" },
   { role: "student", key: "student.avatar",       label: "Mon robot",              href: "/eleve/avatar",          icon: "🤖" },
   { role: "student", key: "student.questions",    label: "Mes questions",          href: "/eleve/questions",       icon: "🙋" },
-  { role: "student", key: "student.atelier",      label: "Mon atelier",            href: "/eleve/atelier",         icon: "🛠️" },
+  { role: "student", key: "student.atelier",      label: "Je code ici",            href: "/eleve/atelier",         icon: "🛠️" },
   { role: "student", key: "student.certificats",  label: "Certificats",             href: "/suivi/certificats",     icon: "🎓" },
   { role: "student", key: "student.abonnement",   label: "Paiement / Abonnement",   href: "/suivi/abonnement",      icon: "💳" },
 
