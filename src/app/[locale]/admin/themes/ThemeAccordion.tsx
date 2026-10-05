@@ -4,10 +4,10 @@ import { useState, useTransition, useRef } from "react";
 import Link from "next/link";
 import StatusBadge from "@/components/backoffice/StatusBadge";
 import type { ContentStatus } from "@/lib/supabase/types";
-import { updateLessonStatus, deleteTheme, reorderThemes, type LessonStatus } from "./actions";
+import { updateLessonStatus, updateLessonAcquis, deleteTheme, reorderThemes, type LessonStatus } from "./actions";
 
 export type LessonRow = {
-  id: string; title: string; xp_reward: number; order_index: number; status: LessonStatus;
+  id: string; title: string; xp_reward: number; order_index: number; status: LessonStatus; acquis: string | null;
 };
 export type ChapterRow = { id: string; title: string; order_index: number; lessons: LessonRow[] };
 export type ThemeRow = {
@@ -26,6 +26,52 @@ const STATUS_CONFIG: Record<LessonStatus, { label: string; color: string; bg: st
   archived:  { label: "Archivée",   color: "text-gray-400",  bg: "bg-gray-100",   dot: "bg-gray-300" },
 };
 const STATUS_OPTIONS: LessonStatus[] = ["draft", "validated", "published", "archived"];
+
+/**
+ * « Votre enfant sait maintenant… »
+ *
+ * Le champ s'enregistre quand on le quitte — pas de bouton « Enregistrer »
+ * pour une ligne de texte. Vide, il se montre quand même : une leçon sans
+ * phrase prive le parent de la seule chose qu'il comprend.
+ */
+function AcquisLecon({ lessonId, initial }: { lessonId: string; initial: string | null }) {
+  const [texte, setTexte] = useState(initial ?? "");
+  const [etat, setEtat] = useState<"repos" | "garde" | "echec">("repos");
+  const [message, setMessage] = useState<string | null>(null);
+  const [enCours, demarrer] = useTransition();
+  const dernier = useRef(initial ?? "");
+
+  function enregistrer() {
+    if (texte.trim() === dernier.current.trim()) return;
+    demarrer(async () => {
+      const r = await updateLessonAcquis(lessonId, texte);
+      if (r.error) { setEtat("echec"); setMessage(r.error); return; }
+      dernier.current = texte;
+      setEtat("garde");
+      setMessage(null);
+      setTimeout(() => setEtat("repos"), 2000);
+    });
+  }
+
+  return (
+    <div className="pl-7 mt-1 flex items-center gap-2">
+      <span className="text-[11px] text-ink-muted shrink-0">Sait maintenant</span>
+      <input
+        value={texte}
+        onChange={(e) => setTexte(e.target.value)}
+        onBlur={enregistrer}
+        disabled={enCours}
+        placeholder="…à écrire : ce que l'enfant sait faire, en mots de parent"
+        className={`flex-1 min-w-0 text-[11px] bg-transparent border-b px-1 py-0.5 outline-none transition-colors
+          ${texte ? "border-gray-200 text-ink focus:border-brand-orange" : "border-dashed border-amber-300 text-ink placeholder-amber-600/60 focus:border-brand-orange"}`}
+      />
+      <span className="text-[11px] shrink-0 w-4">
+        {etat === "garde" ? "✓" : etat === "echec" ? "⚠" : ""}
+      </span>
+      {message && <span className="text-[11px] text-red-600 shrink-0">{message}</span>}
+    </div>
+  );
+}
 
 function LessonStatusSelect({ lessonId, current }: { lessonId: string; current: LessonStatus }) {
   const [status, setStatus] = useState<LessonStatus>(current);
@@ -164,18 +210,24 @@ export function ThemeRows({
                 ) : ch.lessons.map(lesson => {
                   const n = ++globalIdx;
                   return (
-                    <div key={lesson.id} className="flex items-center gap-3 pl-10 pr-4 py-2 rounded-lg hover:bg-white hover:shadow-sm transition-all group">
-                      <span className="text-xs text-ink-muted w-4 text-right shrink-0">{n}.</span>
-                      <Link href={`/admin/themes/${theme.id}/lecons/${lesson.id}`}
-                        className="text-sm font-bold text-ink group-hover:text-brand-orange transition-colors flex-1 min-w-0 truncate">
-                        {lesson.title}
-                      </Link>
-                      <span className="text-xs text-ink-muted shrink-0">{lesson.xp_reward} XP</span>
-                      <div className="shrink-0"><LessonStatusSelect lessonId={lesson.id} current={lesson.status ?? "draft"} /></div>
-                      <Link href={`/admin/themes/${theme.id}/lecons/${lesson.id}`}
-                        className="text-xs font-bold text-brand-orange opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        ✏️ Éditer contenu →
-                      </Link>
+                    <div key={lesson.id} className="pl-10 pr-4 py-2 rounded-lg hover:bg-white hover:shadow-sm transition-all group">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-ink-muted w-4 text-right shrink-0">{n}.</span>
+                        <Link href={`/admin/themes/${theme.id}/lecons/${lesson.id}`}
+                          className="text-sm font-bold text-ink group-hover:text-brand-orange transition-colors flex-1 min-w-0 truncate">
+                          {lesson.title}
+                        </Link>
+                        <span className="text-xs text-ink-muted shrink-0">{lesson.xp_reward} XP</span>
+                        <div className="shrink-0"><LessonStatusSelect lessonId={lesson.id} current={lesson.status ?? "draft"} /></div>
+                        <Link href={`/admin/themes/${theme.id}/lecons/${lesson.id}`}
+                          className="text-xs font-bold text-brand-orange opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          ✏️ Éditer contenu →
+                        </Link>
+                      </div>
+                      {/* La phrase que lira un parent. Elle est posée là,
+                          toujours visible : celles qui manquent se voient d'un
+                          coup d'œil, et s'écrivent sans changer de page. */}
+                      <AcquisLecon lessonId={lesson.id} initial={lesson.acquis} />
                     </div>
                   );
                 })}

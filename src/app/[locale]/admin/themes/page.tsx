@@ -43,7 +43,7 @@ export default async function AdminThemesPage({
         (chapters ?? []).map(async (ch) => {
           const { data: lessons, error: lessonsError } = await (supabase as any)
             .from("lessons")
-            .select("id, title, xp_reward, order_index, status")
+            .select("id, title, xp_reward, order_index, status, acquis")
             .eq("chapter_id", ch.id)
             .order("order_index");
 

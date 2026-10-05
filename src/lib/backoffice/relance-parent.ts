@@ -51,6 +51,8 @@ type Situation = {
   autonomie: number | null;
   /** Le jeton d'un programme qu'il a partagé depuis son atelier. */
   jeton: string | null;
+  /** Ce qu'il sait faire depuis sa dernière leçon terminée, en mots de parent. */
+  acquis: string | null;
 };
 
 async function situations(eleves: Enfant[]): Promise<Map<string, Situation>> {
@@ -61,7 +63,7 @@ async function situations(eleves: Enfant[]): Promise<Map<string, Situation>> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
-  const [parcours, entrainements, ateliers] = await Promise.all([
+  const [parcours, entrainements, ateliers, derniersAcquis] = await Promise.all([
     // Le même calcul que le tableau des élèves : le thème *en cours*, pas
     // celui de la dernière leçon terminée. C'est ce que l'enfant fait
     // aujourd'hui qui intéresse son parent.
@@ -69,6 +71,14 @@ async function situations(eleves: Enfant[]): Promise<Map<string, Situation>> {
     admin.from("training_progress")
       .select("student_id, reussi_sans_indice").in("student_id", ids).eq("status", "completed"),
     admin.from("atelier_eleve").select("student_id, jeton").in("student_id", ids).not("jeton", "is", null),
+    // La dernière leçon terminée qui porte une phrase en mots de parent. Les
+    // leçons sans phrase sont écartées ici plutôt que de faire taire le
+    // message : on remonte à la précédente qui en a une.
+    admin.from("lesson_progress")
+      .select("student_id, completed_at, lessons!lesson_id(acquis)")
+      .in("student_id", ids).eq("status", "completed")
+      .not("completed_at", "is", null)
+      .order("completed_at", { ascending: false }),
   ]);
 
   const faits = new Map<string, { total: number; sans: number }>();
@@ -84,6 +94,13 @@ async function situations(eleves: Enfant[]): Promise<Map<string, Situation>> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const r of (ateliers.data ?? []) as any[]) if (!jetons.has(r.student_id)) jetons.set(r.student_id, r.jeton);
 
+  const acquis = new Map<string, string>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (derniersAcquis.data ?? []) as any[]) {
+    const phrase = r.lessons?.acquis;
+    if (phrase && !acquis.has(r.student_id)) acquis.set(r.student_id, phrase);
+  }
+
   for (const e of eleves) {
     const c = faits.get(e.id);
     resultat.set(e.id, {
@@ -91,6 +108,7 @@ async function situations(eleves: Enfant[]): Promise<Map<string, Situation>> {
       // Sous cinq entraînements, le taux ne veut rien dire : on se tait.
       autonomie: c && c.total >= 5 ? c.sans / c.total : null,
       jeton: jetons.get(e.id) ?? null,
+      acquis: acquis.get(e.id) ?? null,
     });
   }
   return resultat;
@@ -125,8 +143,15 @@ function paragraphesEnfant(nom: string, s: Situation | undefined): string[] {
     return [`${p} vient de rejoindre CodeKids, et sa première séance approche.`];
   }
 
-  const ouverture = s.jeton
-    ? `Savez-vous que ${p} a écrit son propre programme ? Vous pouvez y jouer ici :\n${SITE_URL}/fr/p/${s.jeton}`
+  /**
+   * L'ouverture porte le fait le plus parlant dont on dispose.
+   *
+   * Ce que l'enfant sait faire passe avant tout le reste : c'est la seule
+   * chose qu'un parent comprend sans rien connaître du programme. Le thème
+   * vient derrière, et la seconde ligne le rappelle de toute façon.
+   */
+  const ouverture = s.acquis
+    ? `Savez-vous que ${p} sait maintenant ${s.acquis} ?`
     : `Savez-vous que ${p} travaille en ce moment sur « ${q.themeCourant} » ?`;
 
   const mot = motAutonomie(s.autonomie);
@@ -138,19 +163,29 @@ function paragraphesEnfant(nom: string, s: Situation | undefined): string[] {
    * « sa séance », « il compte » pour le thème — et le prénom ne revient
    * qu'une fois, là où il porte quelque chose.
    */
+  // Quand l'ouverture a parlé de ce qu'il sait faire, le thème n'a pas encore
+  // été nommé : la seconde ligne s'en charge.
+  const theme = s.acquis ? ` du thème « ${q.themeCourant} »` : "";
+
   if (q.termine) {
-    bouts.push(`${p} vient de terminer tout ce qui lui était ouvert — c'est du beau travail.`);
+    bouts.push(`${p} vient de terminer tout ce qui lui était ouvert${theme} — c'est du beau travail.`);
   } else if (q.faites === 0) {
-    bouts.push(`${p} vient de le commencer : il compte ${q.total} séances.`);
+    bouts.push(`${p} vient de commencer « ${q.themeCourant} » : il compte ${q.total} séances.`);
   } else {
-    bouts.push(`C'est sa ${rang(q.faites)} séance sur ${q.total}.`);
+    bouts.push(`C'est sa ${rang(q.faites)} séance sur ${q.total}${theme}.`);
   }
 
   if (mot) {
     bouts.push(`${p} résout ${mot} ses exercices sans demander d'aide.`);
   }
 
-  return [ouverture, bouts.join(" ")];
+  // Le programme de l'atelier, s'il en a partagé un : c'est le seul lien d'un
+  // message de relance sur lequel un parent clique vraiment.
+  if (s.jeton) {
+    bouts.push(`\n\nEt un programme écrit de sa main, auquel vous pouvez jouer :\n${SITE_URL}/fr/p/${s.jeton}`);
+  }
+
+  return [ouverture, bouts.join(" ").trim()];
 }
 
 export function redigerRelance(

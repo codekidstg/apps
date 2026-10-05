@@ -17,6 +17,30 @@ export async function updateLessonStatus(lessonId: string, status: LessonStatus)
   return { success: true };
 }
 
+/**
+ * Ce que l'enfant sait faire après cette leçon, en mots de parent.
+ *
+ * Une phrase sans sujet ni majuscule : elle se range derrière « Votre enfant
+ * sait maintenant… » dans le message de relance. Les bornes sont celles de la
+ * base (migration 044) — rien ne sert de laisser passer ici ce que la
+ * contrainte refusera.
+ */
+export async function updateLessonAcquis(lessonId: string, acquis: string) {
+  const propre = acquis.replace(/\s+/g, " ").trim();
+  if (propre && (propre.length < 10 || propre.length > 160)) {
+    return { error: "Entre 10 et 160 caractères — c'est une phrase, pas un paragraphe." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await (admin.from("lessons") as any)
+    .update({ acquis: propre || null })
+    .eq("id", lessonId);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/themes");
+  revalidateTag("lessons", {});
+  return { success: true };
+}
+
 export async function publishTheme(themeId: string) {
   const admin = createAdminClient();
 
