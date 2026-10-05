@@ -2,6 +2,7 @@ import PageHeader from "@/components/backoffice/PageHeader";
 import { getParentsPageData } from "@/lib/backoffice/parents";
 import { STATUT_PARENT, type StatutParent } from "@/lib/backoffice/statut-parent";
 import { construireRelances } from "@/lib/backoffice/relance-parent";
+import { NUM_TO_SLUG as SLUG_NIVEAU } from "@/lib/levels";
 import ParentsSearchList from "@/app/[locale]/admin/utilisateurs/parents/ParentsSearchList";
 
 export default async function ManagerParentsPage({ searchParams }: { searchParams: Promise<{ statut?: string }> }) {
@@ -19,7 +20,11 @@ export default async function ManagerParentsPage({ searchParams }: { searchParam
       email: p.email,
       enfants: p.children
         .filter((c) => c.students?.profiles)
-        .map((c) => ({ id: c.students!.id, nom: c.students!.profiles!.display_name })),
+        .map((c) => ({
+          id: c.students!.id,
+          nom: c.students!.profiles!.display_name,
+          niveau: SLUG_NIVEAU[c.students!.level_num] ?? "explorer",
+        })),
     })),
   );
 
