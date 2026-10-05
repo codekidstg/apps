@@ -2,6 +2,8 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import QuestReader from "@/app/[locale]/eleve/quete/[lessonId]/QuestReader";
+import { autorisationCours, leconOuverte } from "@/lib/prof/acces-cours";
+import { FondMarque, PiedDeMarque, SignatureInvisible } from "@/components/prof/MarqueProprietaire";
 
 type Block = { id: string; type: string; content: Record<string, unknown>; order_index: number };
 
@@ -17,16 +19,28 @@ export default async function ProfLessonPage({
 
   const admin = createAdminClient();
 
-  const { data: lesson } = await (admin.from("lessons") as any)
-    .select("id, title, xp_reward, chapter_id")
-    .eq("id", lessonId)
-    .single();
+  // Cette page ne vérifiait que la connexion, et lisait avec la clé de service.
+  // Un mentor changeait l'identifiant dans l'adresse et ouvrait n'importe
+  // quelle leçon de la plateforme — autres niveaux, thèmes qu'il n'enseigne
+  // pas, thèmes non publiés. Il voit maintenant ce que ses élèves ont terminé,
+  // plus une leçon d'avance.
+  const autorisation = await autorisationCours(admin, user.id, themeId);
+  if (!leconOuverte(autorisation, lessonId)) notFound();
+
+  const [{ data: lesson }, { data: profil }] = await Promise.all([
+    (admin.from("lessons") as any).select("id, title, xp_reward, chapter_id").eq("id", lessonId).single(),
+    (admin.from("profiles") as any).select("display_name").eq("id", user.id).maybeSingle(),
+  ]);
   if (!lesson) notFound();
 
   const { data: chapter } = await admin.from("chapters")
     .select("id, title, theme_id")
     .eq("id", lesson.chapter_id)
     .single<{ id: string; title: string; theme_id: string }>();
+
+  // L'identifiant du thème de l'adresse ne servait à rien : il n'était jamais
+  // confronté à la leçon demandée.
+  if (chapter?.theme_id !== themeId) notFound();
 
   const { data: theme } = await admin.from("themes")
     .select("id, title")
@@ -52,7 +66,8 @@ export default async function ProfLessonPage({
   if (errTrainings) console.error("prof/cours — entraînements :", errTrainings.message);
 
   return (
-    <div className="p-6 lg:p-10 bg-slate-950 min-h-screen">
+    <div className="p-6 lg:p-10 bg-slate-950 min-h-screen relative">
+      <FondMarque nom={profil?.display_name} />
       {/* Bandeau prof */}
       <div className="mb-5 flex items-center gap-3 bg-indigo-950 border border-indigo-800 rounded-2xl px-5 py-3">
         <span className="text-lg">👁️</span>
@@ -94,7 +109,10 @@ export default async function ProfLessonPage({
             +{lesson.xp_reward} XP
           </span>
         </div>
-        <h1 className="text-2xl font-black text-white">{lesson.title}</h1>
+        <h1 className="text-2xl font-black text-white">
+          {lesson.title}
+          <SignatureInvisible id={user.id} />
+        </h1>
       </div>
 
       <QuestReader
@@ -134,6 +152,8 @@ export default async function ProfLessonPage({
           </div>
         </div>
       )}
+
+      <PiedDeMarque />
     </div>
   );
 }

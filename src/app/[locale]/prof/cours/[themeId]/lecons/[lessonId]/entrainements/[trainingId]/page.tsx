@@ -2,6 +2,8 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import TrainingReader from "@/app/[locale]/eleve/entrainement/[trainingId]/TrainingReader";
+import { autorisationCours, leconOuverte } from "@/lib/prof/acces-cours";
+import { FondMarque, PiedDeMarque } from "@/components/prof/MarqueProprietaire";
 
 type Block = { id: string; type: string; content: Record<string, unknown>; order_index: number };
 
@@ -17,11 +19,21 @@ export default async function ProfTrainingPage({
 
   const admin = createAdminClient();
 
-  const { data: training } = await (admin.from("trainings") as any)
-    .select("id, title, description, xp_reward, lesson_id, lessons(id, title)")
-    .eq("id", trainingId)
-    .single();
+  // Même trou que la page de la leçon : seule la connexion était vérifiée.
+  // Un entraînement suit sa leçon — s'il ne peut pas lire la leçon, il n'a pas
+  // à lire ce qui va avec.
+  const autorisation = await autorisationCours(admin, user.id, themeId);
+  if (!leconOuverte(autorisation, lessonId)) notFound();
+
+  const [{ data: training }, { data: profil }] = await Promise.all([
+    (admin.from("trainings") as any)
+      .select("id, title, description, xp_reward, lesson_id, lessons(id, title)")
+      .eq("id", trainingId).single(),
+    (admin.from("profiles") as any).select("display_name").eq("id", user.id).maybeSingle(),
+  ]);
   if (!training) notFound();
+  // L'entraînement doit bien appartenir à la leçon de l'adresse.
+  if (training.lesson_id !== lessonId) notFound();
 
   const { data: blocksRaw } = await (admin.from("training_blocks") as any)
     .select("id, type, content, order_index")
@@ -32,7 +44,8 @@ export default async function ProfTrainingPage({
   const lessonTitle = training.lessons?.title ?? "Leçon";
 
   return (
-    <div className="p-6 lg:p-10">
+    <div className="p-6 lg:p-10 relative">
+      <FondMarque nom={profil?.display_name} sombre={false} />
       {/* Bandeau prof */}
       <div className="mb-5 flex items-center gap-3 bg-indigo-950 border border-indigo-800 rounded-2xl px-5 py-3">
         <span className="text-lg">👁️</span>
@@ -89,6 +102,8 @@ export default async function ProfTrainingPage({
           readOnly={true}
         />
       )}
+
+      <PiedDeMarque sombre={false} />
     </div>
   );
 }
