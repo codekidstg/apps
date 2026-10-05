@@ -37,8 +37,13 @@ export default function ProgrammePartage({ titre, prenom, code, sortie, interact
           libre
           cacherEditeur
           libelleLancer={interactif ? "Jouer" : "Lancer"}
-          rendreSortie={(stdout) => (
-            <EcranSortie appareil="telephone" sortie={stdout || (sortie ?? "")} titre={titre} />
+          rendreSortie={(stdout, enMarche) => (
+            <EcranSortie appareil="telephone" titre={titre}
+              // Tant que rien n'est sorti, on garde le résultat enregistré sous
+              // les yeux du parent — sauf quand le programme tourne vraiment :
+              // il faut alors dire qu'il tourne, et pas inviter à le lancer.
+              sortie={stdout || (enMarche ? "" : sortie ?? "")}
+              attente={enMarche ? "Ton programme tourne — réponds-lui en dessous." : undefined} />
           )}
         />
       ) : (

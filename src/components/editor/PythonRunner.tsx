@@ -29,7 +29,13 @@ type Props = {
    * téléphone ou d'ordinateur ; les erreurs et les questions restent en clair,
    * en dessous, là où elles se lisent.
    */
-  rendreSortie?: (stdout: string) => React.ReactNode;
+  rendreSortie?: (stdout: string, enMarche: boolean) => React.ReactNode;
+  /**
+   * Le résultat d'une exécution réussie. L'atelier l'enregistre : c'est lui
+   * que verra le parent au bout du lien, avant que Python ne se charge chez
+   * lui. Sans ça, l'écran partagé reste vide pour toujours.
+   */
+  onSortie?: (stdout: string) => void;
   /**
    * Page partagée : le parent vient jouer, pas lire. L'éditeur disparaît, il
    * ne reste que le bouton et l'écran.
@@ -83,6 +89,7 @@ export default function PythonRunner({
   libre = false,
   theme,
   rendreSortie,
+  onSortie,
   cacherEditeur = false,
   libelleLancer = "Exécuter",
 }: Props) {
@@ -158,6 +165,7 @@ export default function PythonRunner({
       } else if (e.data.type === "success") {
         const out = e.data.stdout as string;
         setStdout(out);
+        onSortie?.(out);
 
         // Check expected output if no hidden tests
         const ok = expectedOutput
@@ -175,7 +183,7 @@ export default function PythonRunner({
 
     worker.addEventListener("message", handleMessage);
     worker.postMessage({ id, type: "run", code, tests: hiddenTests });
-  }, [code, hiddenTests, expectedOutput, onSuccess, status]);
+  }, [code, hiddenTests, expectedOutput, onSuccess, onSortie, status]);
 
   function submitInput() {
     const id = runIdRef.current;
@@ -296,7 +304,7 @@ export default function PythonRunner({
       </div>
 
       {/* L'écran de l'atelier : il ne montre que ce que le programme affiche. */}
-      {rendreSortie && !errMsg && !hintMsg && rendreSortie(stdout)}
+      {rendreSortie && !errMsg && !hintMsg && rendreSortie(stdout, isLoading)}
 
       {/* Console output */}
       {((stdout && !rendreSortie) || errMsg || hintMsg) && (
@@ -344,17 +352,21 @@ export default function PythonRunner({
       {inputPrompt !== null && (
         <div className="rounded-xl border border-emerald-700 bg-slate-900 p-3 space-y-2">
           <div className="text-xs font-black text-emerald-400">⌨️ Ton programme te demande quelque chose</div>
+          {/* Sur un téléphone, les trois éléments côte à côte débordaient : un
+              champ de texte refuse de descendre sous sa largeur minimale, et
+              c'est le bouton — le dernier — qui sortait de l'écran. L'intitulé
+              prend donc sa propre ligne, et le champ a le droit de rétrécir. */}
+          {inputPrompt !== "…" && (
+            <div className="font-mono text-sm text-slate-300 break-words">{inputPrompt}</div>
+          )}
           <div className="flex items-center gap-2">
-            {inputPrompt !== "…" && (
-              <span className="font-mono text-sm text-slate-300 shrink-0">{inputPrompt}</span>
-            )}
             <input
               ref={inputRef}
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submitInput(); } }}
               placeholder="Tape ta réponse puis Entrée"
-              className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 font-mono text-sm text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+              className="flex-1 min-w-0 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 font-mono text-sm text-white placeholder-slate-500 outline-none focus:border-emerald-500"
             />
             <button
               onClick={submitInput}

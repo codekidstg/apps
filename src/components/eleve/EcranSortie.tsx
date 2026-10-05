@@ -23,19 +23,26 @@ export const APPAREILS: { id: Appareil; emoji: string; nom: string }[] = [
 
 const VIDE = "Lance ton programme pour voir ce qu'il affiche.";
 
-export default function EcranSortie({ appareil, sortie, titre }: {
+export default function EcranSortie({ appareil, sortie, titre, attente }: {
   appareil: Appareil;
   sortie: string;
   /** Le nom qui s'affiche en haut de l'écran — celui de l'enfant, ou du programme. */
   titre?: string;
+  /**
+   * Ce que dit l'écran quand il n'a encore rien à montrer. Par défaut il
+   * invite à lancer — mais pendant que le programme tourne, cette phrase est
+   * fausse, et c'est elle qui fait croire que rien ne se passe.
+   */
+  attente?: string;
 }) {
   const texte = sortie.trim();
+  const rienAMontrer = attente ?? VIDE;
 
   if (appareil === "console") {
     return (
       <div className="rounded-xl border font-mono text-sm p-4 whitespace-pre-wrap"
         style={{ background: "#0f172a", borderColor: "#334155", color: "#e2e8f0" }}>
-        {texte || <span style={{ color: "#64748b" }}>{VIDE}</span>}
+        {texte || <span style={{ color: "#64748b" }}>{rienAMontrer}</span>}
       </div>
     );
   }
@@ -54,7 +61,7 @@ export default function EcranSortie({ appareil, sortie, titre }: {
         </div>
         <pre className="font-mono text-sm p-4 whitespace-pre-wrap min-h-[160px]"
           style={{ background: "#0b1220", color: "#e2e8f0" }}>
-          {texte || <span style={{ color: "#64748b" }}>{VIDE}</span>}
+          {texte || <span style={{ color: "#64748b" }}>{rienAMontrer}</span>}
         </pre>
       </div>
     );
@@ -80,7 +87,7 @@ export default function EcranSortie({ appareil, sortie, titre }: {
               <pre className="font-mono text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: "#0f172a" }}>{texte}</pre>
             ) : (
               <div className="h-full flex items-center justify-center text-center text-xs" style={{ color: "#94a3b8" }}>
-                {VIDE}
+                {rienAMontrer}
               </div>
             )}
           </div>

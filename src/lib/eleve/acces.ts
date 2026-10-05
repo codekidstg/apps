@@ -191,18 +191,25 @@ export async function accesEntrainement(admin: any, studentId: string, trainingI
  * n'est versée.
  */
 export type Visiteur =
-  | { mode: "eleve"; studentId: string }
+  /**
+   * Le niveau vient avec l'identité : il est déjà dans la fiche qu'on lit ici.
+   * Les pages le redemandaient dans une requête à elles — un aller-retour de
+   * plus, en file indienne, sur une plateforme consultée depuis le Togo.
+   */
+  | { mode: "eleve"; studentId: string; niveau: string | null; niveauNum: number | null }
   | { mode: "apercu" };
 
 export async function visiteurEleve(supabase: any, userId: string): Promise<Visiteur | null> {
   const [profilRes, eleveRes] = await Promise.all([
     supabase.from("profiles").select("role").eq("id", userId).maybeSingle(),
-    supabase.from("students").select("id").eq("profile_id", userId).maybeSingle(),
+    supabase.from("students").select("id, level, level_num").eq("profile_id", userId).maybeSingle(),
   ]);
   if (profilRes.error) console.error("[acces] profiles :", profilRes.error.message);
   if (eleveRes.error) console.error("[acces] students :", eleveRes.error.message);
 
   if ((profilRes.data as any)?.role === "admin") return { mode: "apercu" };
-  const studentId = (eleveRes.data as any)?.id;
-  return studentId ? { mode: "eleve", studentId } : null;
+  const eleve = eleveRes.data as any;
+  return eleve?.id
+    ? { mode: "eleve", studentId: eleve.id, niveau: eleve.level ?? null, niveauNum: eleve.level_num ?? null }
+    : null;
 }

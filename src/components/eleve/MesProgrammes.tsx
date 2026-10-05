@@ -36,7 +36,6 @@ export default function MesProgrammes({ programmes, amorces, locale, apercu = fa
 }) {
   const router = useRouter();
   const [enCours, demarrer] = useTransition();
-  const [choix, setChoix] = useState(programmes.length === 0);
   const [aEffacer, setAEffacer] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -76,7 +75,6 @@ export default function MesProgrammes({ programmes, amorces, locale, apercu = fa
             <h2 className="font-black text-white">Mes programmes</h2>
             <span className="text-xs font-bold" style={{ color: plein ? "#fdba74" : "#64748b" }}>
               {programmes.length} sur {MAX_PROGRAMMES}
-              {plein && " — efface-en un pour en commencer un nouveau"}
             </span>
           </div>
 
@@ -131,29 +129,23 @@ export default function MesProgrammes({ programmes, amorces, locale, apercu = fa
             ))}
           </div>
 
-          {!choix && !plein && (
-            <button type="button" onClick={() => setChoix(true)}
-              className="text-sm font-black px-4 py-2.5 rounded-xl"
-              style={{ background: "#1e293b", border: "1px solid #10b981", color: "#6ee7b7" }}>
-              ＋ Nouveau programme
-            </button>
-          )}
         </div>
       )}
 
-      {choix && !plein && (
+      {/* Les amorces sont toujours là, sous la liste. Elles étaient derrière un
+          bouton logé dans le bloc de la liste : en effaçant son dernier
+          programme, l'enfant se retrouvait devant une page entièrement vide,
+          sans aucun moyen d'en recommencer un. */}
+      {plein ? (
+        <p className="text-sm rounded-2xl px-4 py-3"
+          style={{ background: "rgba(249,115,22,0.10)", border: "1px solid rgba(249,115,22,0.35)", color: "#fdba74" }}>
+          Ton étagère est pleine — {MAX_PROGRAMMES} programmes. Effaces-en un pour en commencer un nouveau.
+        </p>
+      ) : (
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-black text-white">
-              {programmes.length === 0 ? "Choisis par quoi commencer" : "Par quoi commences-tu ?"}
-            </h2>
-            {programmes.length > 0 && (
-              <button type="button" onClick={() => setChoix(false)}
-                className="text-xs font-bold" style={{ color: "#94a3b8" }}>
-                ← Revenir à mes programmes
-              </button>
-            )}
-          </div>
+          <h2 className="font-black text-white">
+            {programmes.length === 0 ? "Choisis par quoi commencer" : "Commence un nouveau programme"}
+          </h2>
           <p className="text-sm" style={{ color: "#94a3b8" }}>
             Chacun marche déjà. Tu le modifies comme tu veux — ici, rien n&apos;est noté.
           </p>

@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { visiteurEleve } from "@/lib/eleve/acces";
 import { requireStudentPermission } from "@/lib/permissions/student";
@@ -38,15 +37,15 @@ export default async function AtelierPage({ params }: { params: Promise<{ locale
     return <Page locale={locale} programmes={[]} apercu />;
   }
 
-  await requireStudentPermission(user.id, "student.atelier", locale);
+  // Le niveau est déjà connu : `visiteurEleve` vient de lire la fiche.
+  if (!atelierOuvertA(visiteur.niveau, visiteur.niveauNum)) redirect(`/${locale}/eleve`);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const admin = createAdminClient() as any;
-  const { data: eleve } = await admin
-    .from("students").select("id, level, level_num").eq("id", visiteur.studentId).maybeSingle();
-  if (!atelierOuvertA(eleve?.level, eleve?.level_num)) redirect(`/${locale}/eleve`);
-
-  const programmes = await listerProgrammes(visiteur.studentId);
+  // Les droits et la liste ne dépendent pas l'un de l'autre : en file
+  // indienne, chacun ajoutait son aller-retour au temps d'affichage.
+  const [, programmes] = await Promise.all([
+    requireStudentPermission(user.id, "student.atelier", locale),
+    listerProgrammes(visiteur.studentId),
+  ]);
   return (
     <Page
       locale={locale}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { sauverProgramme, renommerProgramme, basculerPartage } from "@/app/[locale]/eleve/atelier/actions";
@@ -38,15 +38,17 @@ function relire<T extends string>(cle: string, defaut: T, valides: readonly T[])
   } catch { return defaut; }
 }
 
-export default function AtelierLibre({ id, titreInitial, codeInitial, jetonInitial, modifieLe, locale }: {
+export default function AtelierLibre({ id, titreInitial, codeInitial, sortieInitiale, jetonInitial, modifieLe, locale }: {
   id: string;
   titreInitial: string;
   codeInitial: string;
+  sortieInitiale: string | null;
   jetonInitial: string | null;
   modifieLe: string;
   locale: string;
 }) {
   const [code, setCode] = useState(codeInitial);
+  const [sortie, setSortie] = useState<string | null>(sortieInitiale);
   const [titre, setTitre] = useState(titreInitial);
   const [jeton, setJeton] = useState(jetonInitial);
   const [etat, setEtat] = useState<"repos" | "en_cours" | "garde" | "echec">("repos");
@@ -62,20 +64,28 @@ export default function AtelierLibre({ id, titreInitial, codeInitial, jetonIniti
   }, []);
 
   const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dernierSauve = useRef(codeInitial);
+  const dernierSauve = useRef({ code: codeInitial, sortie: sortieInitiale });
+
+  /**
+   * Le dernier résultat d'une exécution réussie part avec le code.
+   *
+   * Il n'était jamais enregistré : la page partagée promettait au parent de
+   * montrer le résultat avant de charger Python, et montrait un écran vide.
+   */
+  const noterSortie = useCallback((stdout: string) => setSortie(stdout), []);
 
   // La sauvegarde suit la frappe, de loin : deux secondes de silence.
   useEffect(() => {
-    if (code === dernierSauve.current) return;
+    if (code === dernierSauve.current.code && sortie === dernierSauve.current.sortie) return;
     setEtat("en_cours");
     if (minuteur.current) clearTimeout(minuteur.current);
     minuteur.current = setTimeout(async () => {
-      const r = await sauverProgramme(id, code, null);
-      dernierSauve.current = code;
+      const r = await sauverProgramme(id, code, sortie);
+      dernierSauve.current = { code, sortie };
       setEtat(r?.error ? "echec" : "garde");
     }, DELAI_SAUVEGARDE);
     return () => { if (minuteur.current) clearTimeout(minuteur.current); };
-  }, [code, id]);
+  }, [code, sortie, id]);
 
   const motEtat = {
     repos: `Modifié le ${new Date(modifieLe).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`,
@@ -153,7 +163,11 @@ export default function AtelierLibre({ id, titreInitial, codeInitial, jetonIniti
         onCodeChange={setCode}
         libre
         theme={theme}
-        rendreSortie={(stdout) => <EcranSortie appareil={appareil} sortie={stdout} titre={titre} />}
+        onSortie={noterSortie}
+        rendreSortie={(stdout, enMarche) => (
+          <EcranSortie appareil={appareil} sortie={stdout} titre={titre}
+            attente={enMarche ? "Ton programme tourne…" : undefined} />
+        )}
       />
 
       {/* Le partage — éteint tant qu'il ne l'allume pas. */}

@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { visiteurEleve } from "@/lib/eleve/acces";
 import { requireStudentPermission } from "@/lib/permissions/student";
@@ -26,15 +25,13 @@ export default async function ProgrammePage({ params }: {
   const visiteur = await visiteurEleve(supabase, user.id);
   if (!visiteur || visiteur.mode === "apercu") redirect(`/${locale}/eleve/atelier`);
 
-  await requireStudentPermission(user.id, "student.atelier", locale);
+  // Le niveau est déjà connu : `visiteurEleve` vient de lire la fiche.
+  if (!atelierOuvertA(visiteur.niveau, visiteur.niveauNum)) redirect(`/${locale}/eleve`);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const admin = createAdminClient() as any;
-  const { data: eleve } = await admin
-    .from("students").select("level, level_num").eq("id", visiteur.studentId).maybeSingle();
-  if (!atelierOuvertA(eleve?.level, eleve?.level_num)) redirect(`/${locale}/eleve`);
-
-  const programme = await chargerProgramme(visiteur.studentId, id);
+  const [, programme] = await Promise.all([
+    requireStudentPermission(user.id, "student.atelier", locale),
+    chargerProgramme(visiteur.studentId, id),
+  ]);
   if (!programme) redirect(`/${locale}/eleve/atelier`);
 
   return (
@@ -43,6 +40,7 @@ export default async function ProgrammePage({ params }: {
         id={programme.id}
         titreInitial={programme.titre}
         codeInitial={programme.code}
+        sortieInitiale={programme.sortie}
         jetonInitial={programme.jeton}
         modifieLe={programme.modifieLe}
         locale={locale}
