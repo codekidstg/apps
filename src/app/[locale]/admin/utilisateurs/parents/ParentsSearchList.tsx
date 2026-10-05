@@ -5,6 +5,8 @@ import Pages, { decouper, PAR_PAGE } from "@/components/backoffice/Pages";
 import AddChildForm from "./AddChildForm";
 import UnlinkButton from "./UnlinkButton";
 import { STATUT_PARENT, type StatutParent } from "@/lib/backoffice/statut-parent";
+import BoutonsRelance from "@/components/backoffice/BoutonsRelance";
+import type { Relance } from "@/lib/backoffice/relance-parent";
 import type { ActiviteParent } from "@/lib/backoffice/parents";
 
 const STATUTS = Object.entries(STATUT_PARENT) as [StatutParent, (typeof STATUT_PARENT)[StatutParent]][];
@@ -46,10 +48,13 @@ type StudentOption = { id: string; display_name: string };
 export default function ParentsSearchList({
   parents,
   studentList,
+  relances,
   filtreInitial = null,
 }: {
   parents: ParentRow[];
   studentList: StudentOption[];
+  /** Les deux messages de relance, pré-écrits côté serveur pour chaque parent. */
+  relances: Record<string, Relance>;
   /** Arrivée depuis l'alerte du tableau de bord : on ouvre sur « À relancer ». */
   filtreInitial?: StatutParent | null;
 }) {
@@ -163,6 +168,11 @@ export default function ParentsSearchList({
                 <Demarche ok={a.notifications} texte="Notifications" />
               </div>
               {a.derniereAction && <div className="text-xs text-gray-500">Dernière action : {a.derniereAction}</div>}
+              {/* On ne relance pas quelqu'un qui vient : le bouton
+                  n'apparaît pas sur un parent actif. */}
+              {a.statut !== "actif" && relances[parent.id] && (
+                <BoutonsRelance relance={relances[parent.id]} />
+              )}
               {a.recents.length > 0 && (
                 <details className="group">
                   <summary className="cursor-pointer text-xs font-bold text-brand-navy hover:underline list-none">

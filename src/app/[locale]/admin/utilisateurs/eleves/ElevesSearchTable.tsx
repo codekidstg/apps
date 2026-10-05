@@ -7,6 +7,7 @@ import LevelSelect from "./LevelSelect";
 import type { Parcours } from "@/lib/progression";
 import { STATUT_ELEVE, type StatutEleve } from "@/lib/backoffice/statut-eleve";
 import { quandLisible, type Fil } from "@/lib/backoffice/fil-format";
+import Infobulle from "@/components/backoffice/Infobulle";
 
 const LEVELS = [
   { num: 1, name: "Explorateur 🌱", color: "#10B981" },
@@ -164,17 +165,58 @@ export default function ElevesSearchTable({ students, basePath = "/admin/utilisa
                     {p.aucunThemeActive ? (
                       <span className="text-xs font-bold text-amber-600">Aucun thème activé</span>
                     ) : (
-                      <>
-                        <div className="text-sm font-bold text-gray-700">{p.faites}/{p.total} leçons</div>
-                        <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden w-24">
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: lvl.color }} />
-                        </div>
+                      /* D'où il vient et où il va, à l'endroit où l'œil se
+                         pose. L'information existait déjà, mais dans la
+                         dernière colonne du tableau — celle qui sort de
+                         l'écran dès qu'on travaille sur un portable. */
+                      <Infobulle
+                        libelle={`Progression de ${s.name} : ${p.faites} leçons sur ${p.total}`}
+                        contenu={
+                          <span className="block space-y-1.5">
+                            {p.themeCourant && (
+                              <span className="block text-xs font-black text-white">
+                                📚 {p.themeCourant}
+                                {p.rangTheme && (
+                                  <span className="font-bold" style={{ color: "#94a3b8" }}>
+                                    {" "}— thème {p.rangTheme} sur {p.themesDuNiveau}
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                            {s.fil.derniereLecon ? (
+                              <span className="block text-[11px]" style={{ color: "#6ee7b7" }}>
+                                ✅ Terminé : <span className="font-bold">{s.fil.derniereLecon.titre}</span>
+                                <span style={{ color: "#64748b" }}>
+                                  {" "}— {quandLisible(s.fil.derniereLecon.quand, Date.now()).jour}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="block text-[11px]" style={{ color: "#64748b" }}>
+                                Aucune leçon terminée pour l&apos;instant.
+                              </span>
+                            )}
+                            {p.termine ? (
+                              <span className="block text-[11px] font-bold" style={{ color: "#6ee7b7" }}>
+                                ✓ Thème terminé — à ouvrir sur le suivant.
+                              </span>
+                            ) : p.prochaineLecon ? (
+                              <span className="block text-[11px]" style={{ color: "#fdba74" }}>
+                                ▶ Prochaine : <span className="font-bold">{p.prochaineLecon}</span>
+                              </span>
+                            ) : null}
+                          </span>
+                        }
+                      >
+                        <span className="block text-sm font-bold text-gray-700">{p.faites}/{p.total} leçons</span>
+                        <span className="block mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden w-24">
+                          <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: lvl.color }} />
+                        </span>
                         {p.rangTheme && (
-                          <div className="text-[11px] text-gray-400 font-medium mt-1">
+                          <span className="block text-[11px] text-gray-400 font-medium mt-1">
                             Thème {p.rangTheme} sur {p.themesDuNiveau}
-                          </div>
+                          </span>
                         )}
-                      </>
+                      </Infobulle>
                     )}
                   </td>
                   {/* Ce qu'il a fait en dernier. La colonne suivante dit où il va ;

@@ -4,7 +4,8 @@ import Link from "next/link";
 import StudentProfileForm from "./StudentProfileForm";
 import { chargerParcoursEleve } from "@/lib/backoffice/eleves";
 import EvolutionEleve from "@/components/backoffice/EvolutionEleve";
-import FilEleve from "@/components/backoffice/FilEleve";
+import FilEleve, { resumeFilEleve } from "@/components/backoffice/FilEleve";
+import BlocPliable from "@/components/backoffice/BlocPliable";
 
 const LEVELS = [
   { num: 1, name: "Explorateur 🌱", color: "#10B981" },
@@ -95,22 +96,32 @@ export default async function StudentDetailPage({
         </div>
       </div>
 
-      <FilEleve studentId={studentId} />
+      {/* Trois blocs qui se replient, et dont le réglage reste dans le
+          navigateur. Évolution ouvert : c'est le verdict, il doit être sous
+          les yeux en arrivant. Le fil est le détail, la fiche ne s'ouvre que
+          pour écrire. */}
+      <BlocPliable cle="eleve.evolution" titre="Évolution" defautOuvert>
+        <EvolutionEleve studentId={studentId} espace="admin" nu />
+      </BlocPliable>
 
-      <EvolutionEleve studentId={studentId} espace="admin" />
+      <BlocPliable cle="eleve.fil" titre="Son fil" resume={await resumeFilEleve(studentId)}>
+        <FilEleve studentId={studentId} nu />
+      </BlocPliable>
 
-      {/* Formulaire fiche */}
-      <StudentProfileForm
-        studentId={studentId}
-        initial={{
-          gender:       student.gender       ?? null,
-          birth_year:   student.birth_year   ?? null,
-          device:       student.device       ?? null,
-          school_level: student.school_level ?? null,
-          objective:    student.objective    ?? null,
-          notes:        student.notes        ?? null,
-        }}
-      />
+      <BlocPliable cle="eleve.fiche" titre="Fiche de renseignements"
+        resume="Identité, matériel, objectif, notes — on ne l'ouvre que pour écrire.">
+        <StudentProfileForm
+          studentId={studentId}
+          initial={{
+            gender:       student.gender       ?? null,
+            birth_year:   student.birth_year   ?? null,
+            device:       student.device       ?? null,
+            school_level: student.school_level ?? null,
+            objective:    student.objective    ?? null,
+            notes:        student.notes        ?? null,
+          }}
+        />
+      </BlocPliable>
     </div>
   );
 }

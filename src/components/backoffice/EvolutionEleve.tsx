@@ -36,7 +36,7 @@ function SuiteQuestion({ q }: { q: QuestionVue }) {
   );
 }
 
-export function CarteEvolution({ ev, lienQuestions }: { ev: Evolution; lienQuestions?: string }) {
+export function CarteEvolution({ ev, lienQuestions, nu = false }: { ev: Evolution; lienQuestions?: string; nu?: boolean }) {
   const statut = STATUT_ELEVE[ev.statut];
   const p = ev.parcours;
   const retard = ev.seancesPassees > 0 ? Math.max(0, ev.seancesPassees - ev.leconsTerminees) : null;
@@ -54,11 +54,13 @@ export function CarteEvolution({ ev, lienQuestions }: { ev: Evolution; lienQuest
   // plateforme compte une leçon de retard : c'est l'écart qu'il faut voir.
   const ecart = retard !== null && retard >= 1 && enCours && rapportDerniere?.avancement === "completed" ? rapportDerniere : null;
 
+  // `nu` : sans sa carte ni son titre — l'appelant les fournit déjà.
+  const Cadre = nu ? "div" : "section";
   return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-5">
+    <Cadre className={nu ? "" : "bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-5"}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <h2 className="font-black text-base" style={{ color: "#1B2D5E" }}>Évolution</h2>
-        <span className={`text-xs font-black px-3 py-1 rounded-full border ${statut.classes}`}>
+        {!nu && <h2 className="font-black text-base" style={{ color: "#1B2D5E" }}>Évolution</h2>}
+        <span className={`ml-auto text-xs font-black px-3 py-1 rounded-full border ${statut.classes}`}>
           {statut.pastille} {statut.label.toUpperCase()}
         </span>
       </div>
@@ -226,13 +228,13 @@ export function CarteEvolution({ ev, lienQuestions }: { ev: Evolution; lienQuest
           <span>? « Je bloque ici »</span>
         </div>
       </div>
-    </section>
+    </Cadre>
   );
 }
 
 /** La section qui va chercher elle-même ses données : une fiche n'a qu'à la poser. */
-export default async function EvolutionEleve({ studentId, espace }: { studentId: string; espace: "admin" | "manager" }) {
+export default async function EvolutionEleve({ studentId, espace, nu = false }: { studentId: string; espace: "admin" | "manager"; nu?: boolean }) {
   const ev = (await chargerEvolutions([studentId], true)).get(studentId);
   if (!ev) return null;
-  return <CarteEvolution ev={ev} lienQuestions={`/${espace}/questions?eleve=${studentId}`} />;
+  return <CarteEvolution ev={ev} lienQuestions={`/${espace}/questions?eleve=${studentId}`} nu={nu} />;
 }

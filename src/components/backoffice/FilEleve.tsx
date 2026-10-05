@@ -46,14 +46,20 @@ function LigneEvenement({ e, maintenant }: { e: Evenement; maintenant: number })
   );
 }
 
-/** Le fil rendu seul, quand l'appelant a déjà chargé les données. */
-export function CarteFil({ fil, titre = "Son fil" }: { fil: Fil; titre?: string }) {
+/**
+ * Le fil rendu seul, quand l'appelant a déjà chargé les données.
+ *
+ * `nu` : sans sa carte ni son titre — l'appelant les fournit déjà, et deux
+ * cadres emboîtés avec deux titres identiques, ça se voit.
+ */
+export function CarteFil({ fil, titre = "Son fil", nu = false }: { fil: Fil; titre?: string; nu?: boolean }) {
   const maintenant = Date.now();
+  const Cadre = nu ? "div" : "section";
   return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-5">
+    <Cadre className={nu ? "" : "bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-5"}>
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <h2 className="font-black text-base" style={{ color: "#1B2D5E" }}>{titre}</h2>
-        <span className="text-xs text-gray-400">du plus récent au plus ancien</span>
+        {!nu && <h2 className="font-black text-base" style={{ color: "#1B2D5E" }}>{titre}</h2>}
+        <span className="text-xs text-gray-400 ml-auto">du plus récent au plus ancien</span>
       </div>
       <p className="text-sm text-gray-600 mt-1">{resumeDuFil(fil, maintenant)}</p>
 
@@ -64,7 +70,7 @@ export function CarteFil({ fil, titre = "Son fil" }: { fil: Fil; titre?: string 
           {fil.evenements.map((e, i) => <LigneEvenement key={i} e={e} maintenant={maintenant} />)}
         </ul>
       )}
-    </section>
+    </Cadre>
   );
 }
 
@@ -90,6 +96,13 @@ export function FilDeroulant({ fil }: { fil: Fil }) {
   );
 }
 
-export default async function FilEleve({ studentId, limite = 10 }: { studentId: string; limite?: number }) {
-  return <CarteFil fil={await filEleve(studentId, limite)} />;
+export default async function FilEleve({ studentId, limite = 10, nu = false }: {
+  studentId: string; limite?: number; nu?: boolean;
+}) {
+  return <CarteFil fil={await filEleve(studentId, limite)} nu={nu} />;
+}
+
+/** Le résumé du fil, pour l'afficher quand le bloc est replié. */
+export async function resumeFilEleve(studentId: string): Promise<string> {
+  return resumeDuFil(await filEleve(studentId, 1), Date.now());
 }

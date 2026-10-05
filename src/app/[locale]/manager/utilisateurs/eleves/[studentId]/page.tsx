@@ -4,7 +4,8 @@ import Link from "next/link";
 import StudentProfileForm from "@/app/[locale]/admin/utilisateurs/eleves/[studentId]/StudentProfileForm";
 import { chargerParcoursEleve } from "@/lib/backoffice/eleves";
 import EvolutionEleve from "@/components/backoffice/EvolutionEleve";
-import FilEleve from "@/components/backoffice/FilEleve";
+import FilEleve, { resumeFilEleve } from "@/components/backoffice/FilEleve";
+import BlocPliable from "@/components/backoffice/BlocPliable";
 
 const LEVELS = [
   { num: 1, name: "Explorateur 🌱", color: "#10B981" },
@@ -90,9 +91,15 @@ export default async function ManagerStudentDetailPage({
         </div>
       </div>
 
-      <FilEleve studentId={studentId} />
+      {/* Mêmes blocs repliables que côté admin : la fiche est la même, le
+          réglage de chacun reste dans son navigateur. */}
+      <BlocPliable cle="eleve.evolution" titre="Évolution" defautOuvert>
+        <EvolutionEleve studentId={studentId} espace="manager" nu />
+      </BlocPliable>
 
-      <EvolutionEleve studentId={studentId} espace="manager" />
+      <BlocPliable cle="eleve.fil" titre="Son fil" resume={await resumeFilEleve(studentId)}>
+        <FilEleve studentId={studentId} nu />
+      </BlocPliable>
 
       <StudentProfileForm
         studentId={studentId}
