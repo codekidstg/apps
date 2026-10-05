@@ -4,6 +4,7 @@ import Link from "next/link";
 import QuestReader from "@/app/[locale]/eleve/quete/[lessonId]/QuestReader";
 import { autorisationCours, leconOuverte } from "@/lib/prof/acces-cours";
 import { FondMarque, PiedDeMarque, SignatureInvisible } from "@/components/prof/MarqueProprietaire";
+import { noterConsultation } from "@/lib/prof/journal";
 
 type Block = { id: string; type: string; content: Record<string, unknown>; order_index: number };
 
@@ -41,6 +42,10 @@ export default async function ProfLessonPage({
   // L'identifiant du thème de l'adresse ne servait à rien : il n'était jamais
   // confronté à la leçon demandée.
   if (chapter?.theme_id !== themeId) notFound();
+
+  // Le journal n'est pas attendu : si l'écriture échoue, le mentor voit quand
+  // même son cours. Un journal n'a pas à casser une séance du samedi.
+  if (autorisation.mode === "mentor") noterConsultation(user.id, lessonId);
 
   const { data: theme } = await admin.from("themes")
     .select("id, title")

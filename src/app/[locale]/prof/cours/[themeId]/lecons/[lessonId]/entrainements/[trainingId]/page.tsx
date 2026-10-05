@@ -4,6 +4,7 @@ import Link from "next/link";
 import TrainingReader from "@/app/[locale]/eleve/entrainement/[trainingId]/TrainingReader";
 import { autorisationCours, leconOuverte } from "@/lib/prof/acces-cours";
 import { FondMarque, PiedDeMarque } from "@/components/prof/MarqueProprietaire";
+import { noterConsultation } from "@/lib/prof/journal";
 
 type Block = { id: string; type: string; content: Record<string, unknown>; order_index: number };
 
@@ -34,6 +35,10 @@ export default async function ProfTrainingPage({
   if (!training) notFound();
   // L'entraînement doit bien appartenir à la leçon de l'adresse.
   if (training.lesson_id !== lessonId) notFound();
+
+  // L'entraînement compte pour sa leçon : c'est l'étendue du contenu lu qui se
+  // mesure, pas le nombre de pages ouvertes.
+  if (autorisation.mode === "mentor") noterConsultation(user.id, lessonId);
 
   const { data: blocksRaw } = await (admin.from("training_blocks") as any)
     .select("id, type, content, order_index")

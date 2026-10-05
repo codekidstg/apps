@@ -3,6 +3,8 @@ import { getRapportsData } from "@/lib/rapports";
 import { compterBilansAFaire } from "@/lib/backoffice/bilans";
 import { moisABoucler, libelleMois } from "@/lib/backoffice/mois";
 import { debutPeriode, PERIODE_DEFAUT, libellePeriode } from "@/lib/planning/occurrences-passees";
+import { aspirationsRecentes } from "@/lib/prof/journal";
+import { FENETRE_MINUTES } from "@/lib/prof/aspiration";
 
 /**
  * Les deux choses du suivi des mentors qui attendent quelqu'un, en tête des
@@ -45,15 +47,29 @@ export default async function AlerteSuiviMentors(
   const mois = moisABoucler(maintenant);
   // La même période que la page des rapports : l'alerte et l'écran qu'elle
   // ouvre doivent annoncer le même nombre.
-  const [{ manquants }, bilans] = await Promise.all([
+  const [{ manquants }, bilans, aspirations] = await Promise.all([
     getRapportsData({ depuis: debutPeriode(PERIODE_DEFAUT) ?? undefined }),
     mois ? compterBilansAFaire(mois) : Promise.resolve({ mentors: 0, aFaire: 0 }),
+    aspirationsRecentes(),
   ]);
 
-  if (!manquants && !bilans.aFaire) return null;
+  if (!manquants && !bilans.aFaire && aspirations.length === 0) return null;
 
   return (
     <div className="space-y-4">
+      {/* En tête : un mentor qui parcourt le catalogue ne prépare pas une
+          séance. C'est la seule alerte ici qui ne réclame pas un oubli à
+          rattraper — elle demande qu'on aille voir. */}
+      {aspirations.map((a) => (
+        <Ligne
+          key={a.teacherId}
+          href={`/${espace}/mentors`}
+          emoji="🔍"
+          ton="rouge"
+          titre={`${a.nom} a ouvert ${a.pic.lecons} leçons en ${FENETRE_MINUTES} minutes`}
+          detail={`Le ${new Date(a.pic.debut).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}. Préparer une séance en demande deux ou trois — à vérifier avec lui.`}
+        />
+      ))}
       {manquants > 0 && (
         <Ligne
           href={`/${espace}/rapports`}
