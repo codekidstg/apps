@@ -45,8 +45,11 @@ export default async function ProfLayout({ children }: { children: React.ReactNo
     <BackofficeShell
       role="teacher"
       displayName={profile?.display_name ?? "Mentor"}
-      hiddenKeys={hiddenKeys}
-      badges={{ "teacher.questions": questionsEnAttente }}
+      // Tant qu'il n'a pas accepté, le menu disparaît : toutes les pages
+      // affichent de toute façon le même écran, et des liens qui ramènent au
+      // même endroit donnent l'impression d'un site cassé.
+      hiddenKeys={aAccepte ? hiddenKeys : allKeys}
+      badges={aAccepte ? { "teacher.questions": questionsEnAttente } : {}}
     >
       {aAccepte ? children : <EcranEngagement />}
     </BackofficeShell>
