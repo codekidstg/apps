@@ -9,7 +9,11 @@ const intlMiddleware = createIntlMiddleware(routing);
 // « /realisation » est la page qu'un parent ouvre depuis un lien, sans compte :
 // elle doit rester accessible sans connexion, comme l'atelier découverte. Ce
 // qu'elle expose est volontairement limité au prénom (voir migration 030).
-const PUBLIC_PATHS = ["/", "/connexion", "/inscription", "/test-maze", "/test-music", "/atelier", "/realisation"];
+// « /p/<jeton> » est son équivalent pour l'atelier : le programme qu'un enfant
+// envoie à ses parents pour qu'ils y jouent. Même règle — le titre et le
+// prénom, rien d'autre — et la page n'existe que si l'enfant a allumé le
+// partage (migration 042).
+const PUBLIC_PATHS = ["/", "/connexion", "/inscription", "/test-maze", "/test-music", "/atelier", "/realisation", "/p"];
 
 // Routes réservées par rôle (préfixes)
 const ROLE_ROUTES: Record<string, string[]> = {

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugFromNum, type LevelSlug } from "@/lib/levels";
+import { prenomPublic } from "./atelier-regles";
 
 /**
  * L'atelier libre — l'établi de l'enfant.
@@ -173,20 +174,99 @@ for ligne in range(1, hauteur + 1):
   },
 ];
 
-export type Etabli = { code: string; sortie: string | null; modifieLe: string | null };
+/** Un programme de l'enfant, tel qu'il est rangé sur son établi. */
+export type Programme = {
+  id: string;
+  titre: string;
+  code: string;
+  sortie: string | null;
+  /** Le jeton du lien public. Nul tant que l'enfant n'a rien partagé. */
+  jeton: string | null;
+  modifieLe: string;
+};
 
-/** Le code où l'enfant s'est arrêté. Vide la première fois. */
-export async function chargerAtelier(studentId: string): Promise<Etabli> {
+const CHAMPS = "id, titre, code, sortie, jeton, updated_at";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function enProgramme(r: any): Programme {
+  return {
+    id: r.id,
+    titre: r.titre,
+    code: r.code ?? "",
+    sortie: r.sortie ?? null,
+    jeton: r.jeton ?? null,
+    modifieLe: r.updated_at,
+  };
+}
+
+/** Ses programmes, le plus récemment touché devant. */
+export async function listerProgrammes(studentId: string): Promise<Programme[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
   const { data, error } = await admin
     .from("atelier_eleve")
-    .select("code, sortie, updated_at")
+    .select(CHAMPS)
     .eq("student_id", studentId)
+    .order("updated_at", { ascending: false });
+  if (error) {
+    console.error("[atelier] liste :", error.message);
+    return [];
+  }
+  return (data ?? []).map(enProgramme);
+}
+
+/**
+ * Un programme précis, et seulement s'il appartient à cet enfant.
+ *
+ * Le `student_id` est dans la requête, pas vérifié après coup : une adresse
+ * devinée ne doit rien rendre du tout.
+ */
+export async function chargerProgramme(studentId: string, id: string): Promise<Programme | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  const { data, error } = await admin
+    .from("atelier_eleve")
+    .select(CHAMPS)
+    .eq("student_id", studentId)
+    .eq("id", id)
     .maybeSingle();
   if (error) {
     console.error("[atelier] chargement :", error.message);
-    return { code: "", sortie: null, modifieLe: null };
+    return null;
   }
-  return { code: data?.code ?? "", sortie: data?.sortie ?? null, modifieLe: data?.updated_at ?? null };
+  return data ? enProgramme(data) : null;
+}
+
+/** Ce que voit le parent au bout du lien. Rien d'autre que ça. */
+export type ProgrammePartage = {
+  titre: string;
+  code: string;
+  /** Le dernier résultat enregistré : il s'affiche avant que Python ne charge. */
+  sortie: string | null;
+  prenom: string;
+};
+
+export async function programmePartage(jeton: string): Promise<ProgrammePartage | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  const { data, error } = await admin
+    .from("atelier_eleve")
+    .select("titre, code, sortie, student_id")
+    .eq("jeton", jeton)
+    .maybeSingle();
+  if (error || !data) return null;
+
+  // Le prénom passe par le profil ; le nom de famille ne sort jamais d'ici.
+  const { data: eleve } = await admin
+    .from("students").select("profile_id").eq("id", data.student_id).maybeSingle();
+  const { data: profil } = eleve
+    ? await admin.from("profiles").select("display_name").eq("id", eleve.profile_id).maybeSingle()
+    : { data: null };
+
+  return {
+    titre: data.titre,
+    code: data.code ?? "",
+    sortie: data.sortie ?? null,
+    prenom: prenomPublic(profil?.display_name),
+  };
 }

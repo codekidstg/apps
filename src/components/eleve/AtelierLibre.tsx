@@ -1,25 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
-import { sauverAtelier } from "@/app/[locale]/eleve/atelier/actions";
-import type { Amorce } from "@/lib/eleve/atelier";
+import Link from "next/link";
+import { sauverProgramme, renommerProgramme, basculerPartage } from "@/app/[locale]/eleve/atelier/actions";
+import { TITRE_MAX } from "@/lib/eleve/atelier-regles";
 import EcranSortie, { ChoixAppareil, type Appareil } from "./EcranSortie";
 import { THEMES, THEME_DEFAUT, type ThemeId } from "@/components/editor/themes";
 
 const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), { ssr: false });
 
 /**
- * L'atelier libre — l'établi de l'enfant.
- *
- * Il ne s'ouvre jamais sur une page blanche : soit le dernier code écrit, soit
- * le choix d'une amorce qui tourne déjà. Un enfant de douze ans devant un
- * éditeur vide ne tape rien ; devant trois lignes qui marchent, il en change
- * une pour voir.
+ * Un programme sur l'établi.
  *
  * La sauvegarde part toute seule, deux secondes après la dernière frappe. S'il
- * fallait penser à enregistrer, il perdrait son programme une fois — et ne
- * reviendrait pas.
+ * fallait penser à enregistrer, l'enfant perdrait son programme une fois — et
+ * ne reviendrait pas.
+ *
+ * Le partage est éteint tant qu'il ne l'allume pas, et s'éteint pour de bon :
+ * le lien envoyé la veille ne répond plus.
  */
 
 const DELAI_SAUVEGARDE = 2000;
@@ -39,122 +38,92 @@ function relire<T extends string>(cle: string, defaut: T, valides: readonly T[])
   } catch { return defaut; }
 }
 
-export default function AtelierLibre({ codeInitial, amorces, modifieLe }: {
+export default function AtelierLibre({ id, titreInitial, codeInitial, jetonInitial, modifieLe, locale }: {
+  id: string;
+  titreInitial: string;
   codeInitial: string;
-  amorces: Amorce[];
-  modifieLe: string | null;
+  jetonInitial: string | null;
+  modifieLe: string;
+  locale: string;
 }) {
   const [code, setCode] = useState(codeInitial);
-  const [commence, setCommence] = useState(Boolean(codeInitial.trim()));
+  const [titre, setTitre] = useState(titreInitial);
+  const [jeton, setJeton] = useState(jetonInitial);
   const [etat, setEtat] = useState<"repos" | "en_cours" | "garde" | "echec">("repos");
   const [appareil, setAppareil] = useState<Appareil>("telephone");
   const [theme, setTheme] = useState<ThemeId>(THEME_DEFAUT);
-  /**
-   * L'éditeur garde son texte lui-même : lui passer un nouveau code ne suffit
-   * pas à le changer sous les doigts de l'enfant. Choisir une autre amorce le
-   * remonte donc à neuf — c'est à ça que sert ce compteur.
-   */
-  const [graine, setGraine] = useState(0);
-
-  function charger(nouveau: string) {
-    setCode(nouveau);
-    setGraine((g) => g + 1);
-    setCommence(true);
-  }
+  const [copie, setCopie] = useState(false);
+  const [enCours, demarrer] = useTransition();
 
   // Relus après le premier rendu : le serveur ne connaît pas le navigateur.
   useEffect(() => {
     setAppareil(relire("atelier.appareil", "telephone", ["telephone", "ordinateur", "console"] as const));
     setTheme(relire("atelier.theme", THEME_DEFAUT, THEMES.map((t) => t.id) as ThemeId[]));
   }, []);
+
   const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dernierSauve = useRef(codeInitial);
 
-  // La sauvegarde suit la frappe, de loin : deux secondes de silence. Elle ne
-  // regarde pas l'écran affiché : retourner au choix des amorces ne doit pas
-  // annuler l'enregistrement des dernières lettres tapées.
+  // La sauvegarde suit la frappe, de loin : deux secondes de silence.
   useEffect(() => {
-    if (!code.trim() || code === dernierSauve.current) return;
+    if (code === dernierSauve.current) return;
     setEtat("en_cours");
     if (minuteur.current) clearTimeout(minuteur.current);
     minuteur.current = setTimeout(async () => {
-      const r = await sauverAtelier(code, null);
+      const r = await sauverProgramme(id, code, null);
       dernierSauve.current = code;
       setEtat(r?.error ? "echec" : "garde");
     }, DELAI_SAUVEGARDE);
     return () => { if (minuteur.current) clearTimeout(minuteur.current); };
-  }, [code]);
-
-  if (!commence) {
-    // Il n'y a qu'un seul établi : prendre une autre amorce remplace ce qui est
-    // dessus. On le dit avant, et on laisse la porte de sortie bien visible.
-    const aDejaUnProgramme = Boolean(code.trim());
-    return (
-      <div className="space-y-4">
-        <p className="text-sm" style={{ color: "#94a3b8" }}>
-          Choisis un programme qui marche déjà. Tu le modifies comme tu veux — ici, rien n&apos;est noté.
-        </p>
-        {aDejaUnProgramme && (
-          <div className="rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3"
-            style={{ background: "rgba(249,115,22,0.10)", border: "1px solid rgba(249,115,22,0.35)" }}>
-            <span className="text-xs font-bold" style={{ color: "#fdba74" }}>
-              ⚠️ Si tu en choisis un, il prendra la place de ton programme d&apos;aujourd&apos;hui.
-            </span>
-            <button type="button" onClick={() => setCommence(true)}
-              className="text-xs font-black px-3 py-1.5 rounded-xl shrink-0"
-              style={{ background: "#1e293b", border: "1px solid #10b981", color: "#6ee7b7" }}>
-              ← Revenir à mon programme
-            </button>
-          </div>
-        )}
-        {/* Huit amorces : deux colonnes sur tablette, quatre sur ordinateur.
-            Chacune annonce la notion qu'elle fait rencontrer — sans ça, un
-            enfant les ouvre au hasard et retombe trois fois sur la même. */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {amorces.map((a) => (
-            <button key={a.id} type="button"
-              onClick={() => charger(a.code)}
-              className="text-left rounded-2xl p-4 flex flex-col gap-1.5 transition-colors hover:border-emerald-600"
-              style={{ background: "#1e293b", border: "1px solid #334155" }}>
-              <div className="text-2xl">{a.emoji}</div>
-              <div className="font-black text-white text-sm">{a.titre}</div>
-              <span className="text-[10px] font-black uppercase tracking-wide self-start px-2 py-0.5 rounded-full"
-                style={{ background: "rgba(16,185,129,0.12)", color: "#6ee7b7" }}>
-                {a.notion}
-              </span>
-              <div className="text-xs leading-relaxed" style={{ color: "#94a3b8" }}>{a.quoi}</div>
-            </button>
-          ))}
-        </div>
-        <button type="button" onClick={() => charger("# Écris ton programme ici\n")}
-          className="text-xs font-bold underline" style={{ color: "#64748b" }}>
-          Je préfère partir de rien
-        </button>
-      </div>
-    );
-  }
+  }, [code, id]);
 
   const motEtat = {
-    repos: modifieLe ? `Dernière fois : ${new Date(modifieLe).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : "",
+    repos: `Modifié le ${new Date(modifieLe).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`,
     en_cours: "Enregistrement…",
     garde: "✓ Enregistré",
     echec: "⚠ Pas enregistré — réessaie dans un instant",
   }[etat];
 
+  const lien = jeton ? `${typeof window !== "undefined" ? window.location.origin : ""}/${locale}/p/${jeton}` : null;
+
+  function changerPartage(actif: boolean) {
+    demarrer(async () => {
+      const r = await basculerPartage(id, actif);
+      if (!r.error) { setJeton(r.jeton ?? null); setCopie(false); }
+    });
+  }
+
+  function copier() {
+    if (!lien) return;
+    navigator.clipboard?.writeText(lien).then(() => {
+      setCopie(true);
+      setTimeout(() => setCopie(false), 2500);
+    }).catch(() => { /* le lien reste affiché, il peut le recopier */ });
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {/* La seule porte vers le choix des programmes : elle était en bas,
-            repliée, et ne changeait rien à l'éditeur. */}
-        <button type="button" onClick={() => setCommence(false)}
+        <Link href={`/${locale}/eleve/atelier`}
           className="text-xs font-black px-3 py-1.5 rounded-xl transition-colors hover:border-emerald-600"
           style={{ background: "#1e293b", border: "1px solid #334155", color: "#94a3b8" }}>
-          ← Changer de programme
-        </button>
+          ← Mes programmes
+        </Link>
         <span className="text-xs font-bold" style={{ color: etat === "echec" ? "#fca5a5" : "#64748b" }}>
           {motEtat}
         </span>
       </div>
+
+      {/* Le titre s'écrit sur place : pas de bouton « renommer », pas de boîte. */}
+      <input
+        value={titre}
+        maxLength={TITRE_MAX}
+        onChange={(e) => setTitre(e.target.value)}
+        onBlur={() => { if (titre.trim() && titre !== titreInitial) renommerProgramme(id, titre); }}
+        aria-label="Le nom de ton programme"
+        className="w-full bg-transparent text-2xl font-black text-white outline-none rounded-lg px-2 py-1 -ml-2 focus:bg-slate-900"
+      />
+
       <p className="text-xs" style={{ color: "#64748b" }}>
         Ton programme s&apos;enregistre tout seul. Rien n&apos;est noté ici.
       </p>
@@ -178,15 +147,56 @@ export default function AtelierLibre({ codeInitial, amorces, modifieLe }: {
       </div>
 
       <PythonRunner
-        key={`atelier-${graine}`}
+        key={id}
         starterCode={code}
         initialCode={code}
         onCodeChange={setCode}
         libre
         theme={theme}
-        rendreSortie={(stdout) => <EcranSortie appareil={appareil} sortie={stdout} />}
+        rendreSortie={(stdout) => <EcranSortie appareil={appareil} sortie={stdout} titre={titre} />}
       />
 
+      {/* Le partage — éteint tant qu'il ne l'allume pas. */}
+      <div className="rounded-2xl px-4 py-3 space-y-2" style={{ background: "#0f172a", border: "1px solid #1e293b" }}>
+        {jeton ? (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-black" style={{ color: "#6ee7b7" }}>
+                🔗 Ton programme est partagé
+              </span>
+              <button type="button" onClick={() => changerPartage(false)} disabled={enCours}
+                className="text-xs font-bold hover:underline disabled:opacity-50" style={{ color: "#fca5a5" }}>
+                Arrêter le partage
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="flex-1 min-w-0 truncate text-xs font-mono px-3 py-2 rounded-lg"
+                style={{ background: "#1e293b", color: "#e2e8f0" }}>
+                {lien}
+              </code>
+              <button type="button" onClick={copier}
+                className="text-xs font-black px-3 py-2 rounded-lg shrink-0"
+                style={{ background: "#064e3b", color: "#6ee7b7" }}>
+                {copie ? "✓ Copié" : "Copier"}
+              </button>
+            </div>
+            <p className="text-xs" style={{ color: "#64748b" }}>
+              Envoie ce lien à tes parents : ils pourront y jouer, sans rien installer.
+            </p>
+          </>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs" style={{ color: "#94a3b8" }}>
+              Tu veux le montrer à tes parents ? Partage-le, ils pourront y jouer depuis leur téléphone.
+            </p>
+            <button type="button" onClick={() => changerPartage(true)} disabled={enCours}
+              className="text-xs font-black px-3 py-2 rounded-xl shrink-0 disabled:opacity-50"
+              style={{ background: "#1e293b", border: "1px solid #10b981", color: "#6ee7b7" }}>
+              🔗 Partager mon programme
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

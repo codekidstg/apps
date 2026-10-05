@@ -30,6 +30,13 @@ type Props = {
    * en dessous, là où elles se lisent.
    */
   rendreSortie?: (stdout: string) => React.ReactNode;
+  /**
+   * Page partagée : le parent vient jouer, pas lire. L'éditeur disparaît, il
+   * ne reste que le bouton et l'écran.
+   */
+  cacherEditeur?: boolean;
+  /** Le mot sur le bouton : « Exécuter » pour l'enfant, « Jouer » pour le parent. */
+  libelleLancer?: string;
 };
 
 let workerInstance: Worker | null = null;
@@ -76,6 +83,8 @@ export default function PythonRunner({
   libre = false,
   theme,
   rendreSortie,
+  cacherEditeur = false,
+  libelleLancer = "Exécuter",
 }: Props) {
   const [code, setCode] = useState(initialCode ?? starterCode);
 
@@ -220,14 +229,16 @@ export default function PythonRunner({
       )}
 
       {/* Éditeur */}
-      <CodeEditor
-        value={code}
-        onChange={handleCodeChange}
-        language={language}
-        readOnly={readOnly}
-        minHeight="180px"
-        theme={theme}
-      />
+      {!cacherEditeur && (
+        <CodeEditor
+          value={code}
+          onChange={handleCodeChange}
+          language={language}
+          readOnly={readOnly}
+          minHeight="180px"
+          theme={theme}
+        />
+      )}
 
       {/* Barre d'actions */}
       <div className="flex items-center gap-3">
@@ -242,7 +253,7 @@ export default function PythonRunner({
               {status === "loading_pyodide" ? "Chargement Python…" : "Exécution…"}
             </>
           ) : (
-            <> ▶ Exécuter</>
+            <> ▶ {libelleLancer}</>
           )}
         </button>
 
