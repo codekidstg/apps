@@ -99,9 +99,11 @@ export function verifier(EXOS, { interdits = [], paliers = [1, 1, 2, 2, 2, 3, 3]
         if (d1.length !== new Set(d1).size) mauvais(`${e.title} : deux paires ont la même droite — insoluble`);
       }
 
-      // Le moteur du quiz affiche les choix dans l'ordre donné — il ne les
-      // mélange pas, contrairement aux phrases à trous. Une bonne réponse
-      // toujours au même rang se devine sans lire la question.
+      // Le lecteur d'ENTRAÎNEMENT affiche les choix d'un quiz dans l'ordre
+      // donné — il ne les mélange pas (TrainingReader), contrairement aux
+      // phrases à trous et aux quiz de SÉANCE, qui passent tous deux par
+      // seededShuffle. Dans un entraînement, une bonne réponse toujours au
+      // même rang se devine donc sans lire la question.
       if ((c.questions ?? []).length >= 3) {
         const rangs = c.questions.map((q) => q.answer);
         if (new Set(rangs).size === 1) mauvais(`${e.title} : toutes les bonnes réponses sont au rang ${rangs[0] + 1} — il suffit de cliquer toujours au même endroit`);
