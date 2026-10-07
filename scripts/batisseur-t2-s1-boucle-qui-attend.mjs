@@ -30,63 +30,16 @@ import { base, lecteur, banc } from "./lib/terrain.mjs";
 
 const db = base(), g = lecteur(db);
 const LECON = "La boucle qui attend";
-const AVEC_PIROGUE = process.argv.includes("--avec-pirogue");
-
-// ── Garde-fous arithmétiques : un palier ne doit jamais se perdre au tirage ──
-const PALIERS = [
-  { n: 1, prise: [4, 12], objectif: 50, chavire: 70, minutes: null },
-  { n: 2, prise: [10, 25], objectif: 50, chavire: 70, minutes: null },
-  { n: 3, prise: [4, 12], objectif: 50, chavire: 70, minutes: 8 },
-];
-// Palier 1 : le pire cas doit rester SOUS le seuil — on ne peut pas chavirer,
-// donc la seule façon de perdre est de s'arrêter trop tôt.
-{
-  const p = PALIERS[0], pire = p.objectif - 1 + p.prise[1];
-  if (pire >= p.chavire) throw new Error(`palier 1 : le pire cas est ${pire} kg, il chavire à ${p.chavire}`);
-}
-// Palier 2 : le bon programme allège à 44 kg, donc 44 + la plus grosse prise
-// doit tenir. Sinon le jeu se perd à la chance, et un jeu qui se perd à la
-// chance n'enseigne rien.
-{
-  const p = PALIERS[1], pire = 44 + p.prise[1];
-  if (pire >= p.chavire) throw new Error(`palier 2 : 44 + ${p.prise[1]} = ${pire}, il chavire à ${p.chavire}`);
-  if (p.objectif - 1 + p.prise[1] < p.chavire) throw new Error("palier 2 : sans alléger, on ne peut pas chavirer — le palier n'enseigne rien");
-}
-// Palier 3 : huit coups doivent pouvoir suffire, sans être garantis.
-{
-  const p = PALIERS[2];
-  if (p.minutes * p.prise[1] < p.objectif) throw new Error("palier 3 : même au mieux, 8 coups ne remplissent pas le filet");
-  if (p.minutes * p.prise[0] >= p.objectif) throw new Error("palier 3 : même au pire, 8 coups remplissent le filet — la fermeture n'arrive jamais");
-}
 
 const texte = (html) => ({ type: "text", content: { html } });
 const jeu = (content) => ({ type: "game", content });
 
-/** Un palier de « La pirogue ». La forme du content est figée par docs/jeu-pirogue.md. */
-const pirogue = (p, { title, instructions, starter_code, exige, jeter_dispo = false }) => jeu({
-  game_type: "pirogue",
-  palier: p.n,
-  title, instructions, starter_code, exige,
-  prise: { min: p.prise[0], max: p.prise[1] },
-  objectif_kg: p.objectif,
-  chavire_kg: p.chavire,
-  minutes_max: p.minutes,
-  jeter_dispo,
-  plafond_appels: 200,
-  messages: {
-    pas_assez: "Le marche refuse : il veut 50 kg. Ta boucle s'est arretee trop tot.",
-    chavire: "Trop lourd d'un coup : la pirogue a verse. Allege avant de tirer.",
-    trop_tard: "Le marche a ferme pendant que tu tirais encore.",
-    sans_fin: "Ton filet n'a jamais bouge. Qu'est-ce qui devrait avancer ?",
-  },
-});
-
 const BLOCS = [
   // ── 0. L'accroche : une question dont il n'a pas la réponse ─────────────
   texte(
-    "<h3>Combien de coups de filet ?</h3>" +
-    "<p>Il est cinq heures du matin sur le lac. Le marché ouvre à sept heures et il veut <strong>50 kg de poisson</strong>.</p>" +
-    "<p>Alors, combien de coups de filet ? Quatre ? Neuf ? <strong>Tu ne peux pas le savoir.</strong> C'est le lac qui décide : un coup remonte trois poissons, le suivant en remonte douze.</p>" +
+    "<h3>Combien de seaux ?</h3>" +
+    "<p>Il est six heures du matin au forage. La bassine de la maison est vide, et il lui faut <strong>40 litres</strong>.</p>" +
+    "<p>Alors, combien de seaux ? Quatre ? Neuf ? <strong>Tu ne peux pas le savoir.</strong> C'est la pompe qui décide : un coup donne quatre litres, le suivant en donne douze.</p>" +
     "<p>Toutes tes boucles jusqu'ici commençaient par un nombre que tu écrivais toi-même. Aujourd'hui, ce nombre, personne ne te le donnera.</p>"
   ),
 
@@ -101,49 +54,37 @@ const BLOCS = [
       language: "python",
       required: true,
       instructions:
-        "Chaque coup de filet ramene 7 kg, et ce programme s'arrete a 20.\n" +
-        "Le marche en veut 50 : change la question de la boucle, puis lance.",
+        "Chaque coup de pompe donne 8 litres, et ce programme s'arrete a 16.\n" +
+        "La bassine en veut 40 : change la question de la boucle, puis lance.",
       starter_code:
-        "poids = 0\n\n" +
-        "while poids < 20:\n" +
-        "    poids = poids + 7\n" +
-        '    print("Dans le filet :", poids, "kg")\n',
+        "litres = 0\n\n" +
+        "while litres < 16:\n" +
+        "    litres = litres + tirer()\n" +
+        '    print("Dans la bassine :", litres, "litres")\n',
+      // Le décor que ce programme fait bouger : l'eau monte d'un cran à chaque
+      // tour de la boucle. Sans ce champ, le défi garde sa console noire.
+      scene: { decor: "forage", reglages: { contenance: 40, prise_min: 8, prise_max: 8 }, plafond: 200 },
       hidden_tests:
         "import re\n" +
-        'assert "while" in code, "Garde la boucle while : c est elle qui tire le filet."\n' +
-        'assert "50" in code, "Le marche veut 50 kg : change le nombre dans la question."\n' +
-        'assert output.count("Dans le filet") == 8, "Avec 7 kg par coup, il faut 8 coups pour depasser 50. Ton programme en donne " + str(output.count("Dans le filet")) + "."\n' +
+        'assert "while" in code, "Garde la boucle while : c est elle qui remplit la bassine."\n' +
+        'assert "40" in code, "La bassine veut 40 litres : change le nombre dans la question."\n' +
+        'assert output.count("Dans la bassine") == 5, "Avec 8 litres par coup, il faut 5 coups pour remplir 40 litres. Ton programme en donne " + str(output.count("Dans la bassine")) + "."\n' +
         'nombres = re.findall(r"\\d+", output)\n' +
-        'assert "56" in nombres, "Le huitieme coup amene a 56 kg. Une boucle while depasse le seuil, elle ne tombe pas pile dessus."',
+        'assert "40" in nombres, "Le cinquieme coup remplit la bassine : 40 litres."',
     },
   },
-
-  // ── 2. Le même filet, mais c'est le lac qui décide ─────────────────────
-  pirogue(PALIERS[0], {
-    title: "La pirogue — remplir le filet",
-    instructions:
-      "A l'instant, chaque coup ramenait 7 kg. Sur le lac, c'est tirer() qui decide :\n" +
-      "4 kg parfois, 12 kg parfois, et tu ne sais jamais lequel.\n" +
-      "La meme boucle, donc, et le marche veut toujours 50 kg.",
-    starter_code:
-      "poids = 0\n\n" +
-      "while poids < 20:\n" +
-      '    poids = poids + tirer()\n' +
-      '    print("Dans le filet :", poids, "kg")\n',
-    exige: ["while"],
-  }),
 
   // ── 2. L'explication, après le geste ────────────────────────────────────
   texte(
     "<h3>La boucle qui pose une question</h3>" +
     "<p>Tu connais déjà <code>for</code>. Il faut lui dire le nombre de tours d'avance : <code>for i in range(7)</code>, c'est sept tours, décidés par toi.</p>" +
     "<p><code>while</code> ne compte rien. <strong>Il pose une question avant chaque tour.</strong> Tant que la réponse est oui, il refait un tour. Dès qu'elle est non, il passe à la suite.</p>" +
-    "<pre><code>poids = 0                      ← la valeur de départ\n" +
-    "while poids &lt; 50:              ← la question\n" +
-    "    poids = poids + tirer()    ← la ligne qui fait avancer</code></pre>" +
+    "<pre><code>litres = 0                     ← la valeur de départ\n" +
+    "while litres &lt; 40:             ← la question\n" +
+    "    litres = litres + tirer()  ← la ligne qui fait avancer</code></pre>" +
     "<p><strong>Trois morceaux, et il en manque un seul pour que tout casse.</strong> La valeur de départ existe avant la boucle, sinon Python ne sait pas de quoi tu parles. La ligne qui fait avancer est <em>dedans</em>, sinon la réponse ne change jamais.</p>" +
-    "<p>Et le nombre de tours ? Tu ne l'as écrit nulle part. C'est le lac qui l'a décidé.</p>" +
-    "<p>Un mot sur <code>tirer()</code>, que tu vas revoir souvent : c'est une commande que je te prête. Elle donne un coup de filet et ramène du poisson — <strong>et on ne sait jamais combien</strong>. C'est elle qui rend la boucle imprévisible, et c'est pour ça qu'un <code>for</code> ne peut rien ici.</p>"
+    "<p>Et le nombre de tours ? Tu ne l'as écrit nulle part. C'est la pompe qui l'a décidé.</p>" +
+    "<p>Un mot sur <code>tirer()</code>, que tu vas revoir souvent : c'est une commande que je te prête. Elle donne un coup de pompe et remonte de l'eau — <strong>et on ne sait jamais combien</strong>. C'est elle qui rend la boucle imprévisible, et c'est pour ça qu'un <code>for</code> ne peut rien ici.</p>"
   ),
 
   // ── 3. Les trois morceaux, à remettre ───────────────────────────────────
@@ -151,9 +92,9 @@ const BLOCS = [
     game_type: "fill_blank",
     title: "Les trois morceaux",
     template:
-      "poids = [___]\n" +
-      "[___] poids < 50:\n" +
-      "    poids = poids [___] tirer()",
+      "litres = [___]\n" +
+      "[___] litres < 40:\n" +
+      "    litres = litres [___] tirer()",
     blanks: ["0", "while", "+"],
   }),
 
@@ -165,15 +106,15 @@ const BLOCS = [
         { question: "Tu ne sais pas d'avance combien de tours il faudra. Tu prends quoi ?",
           choices: ["for", "while", "if"], answer: 1,
           explanation: "for réclame le nombre de tours d'avance. while se contente d'une question posée avant chaque tour." },
-        { question: "Où doit se trouver la ligne qui fait avancer le poids ?",
+        { question: "Où doit se trouver la ligne qui fait avancer le niveau ?",
           choices: ["avant la boucle", "après la boucle", "dans la boucle"], answer: 2,
           explanation: "Dans la boucle : c'est à chaque tour que la valeur doit changer, sinon la question répond toujours la même chose." },
-        { question: "Quand la question « poids < 50 » est-elle posée ?",
+        { question: "Quand la question « litres < 40 » est-elle posée ?",
           choices: ["avant chaque tour", "une seule fois au début", "à la fin du programme"], answer: 0,
           explanation: "Avant chaque tour. C'est pour ça qu'une boucle while peut s'arrêter au bout de quatre tours comme au bout de onze." },
-        { question: "poids vaut 50, et la question est « poids < 50 ». Combien de tours encore ?",
+        { question: "litres vaut 40, et la question est « litres < 40 ». Combien de tours encore ?",
           choices: ["un dernier", "aucun", "deux"], answer: 1,
-          explanation: "50 n'est pas plus petit que 50 : la réponse est non, la boucle s'arrête sans faire ce tour-là." },
+          explanation: "40 n'est pas plus petit que 40 : la réponse est non, la boucle s'arrête sans faire ce tour-là." },
       ],
     },
   },
@@ -181,67 +122,50 @@ const BLOCS = [
   // ── 5. Le programme, dans l'ordre ───────────────────────────────────────
   jeu({
     game_type: "sort",
-    title: "Remets la pêche dans l'ordre",
-    description: "Ce programme tire le filet jusqu'à ce qu'il soit assez lourd, puis rentre.",
-    hint: "Le poids existe avant qu'on pose la question. Et la ligne qui fait avancer est à l'intérieur de la boucle.",
+    title: "Remets le remplissage dans l'ordre",
+    description: "Ce programme remplit la bassine jusqu'à ce qu'elle soit pleine, puis le dit.",
+    hint: "Le niveau existe avant qu'on pose la question. Et la ligne qui fait avancer est à l'intérieur de la boucle.",
     items: [
-      "poids = 0",
-      "while poids < 50:",
-      '    print("Un coup de filet !")',
-      "    poids = poids + tirer()",
-      'print("Je rentre au marche")',
+      "litres = 0",
+      "while litres < 40:",
+      '    print("Un coup de pompe !")',
+      "    litres = litres + tirer()",
+      'print("La bassine est pleine")',
     ],
   }),
 
   // ── 6. Le piège de la séance ────────────────────────────────────────────
   texte(
     "<h3>La boucle qui ne finit plus</h3>" +
-    "<p>Enlève la ligne qui fait avancer. <code>poids</code> reste à 0. La question « poids &lt; 50 » répond oui… et répond oui… et répond oui.</p>" +
+    "<p>Enlève la ligne qui fait avancer. <code>litres</code> reste à 0. La question « litres &lt; 40 » répond oui… et répond oui… et répond oui.</p>" +
     "<p><strong>Le programme ne s'arrête plus.</strong> Rien ne s'affiche, le bouton vert tourne dans le vide. Ça arrive à tous ceux qui écrivent des boucles, et ça arrivera à toi.</p>" +
     "<p>Deux choses à savoir, et tu n'auras plus peur :</p>" +
     "<p>1. Le bouton <strong>■ Arrêter</strong> est juste à côté du bouton vert. Il coupe le programme net.<br>" +
-    "2. Dans la pirogue, au 200ᵉ coup de filet, le jeu s'arrête tout seul et te pose la question : <em>qu'est-ce qui devrait avancer ?</em></p>" +
+    "2. Au 200ᵉ coup de pompe, le programme s'arrête tout seul et te pose la question : <em>qu'est-ce qui devrait avancer ?</em></p>" +
     "<p>Une boucle sans fin n'est pas une catastrophe. C'est une ligne oubliée.</p>"
   ),
 
   // ── 7. Le piège en action ───────────────────────────────────────────────
   jeu({
     game_type: "bug_hunt",
-    title: "Le filet qui ne remonte jamais",
-    context: "Le programme devait tirer jusqu'à 50 kg. Il tire pour toujours : il a fallu cliquer sur ■ Arrêter.",
+    title: "La bassine qui ne monte jamais",
+    context: "Le programme devait remplir 40 litres. Il pompe pour toujours : il a fallu cliquer sur ■ Arrêter.",
     description: "Une seule ligne est fausse — clique dessus.",
     bug_index: 3,
-    fix: "    poids = poids + tirer()",
-    explanation: "poids + tirer() calcule bien le nouveau poids… puis le jette. Sans le signe =, rien n'est rangé : poids reste à 0, la question répond toujours oui, et la boucle ne s'arrête jamais.",
+    fix: "    litres = litres + tirer()",
+    explanation: "litres + tirer() calcule bien le nouveau niveau… puis le jette. Sans le signe =, rien n'est rangé : litres reste à 0, la question répond toujours oui, et la boucle ne s'arrête jamais.",
     instructions: [
-      "poids = 0",
-      "while poids < 50:",
-      '    print("Un coup de filet !")',
-      "    poids + tirer()",
+      "litres = 0",
+      "while litres < 40:",
+      '    print("Un coup de pompe !")',
+      "    litres + tirer()",
     ],
-  }),
-
-  // ── 8. Palier 2 : décider à l'intérieur de la boucle ────────────────────
-  pirogue(PALIERS[1], {
-    title: "La pirogue — ne pas chavirer",
-    instructions:
-      "Aujourd'hui le lac est genereux : un coup de filet peut remonter 25 kg d'un coup.\n" +
-      "La pirogue chavire a 70 kg. Tu peux rejeter des poissons a l'eau avec jeter(10).\n" +
-      "Allege AVANT de tirer, pas apres : apres, il est trop tard.",
-    starter_code:
-      "poids = 0\n\n" +
-      "while poids < 50:\n" +
-      "    # Si la pirogue est deja lourde, allege avant le prochain coup.\n" +
-      "    poids = poids + tirer()\n" +
-      '    print("Dans le filet :", poids, "kg")\n',
-    exige: ["while", "if", "jeter"],
-    jeter_dispo: true,
   }),
 
   // ── 9. La deuxième forme : attendre quelqu'un ───────────────────────────
   texte(
     "<h3>La boucle qui attend quelqu'un</h3>" +
-    "<p>Jusqu'ici tu savais où tu allais : 50 kg. Mais au marché, le matin, tu ne sais pas combien de clients viendront. Tu sers, et tu fermes quand il n'y a plus personne.</p>" +
+    "<p>Jusqu'ici tu savais où tu allais : 40 litres. Mais au marché, le matin, tu ne sais pas combien de clients viendront. Tu sers, et tu fermes quand il n'y a plus personne.</p>" +
     "<pre><code>reponse = input(\"Nom du client (ou fin) : \")\n\n" +
     "while reponse != \"fin\":\n" +
     "    print(\"Bonjour\", reponse)\n" +
@@ -315,22 +239,6 @@ const BLOCS = [
     },
   },
 
-  // ── 13. Palier 3 : deux raisons d'arrêter ───────────────────────────────
-  pirogue(PALIERS[2], {
-    title: "La pirogue — rentrer avant la fermeture",
-    instructions:
-      "Chaque coup de filet coute une minute, et le marche ferme dans 8 minutes.\n" +
-      "Deux raisons d'arreter, donc : le filet est plein, OU il est trop tard.\n" +
-      "Et apres la boucle, dis laquelle des deux t'a arrete.",
-    starter_code:
-      "poids = 0\n\n" +
-      "# Deux conditions dans la meme question : sers-toi de and.\n" +
-      "while poids < 50:\n" +
-      "    poids = poids + tirer()\n\n" +
-      "# Le filet est-il plein, ou le marche a-t-il ferme ?\n",
-    exige: ["while", "and", "if"],
-  }),
-
   // ── 14. Le défi de la séance ────────────────────────────────────────────
   {
     type: "code_challenge",
@@ -366,7 +274,7 @@ const BLOCS = [
     pairs: [
       { left: "while", right: "Tant que la réponse est oui, on refait un tour" },
       { left: "La ligne qui fait avancer", right: "Sans elle, la boucle ne s'arrête jamais" },
-      { left: "poids + tirer()", right: "Calcule, puis jette le résultat" },
+      { left: "litres + tirer()", right: "Calcule, puis jette le résultat" },
       { left: "■ Arrêter", right: "Couper un programme qui ne finit plus" },
       { left: "input écrit deux fois", right: "Une fois avant, une fois à chaque tour" },
     ],
@@ -385,17 +293,22 @@ const BLOCS = [
 
 // ── Le banc : bonnes et mauvaises solutions des défis de code ────────────
 const SOLUTIONS = {
-  1: { cas: [
-    { nom: "juste", attendu: "ok", code:
-      "poids = 0\n\nwhile poids < 50:\n    poids = poids + 7\n    print(\"Dans le filet :\", poids, \"kg\")\n" },
-    { nom: "laisse la question a 20", attendu: "test raté", code:
-      "poids = 0\n\nwhile poids < 20:\n    poids = poids + 7\n    print(\"Dans le filet :\", poids, \"kg\")\n" },
-    // Huit tours écrits à la main : le compte tombe juste, et pourtant ce
-    // n'est pas une boucle qui a décidé du nombre.
-    { nom: "un for de huit tours", attendu: "test raté", code:
-      "poids = 0\n\nfor i in range(8):\n    poids = poids + 7\n    print(\"Dans le filet :\", poids, \"kg\")\n" },
-  ] },
-  11: {
+  1: {
+    // Le banc rejoue le prélude de la scène : `tirer()` doit exister ici comme
+    // il existe dans le navigateur, sinon on testerait un autre programme.
+    prelude: "def tirer():\n    return 8\n",
+    cas: [
+      { nom: "juste", attendu: "ok", code:
+        "litres = 0\n\nwhile litres < 40:\n    litres = litres + tirer()\n    print(\"Dans la bassine :\", litres, \"litres\")\n" },
+      { nom: "laisse la question a 16", attendu: "test raté", code:
+        "litres = 0\n\nwhile litres < 16:\n    litres = litres + tirer()\n    print(\"Dans la bassine :\", litres, \"litres\")\n" },
+      // Cinq tours écrits à la main : le compte tombe juste, et pourtant ce
+      // n'est pas une boucle qui a décidé du nombre.
+      { nom: "un for de cinq tours", attendu: "test raté", code:
+        "litres = 0\n\nfor i in range(5):\n    litres = litres + tirer()\n    print(\"Dans la bassine :\", litres, \"litres\")\n" },
+    ],
+  },
+  9: {
     reponses: ["Ama", "Kofi", "fin"],
     cas: [
       { nom: "juste", attendu: "ok", code:
@@ -438,7 +351,7 @@ const SOLUTIONS = {
         'print("Clients :", 2)\n' },
     ],
   },
-  15: {
+  12: {
     reponses: ["1500", "800", "2300", "fin"],
     cas: [
       { nom: "juste", attendu: "ok", code:
@@ -580,12 +493,9 @@ if (deja.length && !process.argv.includes("--refaire"))
 // infinissable : allBlocklyDone exige que chacun soit résolu, et un type
 // inconnu n'affiche rien. Tant que le moteur n'existe pas, la pirogue reste
 // écrite ici et absente de la base.
-const A_ECRIRE = AVEC_PIROGUE ? BLOCS : BLOCS.filter((b) => b.content.game_type !== "pirogue");
+const A_ECRIRE = BLOCS;
 const ECRIRE = process.argv.includes("--ecrire");
 console.log(`\n${ECRIRE ? "ÉCRITURE" : "APERÇU (--ecrire pour appliquer)"} — ${A_ECRIRE.length} blocs sur « ${L.title} » (${L.status})`);
-console.log(AVEC_PIROGUE
-  ? "⚠ --avec-pirogue : les 3 paliers sont inclus. Le moteur doit exister, sinon la leçon ne peut plus être terminée.\n"
-  : `↷ ${BLOCS.length - A_ECRIRE.length} paliers de pirogue écrits mais NON insérés (moteur absent) — --avec-pirogue quand il existera.\n`);
 A_ECRIRE.forEach((b, i) => console.log(`  [${String(i).padStart(2)}] ${(b.content.game_type ?? b.type).padEnd(16)} ${(b.content.title ?? (b.content.html ?? "").replace(/<[^>]+>/g, " ").trim().slice(0, 56))}`));
 if (!ECRIRE) { console.log("\nRien n'a été écrit."); process.exit(0); }
 

@@ -469,7 +469,7 @@ export function banc(EXOS, SOLUTIONS) {
       if (!s) throw new Error(`${e.title} : défi de code sans solutions de référence`);
       // Un cas peut apporter ses propres réponses : c'est ainsi qu'on éprouve
       // les deux branches d'une décision avec le même programme.
-      for (const c of s.cas) cas.push({ code: c.code, tests: b.content.hidden_tests, reponses: c.reponses ?? s.reponses ?? [], nom: `${e.title} — ${c.nom}`, attendu: c.attendu });
+      for (const c of s.cas) cas.push({ code: c.code, tests: b.content.hidden_tests, reponses: c.reponses ?? s.reponses ?? [], prelude: c.prelude ?? s.prelude ?? "", nom: `${e.title} — ${c.nom}`, attendu: c.attendu });
     }
   }
   return cas;

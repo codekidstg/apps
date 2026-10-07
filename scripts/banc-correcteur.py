@@ -7,7 +7,7 @@ terminal, puis les tests cachés tournent avec `output` (tout ce qui a été
 affiché) et `code` (le texte du programme), dans les mêmes variables que le
 programme. Un changement du correcteur se reporte ici.
 
-Lit sur l'entrée une liste JSON de cas {code, tests, reponses} ; écrit la
+Lit sur l'entrée une liste JSON de cas {code, tests, reponses, prelude} ; écrit la
 liste JSON des verdicts {verdict, detail} : « ok », « test raté »,
 « plante », « saisie manquante » ou « test plante ».
 
@@ -25,7 +25,7 @@ class BesoinSaisie(Exception):
     pass
 
 
-def executer(code, tests, reponses):
+def executer(code, tests, reponses, prelude=""):
     variables = {"__name__": "__main__"}
     curseur = [0]
 
@@ -43,6 +43,11 @@ def executer(code, tests, reponses):
     tampon = io.StringIO()
     try:
         with contextlib.redirect_stdout(tampon):
+            # Le prélude d'une scène définit les commandes du décor — tirer(),
+            # encaisser() — avant le code de l'enfant, exactement comme dans le
+            # navigateur.
+            if prelude:
+                exec(compile(prelude, "<prelude>", "exec"), variables)
             exec(compile(code, "<exec>", "exec"), variables)
     except BesoinSaisie as e:
         return "saisie manquante", str(e)
@@ -67,6 +72,6 @@ def executer(code, tests, reponses):
 if __name__ == "__main__":
     resultats = []
     for cas in json.load(sys.stdin):
-        verdict, detail = executer(cas["code"], cas.get("tests") or "", cas.get("reponses") or [])
+        verdict, detail = executer(cas["code"], cas.get("tests") or "", cas.get("reponses") or [], cas.get("prelude") or "")
         resultats.append({"verdict": verdict, "detail": detail})
     print(json.dumps(resultats, ensure_ascii=False))
