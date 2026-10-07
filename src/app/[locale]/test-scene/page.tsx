@@ -7,11 +7,11 @@ import { preludeDe, COLLECTE, type SceneConfig } from "@/components/eleve/scenes
 const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), { ssr: false });
 const Scene = dynamic(() => import("@/components/eleve/scenes/Scene"), { ssr: false });
 
-const sc: SceneConfig = { decor: "forage", reglages: { contenance: 40, prise_min: 4, prise_max: 12 }, plafond: 200 };
-const SUJET = `<p>Ce matin, la pompe est capricieuse : un coup donne 4 litres, le suivant en donne 12. <strong>Tu ne peux pas savoir combien de seaux il te faudra</strong> — personne ne peut.</p>
-<p>🎯 <strong>Ta mission</strong> — remplir les 40 litres de la bassine, et annoncer combien de seaux il a fallu.<br>
-🧰 <strong>Tu as</strong> — <code>tirer()</code>, qui donne le contenu d'un seau en litres. Et un éditeur vide.<br>
-✅ <strong>C'est réussi quand</strong> — la bassine est pleine, et que ta dernière ligne annonce le nombre de seaux.</p>`;
+const sc: SceneConfig = { decor: "etal", reglages: { papiers: ["2000", "1 500", "2 500", "800"] }, plafond: 200 };
+const SUJET = `<p>C'est le marché. Quatre clients t'ont tendu leur papier, et trois ont écrit leur montant avec un espace au milieu.</p>
+<p>🎯 <strong>Ta mission</strong> — encaisser les quatre papiers, et annoncer le total de la caisse.<br>
+🧰 <strong>Tu as</strong> — la liste <code>papiers</code>, la commande <code>encaisser(papier)</code>, et <code>.replace(" ", "")</code>.<br>
+✅ <strong>C'est réussi quand</strong> — les quatre clients sont servis et que la caisse affiche 6800.</p>`;
 
 export default function Verif() {
   return (
@@ -20,8 +20,8 @@ export default function Verif() {
         <div style={{ color: "#94a3b8", fontSize: 14, lineHeight: 1.7, marginBottom: 16 }}
              dangerouslySetInnerHTML={{ __html: SUJET }} />
         <PythonRunner
-          starterCode={"# La bassine fait 40 litres. tirer() te donne un seau.\n# A toi d'ecrire le programme.\n"}
-          hiddenTests={'seaux = [e for e in _journal if e["quoi"] == "verser"]\ntotal = sum(e["litres"] for e in seaux)\nassert "while" in code, "Seul un while peut decider tout seul quand s arreter."\nassert total >= 40, "La bassine veut 40 litres, et ton programme s arrete a " + str(total) + "."\nlignes = [l for l in output.split("\\n") if l.strip()]\nassert lignes, "Ton programme n affiche rien."\nassert str(len(seaux)) in lignes[-1], "Il a fallu " + str(len(seaux)) + " seaux : ta derniere ligne doit l annoncer."'}
+          starterCode={"caisse = 0\n\n# Pour chaque papier : nettoie-le, ajoute-le a la caisse, encaisse.\n"}
+          hiddenTests={'encaisses = [e for e in _journal if e["quoi"] == "encaisser"]\nassert ".replace(" in code, "Un espace au milieu tue int()."\nassert len(encaisses) == 4, "Les 4 clients doivent etre encaisses, ton programme en a servi " + str(len(encaisses)) + "."\nassert "6800" in output, "La caisse doit afficher 6800."'}
           language="python"
           prelude={preludeDe(sc)}
           collect={COLLECTE[sc.decor]}
