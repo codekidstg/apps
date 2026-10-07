@@ -25,10 +25,12 @@ import type { BadgeId } from "@/lib/gamification/badges";
 import { BADGES } from "@/lib/gamification/badges";
 import BlocklyRobot from "@/components/eleve/BlocklyRobotLoader";
 import { MemoryGame, AssociationGame, SortGame, BugHuntGame, FillBlankGame } from "@/components/eleve/jeux";
+import { preludeDe, COLLECTE, type SceneConfig } from "@/components/eleve/scenes/preludes";
 import BlocklyKodi from "@/components/eleve/BlocklyKodiLoader";
 import BlocklyMusic from "@/components/eleve/BlocklyMusicLoader";
 import dynamic from "next/dynamic";
 const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), { ssr: false });
+const Scene = dynamic(() => import("@/components/eleve/scenes/Scene"), { ssr: false });
 const PythonMaze   = dynamic(() => import("@/components/eleve/PythonMaze"), { ssr: false });
 const PythonArcade = dynamic(() => import("@/components/eleve/PythonArcade"), { ssr: false });
 const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { ssr: false });
@@ -456,6 +458,8 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
               expected_output?: string;
               language?: "python" | "javascript" | "html";
               required?: boolean;
+              /** Le décor que le programme fait bouger, à la place de la console. */
+              scene?: SceneConfig;
             };
             const done = codeResults[block.id];
             return (
@@ -483,15 +487,29 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
                       style={{ color: "#94a3b8" }}
                       dangerouslySetInnerHTML={{ __html: cfg.instructions }} />
                   )}
-                  <PythonRunner
-                    starterCode={cfg.starter_code ?? "# Écris ton code ici\n"}
-                    initialCode={codeValues[block.id]}
-                    onCodeChange={(c) => saveCodeValue(block.id, c)}
-                    hiddenTests={cfg.hidden_tests}
-                    expectedOutput={cfg.expected_output}
-                    language={cfg.language ?? "python"}
-                    onSuccess={() => markCodeDone(block.id)}
-                  />
+                  {(() => {
+                    // Une scène remplace la console noire par un décor que le
+                    // programme de l'enfant fait bouger. Sans le champ `scene`,
+                    // le défi se comporte exactement comme avant.
+                    const sc = cfg.scene as SceneConfig | undefined;
+                    return (
+                      <PythonRunner
+                        starterCode={cfg.starter_code ?? "# Écris ton code ici\n"}
+                        initialCode={codeValues[block.id]}
+                        onCodeChange={(c) => saveCodeValue(block.id, c)}
+                        hiddenTests={cfg.hidden_tests}
+                        expectedOutput={cfg.expected_output}
+                        language={cfg.language ?? "python"}
+                        onSuccess={() => markCodeDone(block.id)}
+                        prelude={sc ? preludeDe(sc) : undefined}
+                        collect={sc ? COLLECTE[sc.decor] : undefined}
+                        rendreSortie={sc
+                          ? (out, enMarche, recolte) => (
+                              <Scene scene={sc} recolte={recolte} enMarche={enMarche} stdout={out} />)
+                          : undefined}
+                      />
+                    );
+                  })()}
                 </div>
               </div>
             );

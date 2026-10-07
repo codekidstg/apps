@@ -24,6 +24,7 @@ import { travailLisible } from "@/lib/questions/travail";
 import type { Question } from "@/lib/questions/donnees";
 
 const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), { ssr: false });
+const Scene = dynamic(() => import("@/components/eleve/scenes/Scene"), { ssr: false });
 const BlocklyKodi  = dynamic(() => import("@/components/eleve/BlocklyKodi"), { ssr: false });
 const PythonMaze   = dynamic(() => import("@/components/eleve/PythonMaze"), { ssr: false });
 const PythonPiano  = dynamic(() => import("@/components/eleve/PythonPiano"), { ssr: false });
@@ -34,6 +35,7 @@ const PatternBuild  = dynamic(() => import("@/components/eleve/PatternBuild"), {
 const PlanBuilder   = dynamic(() => import("@/components/eleve/PlanBuilder"), { ssr: false });
 const DeviensOrdinateur = dynamic(() => import("@/components/eleve/DeviensOrdinateur"), { ssr: false });
 import { MemoryGame, AssociationGame, SortGame, BugHuntGame } from "@/components/eleve/jeux";
+import { preludeDe, COLLECTE, type SceneConfig } from "@/components/eleve/scenes/preludes";
 
 /**
  * La contrainte CHECK de training_blocks n'accepte pas de nouveau type : les
@@ -628,14 +630,27 @@ export default function TrainingReader({ trainingId, blocks, xpReward, previousA
                     <div className="text-sm leading-relaxed" style={{ color: "#cbd5e1" }}
                       dangerouslySetInnerHTML={{ __html: cfg.instructions }} />
                   )}
-                  <PythonRunner
-                    starterCode={cfg.starter_code ?? "# Écris ton code ici\n"}
-                    hiddenTests={cfg.hidden_tests}
-                    expectedOutput={cfg.expected_output}
-                    language={cfg.language ?? "python"}
-                    onSuccess={() => { if (!completed) setCodeResults(prev => ({ ...prev, [block.id]: true })); }}
-                    onCodeChange={garderCode(block.id)}
-                  />
+                  {(() => {
+                    // Même branchement que dans la séance : sans le champ
+                    // `scene`, le mini-défi garde sa console.
+                    const sc = (cfg as { scene?: SceneConfig }).scene;
+                    return (
+                      <PythonRunner
+                        starterCode={cfg.starter_code ?? "# Écris ton code ici\n"}
+                        hiddenTests={cfg.hidden_tests}
+                        expectedOutput={cfg.expected_output}
+                        language={cfg.language ?? "python"}
+                        onSuccess={() => { if (!completed) setCodeResults(prev => ({ ...prev, [block.id]: true })); }}
+                        onCodeChange={garderCode(block.id)}
+                        prelude={sc ? preludeDe(sc) : undefined}
+                        collect={sc ? COLLECTE[sc.decor] : undefined}
+                        rendreSortie={sc
+                          ? (out, enMarche, recolte) => (
+                              <Scene scene={sc} recolte={recolte} enMarche={enMarche} stdout={out} />)
+                          : undefined}
+                      />
+                    );
+                  })()}
                 </div>
               </div>
             );

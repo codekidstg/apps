@@ -13,7 +13,7 @@ const intlMiddleware = createIntlMiddleware(routing);
 // envoie à ses parents pour qu'ils y jouent. Même règle — le titre et le
 // prénom, rien d'autre — et la page n'existe que si l'enfant a allumé le
 // partage (migration 042).
-const PUBLIC_PATHS = ["/", "/connexion", "/inscription", "/test-maze", "/test-music", "/atelier", "/realisation", "/p"];
+const PUBLIC_PATHS = ["/", "/connexion", "/inscription", "/test-maze", "/test-music", "/test-scene", "/atelier", "/realisation", "/p"];
 
 // Routes réservées par rôle (préfixes)
 const ROLE_ROUTES: Record<string, string[]> = {

@@ -29,7 +29,14 @@ type Props = {
    * téléphone ou d'ordinateur ; les erreurs et les questions restent en clair,
    * en dessous, là où elles se lisent.
    */
-  rendreSortie?: (stdout: string, enMarche: boolean) => React.ReactNode;
+  rendreSortie?: (stdout: string, enMarche: boolean, recolte: Record<string, unknown> | null) => React.ReactNode;
+  /**
+   * Code exécuté avant celui de l'enfant. C'est lui qui définit les commandes
+   * d'une scène — `tirer()`, `encaisser()` — et le journal qu'elles remplissent.
+   */
+  prelude?: string;
+  /** Variables Python à ramener après l'exécution, le journal en tête. */
+  collect?: string[];
   /**
    * Le résultat d'une exécution réussie. L'atelier l'enregistre : c'est lui
    * que verra le parent au bout du lien, avant que Python ne se charge chez
@@ -89,6 +96,8 @@ export default function PythonRunner({
   libre = false,
   theme,
   rendreSortie,
+  prelude,
+  collect,
   onSortie,
   cacherEditeur = false,
   libelleLancer = "Exécuter",
@@ -101,6 +110,7 @@ export default function PythonRunner({
   }
   const [status, setStatus]     = useState<RunStatus>("idle");
   const [stdout, setStdout]     = useState("");
+  const [recolte, setRecolte]   = useState<Record<string, unknown> | null>(null);
   const [errMsg, setErrMsg]     = useState("");
   const [hintMsg, setHintMsg]   = useState("");
   const [passed, setPassed]     = useState(false);
@@ -129,6 +139,7 @@ export default function PythonRunner({
     if (status === "loading_pyodide" || status === "running") return;
     setStatus("loading_pyodide");
     setStdout("");
+    setRecolte(null);
     setErrMsg("");
     setHintMsg("");
     setPassed(false);
@@ -160,11 +171,15 @@ export default function PythonRunner({
 
       if (e.data.type === "test_failed") {
         setStdout(e.data.stdout as string);
+        // Le journal arrive même quand le test échoue : la bassine qui déborde
+        // doit se voir, c'est elle qui explique pourquoi c'est raté.
+        setRecolte((e.data.collected as Record<string, unknown>) ?? null);
         setHintMsg(e.data.hint as string);
         setStatus("test_failed");
       } else if (e.data.type === "success") {
         const out = e.data.stdout as string;
         setStdout(out);
+        setRecolte((e.data.collected as Record<string, unknown>) ?? null);
         onSortie?.(out);
 
         // Check expected output if no hidden tests
@@ -182,8 +197,8 @@ export default function PythonRunner({
     }
 
     worker.addEventListener("message", handleMessage);
-    worker.postMessage({ id, type: "run", code, tests: hiddenTests });
-  }, [code, hiddenTests, expectedOutput, onSuccess, onSortie, status]);
+    worker.postMessage({ id, type: "run", code, tests: hiddenTests, prelude, collect });
+  }, [code, hiddenTests, expectedOutput, onSuccess, onSortie, status, prelude, collect]);
 
   function submitInput() {
     const id = runIdRef.current;
@@ -304,7 +319,7 @@ export default function PythonRunner({
       </div>
 
       {/* L'écran de l'atelier : il ne montre que ce que le programme affiche. */}
-      {rendreSortie && !errMsg && !hintMsg && rendreSortie(stdout, isLoading)}
+      {rendreSortie && !errMsg && rendreSortie(stdout, isLoading, recolte)}
 
       {/* Console output */}
       {((stdout && !rendreSortie) || errMsg || hintMsg) && (
@@ -340,7 +355,7 @@ export default function PythonRunner({
             })()
           ) : hintMsg ? (
             <>
-              {stdout && <div className="text-slate-400 mb-3 pb-3 border-b border-amber-900">{stdout}</div>}
+              {stdout && !rendreSortie && <div className="text-slate-400 mb-3 pb-3 border-b border-amber-900">{stdout}</div>}
               <span className="text-amber-400 font-black block mb-1">💡 Indice</span>
               {hintMsg}
             </>

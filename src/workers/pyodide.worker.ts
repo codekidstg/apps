@@ -114,6 +114,20 @@ function cleanError(msg: string): string {
   return indice ? `${propre}\n\n💡 ${indice}` : propre;
 }
 
+/** Ramène les variables demandées, sérialisées en JSON. Best effort : une
+ *  variable absente vaut null plutôt que de faire échouer l'exécution. */
+async function recolter(ctx: RunCtx): Promise<Record<string, unknown> | undefined> {
+  if (!ctx.collect?.length) return undefined;
+  const sortie: Record<string, unknown> = {};
+  for (const nom of ctx.collect) {
+    try {
+      const brut = await pyodide!.runPythonAsync(`import json as _json\n_json.dumps(${nom})`);
+      sortie[nom] = JSON.parse(String(brut));
+    } catch { sortie[nom] = null; }
+  }
+  return sortie;
+}
+
 async function execute(id: string, ctx: RunCtx) {
   const stdout: string[] = [];
   const stderr: string[] = [];
@@ -142,11 +156,15 @@ async function execute(id: string, ctx: RunCtx) {
       return;
     }
     runs.delete(id);
-    postMessage({ id, type: "error", error: cleanError(msg) });
+    postMessage({ id, type: "error", error: cleanError(msg), collected: await recolter(ctx) });
     return;
   }
 
   const capturedOutput = stdout.join("\n");
+
+  // Variables demandées par l'appelant — c'est ainsi qu'un jeu récupère,
+  // par exemple, la liste des déplacements produits par le code de l'enfant.
+  const collected = await recolter(ctx);
 
   // Tests cachés — `output` et `code` disponibles comme globales
   if (ctx.tests) {
@@ -159,27 +177,12 @@ async function execute(id: string, ctx: RunCtx) {
       if (msg.includes("AssertionError")) {
         const hint = msg.split("AssertionError:").pop()?.trim() ?? "Pas encore correct, réessaie !";
         runs.delete(id);
-        postMessage({ id, type: "test_failed", stdout: capturedOutput, hint });
+        postMessage({ id, type: "test_failed", stdout: capturedOutput, hint, collected });
         return;
       }
       runs.delete(id);
       postMessage({ id, type: "error", error: cleanError(msg) });
       return;
-    }
-  }
-
-  // Variables demandées par l'appelant — c'est ainsi qu'un jeu récupère,
-  // par exemple, la liste des déplacements produits par le code de l'enfant.
-  let collected: Record<string, unknown> | undefined;
-  if (ctx.collect?.length) {
-    collected = {};
-    for (const nom of ctx.collect) {
-      try {
-        const brut = await pyodide!.runPythonAsync(
-          `import json as _json\n_json.dumps(${nom})`
-        );
-        collected[nom] = JSON.parse(String(brut));
-      } catch { collected[nom] = null; }
     }
   }
 
