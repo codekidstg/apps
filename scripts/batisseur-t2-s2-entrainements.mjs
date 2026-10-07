@@ -57,7 +57,7 @@ const EXOS = [
             { id: "f", emoji: "6️⃣", label: '"fin "', correct: "strip", hint: "Un espace à la fin, qu'on ne voit même pas." },
             { id: "g", emoji: "7️⃣", label: '"3.000"', correct: "replace", hint: "Le point des milliers est au milieu du nombre." },
             { id: "h", emoji: "8️⃣", label: '"OUI"', correct: "lower", hint: "Encore des majuscules." },
-            { id: "i", emoji: "9️⃣", label: '"Bonjour  "', correct: "strip", hint: "Les espaces sont tout à la fin." },
+            { id: "i", emoji: "9️⃣", label: '"bonjour  "', correct: "strip", hint: "Pas de majuscule ici : seulement deux espaces, et tout à la fin." },
             { id: "j", emoji: "🔟", label: '"2 000 000"', correct: "replace", hint: "Deux espaces, et tous les deux au milieu." },
             { id: "k", emoji: "🅰️", label: '"KOFI"', correct: "lower", hint: "Un prénom crié : .lower() le calme." },
             { id: "l", emoji: "🅱️", label: '" oui "', correct: "strip", hint: "Un espace de chaque côté : c'est exactement le travail de .strip()." },

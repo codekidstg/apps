@@ -44,7 +44,7 @@ const EXOS = [
     blocs: [
       kodi(
         "<p>Chaque outil rend un texte — pas toujours celui qu'on croit.</p>" +
-        "<p><code>.strip()</code> ne touche pas aux majuscules. <code>.replace()</code> qui ne trouve rien ne change rien. Range chaque ligne sous son résultat exact.</p>"
+        "<p><code>.strip()</code> ne touche pas aux majuscules, et il ne voit pas le milieu du texte. <code>.replace()</code> qui ne trouve rien rend le texte entier.</p><p>Range chaque ligne sous <strong>le texte exact qu'elle rend</strong>.</p>"
       ),
       {
         type: "drag_to_bin",
@@ -56,28 +56,33 @@ const EXOS = [
             criteria: [
               ".lower() ne touche qu'aux majuscules.",
               ".strip() ne touche qu'aux espaces du début et de la fin.",
-              ".replace(a, b) ne touche qu'à ce qu'il trouve — s'il ne trouve rien, rien ne change.",
+              ".replace(a, b) ne touche qu'à ce qu'il trouve — s'il ne trouve rien, le texte ressort entier.",
+              "Un outil qui ne trouve rien à nettoyer n'est pas en panne : il rend le texte tel quel.",
             ],
           },
+          // Le bac « Rien ne change » a été retiré : il recouvrait les autres.
+          // « "FIN".strip() » rend bien "FIN" ET ne change rien — l'enfant
+          // avait raison des deux façons, et le jeu lui disait non. Quatre bacs
+          // de RÉSULTATS, donc, et une seule réponse possible par carte.
           bins: [
             { id: "fin", label: '"fin"', emoji: "🔡", color: "#FDB813" },
             { id: "FIN", label: '"FIN"', emoji: "🔠", color: "#a78bfa" },
             { id: "n1500", label: '"1500"', emoji: "💰", color: "#10b981" },
-            { id: "rien", label: "Rien ne change", emoji: "🪨", color: "#64748b" },
+            { id: "sale", label: '"1 500"', emoji: "🪨", color: "#64748b" },
           ],
           items: [
-            { id: "a", emoji: "1️⃣", label: '"FIN".lower()', correct: "fin", hint: "Les majuscules tombent." },
-            { id: "b", emoji: "2️⃣", label: '" fin ".strip()', correct: "fin", hint: "Les deux espaces sautent." },
+            { id: "a", emoji: "1️⃣", label: '"FIN".lower()', correct: "fin", hint: "Les trois majuscules tombent." },
+            { id: "b", emoji: "2️⃣", label: '" fin ".strip()', correct: "fin", hint: "Les deux espaces des bouts sautent." },
             { id: "c", emoji: "3️⃣", label: '"Fin".lower()', correct: "fin", hint: "Une seule majuscule, mais elle compte." },
-            { id: "d", emoji: "4️⃣", label: '" FIN ".strip()', correct: "FIN", hint: "Les espaces partent, les majuscules restent : strip ne les voit pas." },
-            { id: "e", emoji: "5️⃣", label: '"FIN".strip()', correct: "FIN", hint: "Aucun espace à enlever : le texte ressort tel quel." },
-            { id: "f", emoji: "6️⃣", label: '"fin".replace("f", "F")', correct: "FIN", hint: "Attention : chaque f devient F, y compris celui du milieu… il n'y en a qu'un." },
-            { id: "g", emoji: "7️⃣", label: '"1 500".replace(" ", "")', correct: "n1500", hint: "L'espace du milieu disparaît, les morceaux se recollent." },
-            { id: "h", emoji: "8️⃣", label: '"1500F".replace("F", "")', correct: "n1500", hint: "Le F collé s'en va." },
-            { id: "i", emoji: "9️⃣", label: '"1.500".replace(".", "")', correct: "n1500", hint: "Le point des milliers s'en va." },
-            { id: "j", emoji: "🔟", label: '"1500".strip()', correct: "n1500", hint: "Rien à enlever aux bords : le nombre ressort entier." },
-            { id: "k", emoji: "🅰️", label: '"1 500".replace("F", "")', correct: "rien", hint: "Il cherche un F… et il n'y en a pas. L'espace, lui, est toujours là." },
-            { id: "l", emoji: "🅱️", label: '"fin".lower()', correct: "rien", hint: "C'est déjà tout en petites lettres : la ligne ne change rien." },
+            { id: "d", emoji: "4️⃣", label: '"fin".lower()', correct: "fin", hint: "C'est deja en petites lettres : le texte ressort tel quel." },
+            { id: "e", emoji: "5️⃣", label: '" FIN ".strip()', correct: "FIN", hint: "Les espaces partent, les majuscules restent : strip ne les voit pas." },
+            { id: "f", emoji: "6️⃣", label: '"FIN ".strip()', correct: "FIN", hint: "Un seul espace a enlever, et rien d'autre ne bouge." },
+            { id: "g", emoji: "7️⃣", label: '"FIN".replace(" ", "")', correct: "FIN", hint: "Il cherche un espace... il n'y en a pas. Le texte ressort entier." },
+            { id: "h", emoji: "8️⃣", label: '"1 500".replace(" ", "")', correct: "n1500", hint: "L'espace du milieu disparait, les morceaux se recollent." },
+            { id: "i", emoji: "9️⃣", label: '"1500F".replace("F", "")', correct: "n1500", hint: "Le F colle s'en va." },
+            { id: "j", emoji: "🔟", label: '"1.500".replace(".", "")', correct: "n1500", hint: "Le point des milliers s'en va." },
+            { id: "k", emoji: "🅰️", label: '"1 500".strip()', correct: "sale", hint: "Rien aux bouts a enlever. L'espace du milieu, strip ne le voit meme pas." },
+            { id: "l", emoji: "🅱️", label: '"1 500".replace("F", "")', correct: "sale", hint: "Il cherche un F, n'en trouve aucun, et ne change rien. L'espace est toujours la." },
           ],
         },
       },

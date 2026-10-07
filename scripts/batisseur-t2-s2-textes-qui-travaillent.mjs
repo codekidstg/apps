@@ -107,11 +107,17 @@ const BLOCS = [
   jeu({
     game_type: "fill_blank",
     title: "Chaque saleté, son outil",
+    // Les deux premiers trous se remplissaient indifféremment par strip ou
+    // lower : les deux ordres donnent « fin », et le moteur n'en acceptait
+    // qu'un. Chaque trou a donc maintenant sa consigne au-dessus, et une seule
+    // réponse possible.
     template:
-      'mot = "  FIN "\n' +
-      "mot = mot.[___]()\n" +
-      "mot = mot.[___]()\n" +
-      'montant = "1 500".[___](" ", "")',
+      "# enlever les espaces des bouts\n" +
+      'mot = "  fin  ".[___]()\n' +
+      "# calmer les majuscules\n" +
+      'cri = "FIN".[___]()\n' +
+      "# enlever l'espace du milieu\n" +
+      'prix = "1 500".[___](" ", "")',
     blanks: ["strip", "lower", "replace"],
   }),
 
@@ -254,7 +260,7 @@ const BLOCS = [
           choices: ["Le nombre est trop grand", "À cause de l'espace au milieu", "Parce qu'il y a des guillemets"], answer: 1,
           explanation: "Python veut des chiffres collés. L'espace du milieu l'arrête net." },
         { question: 'Est-ce que .strip() sauve int("1 500") ?',
-          choices: ["Non : strip ne touche que les deux bouts", "Oui, il enlève tous les espaces"], answer: 0,
+          choices: ["Non : strip ne touche que les deux bouts", "Oui, il enlève tous les espaces", "Seulement si l'espace est au début"], answer: 0,
           explanation: "strip nettoie les bords, pas le milieu. Ici c'est .replace() qu'il faut — et c'est pour ça que les deux existent." },
         { question: "Le client tape « FIN ». Quel outil te sauve ?",
           choices: [".replace()", ".lower()", "int()"], answer: 1,
@@ -556,7 +562,7 @@ const { error } = await db.from("lesson_blocks").insert(
   BLOCS.map((b, i) => ({ lesson_id: L.id, theme_id: L.theme_id, type: b.type, content: b.content, order_index: i })),
 );
 if (error) throw new Error(error.message);
-const { error: eo } = await db.from("lessons").update({ objectives: OBJECTIFS, acquis: ACQUIS }).eq("id", L.id);
+const { error: eo } = await db.from("lessons").update({ objectives: OBJECTIFS, acquis: ACQUIS, status: "published" }).eq("id", L.id);
 if (eo) throw new Error(`objectifs : ${eo.message}`);
 
 let pb = 0; const ok = (c, m) => { console.log(`  ${c ? "✓" : "⛔"} ${m}`); if (!c) pb++; };
@@ -567,7 +573,8 @@ ok(ap.every((b, i) => b.order_index === i), "numérotation contiguë");
 ok(ap.filter((b) => b.type === "code_challenge").every((b) => b.content.hidden_tests), "chaque défi garde ses tests");
 const RENDUS = ["memory", "association", "sort", "fill_blank", "bug_hunt", "deviens_ordinateur"];
 ok(ap.filter((b) => b.type === "game").every((b) => RENDUS.includes(b.content.game_type)), "aucun jeu sans moteur");
-const relu = (await g("lessons", "objectives,acquis", (q) => q.eq("id", L.id)))[0];
+const relu = (await g("lessons", "objectives,acquis,status", (q) => q.eq("id", L.id)))[0];
 ok(relu.objectives?.length === 4 && relu.acquis === ACQUIS, "objectifs et acquis en base");
+ok(relu.status === "published", `publiée comme la séance 1 (trouvé ${relu.status})`);
 console.log(pb === 0 ? "\n✅ TOUT EST BON" : `\n⛔ ${pb} PROBLÈME(S)`);
 process.exit(pb === 0 ? 0 : 1);
