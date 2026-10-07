@@ -1,0 +1,178 @@
+<!--
+  Scène « Le cahier » — Bâtisseur, thème 3, séance 4 et Jalon 2.
+
+  Dessin de contenu, pas d'applicatif : aucun script ni animation ici. Le
+  lecteur de scènes manipule les identifiants ci-dessous d'après le journal de
+  la boucle de l'enfant.
+
+  CE QU'ELLE ENSEIGNE, ET QU'AUCUN TEXTE NE FAIT SENTIR
+  ────────────────────────────────────────────────────
+  Les feuilles volantes posées sur la table, c'est la mémoire : à la fermeture
+  du programme, la nuit les emporte par la fenêtre. Le cahier relié, c'est le
+  fichier : il reste sur la table. Écrire avant de fermer, relire au
+  démarrage — et l'ordre des deux gestes n'est pas négociable.
+
+  Troisième décor, troisième lumière : le forage est en plein jour, l'étal au
+  crépuscule, le cahier passe du jour à la nuit et revient. C'est le cycle qui
+  enseigne, donc il se voit.
+
+  CE QUE LE LECTEUR PILOTE
+  ────────────────────────
+  #note-1..5      group : les feuilles de la mémoire. opacity 0 → 1 quand une
+                  donnée arrive. Au coucher, translate vers la fenêtre
+                  (environ -120,-190) + opacity 0 : elles s'envolent.
+  #ligne-1..4     text : ce qui est écrit dans le cahier. Le lecteur y met le
+                  texte réel, et passe opacity 0 → 1 à chaque noter().
+                  Le piège du mode "w" : les quatre repassent à 0 d'un coup.
+  #cahier         group : léger rebond quand on écrit dedans.
+  #plume          group : la main qui écrit. Caché par défaut ; se montre au
+                  passage de la ligne, de #ligne-1 vers #ligne-4.
+  #ciel-nuit      group : le ciel de la fenêtre. opacity 0 → 1 au coucher.
+  #nuit           rect : la pièce qui s'assombrit. opacity 0 → 0.78.
+  #lueur-lampe    circle : posé PAR-DESSUS #nuit, c'est lui qui éclaire la
+                  table la nuit. opacity 0 → 1 avec la lampe.
+  #lampe-allumee  group : la flamme. opacity 0 → 1 la nuit.
+  #avatar-fente   group : gabarit 120 × 140 de AvatarSvg, derrière la table.
+
+  Palette : contour #1f2937, épaisseur 3. Mur #e3cfae, bois #a9703f,
+  cahier #2f6f8f, accent de l'application #FDB813.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img"
+     aria-label="Une table, des feuilles volantes et un cahier relié, devant une fenêtre">
+  <defs>
+    <linearGradient id="mur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ead9bb"/><stop offset="1" stop-color="#d8bf98"/>
+    </linearGradient>
+    <linearGradient id="sol" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a6243"/><stop offset="1" stop-color="#6b4a33"/>
+    </linearGradient>
+    <linearGradient id="bois" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c08a52"/><stop offset="1" stop-color="#8e5c2f"/>
+    </linearGradient>
+    <linearGradient id="jour" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ecae6"/><stop offset="1" stop-color="#d8f0f7"/>
+    </linearGradient>
+    <radialGradient id="flamme" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffd166" stop-opacity="0.9"/>
+      <stop offset="0.55" stop-color="#ffb703" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#ffb703" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ══ LA PIÈCE ══════════════════════════════════════════════════════ -->
+  <rect x="0" y="0" width="480" height="286" fill="url(#mur)"/>
+  <path d="M0 286 h480 v74 H0 z" fill="url(#sol)" stroke="#1f2937" stroke-width="3"/>
+  <path d="M0 286 h480" stroke="#1f2937" stroke-width="3"/>
+
+  <!-- ══ LA FENÊTRE ════════════════════════════════════════════════════ -->
+  <g>
+    <rect x="28" y="44" width="148" height="124" fill="url(#jour)"/>
+    <g id="ciel-nuit" opacity="0">
+      <rect x="28" y="44" width="148" height="124" fill="#101c3a"/>
+      <circle cx="140" cy="76" r="14" fill="#ffe8a3"/>
+      <circle cx="134" cy="72" r="12" fill="#101c3a"/>
+      <g fill="#e2e8f0">
+        <circle cx="54" cy="68" r="1.6"/><circle cx="82" cy="58" r="1.3"/>
+        <circle cx="66" cy="104" r="1.5"/><circle cx="104" cy="88" r="1.2"/>
+        <circle cx="48" cy="134" r="1.4"/><circle cx="158" cy="118" r="1.5"/>
+      </g>
+    </g>
+    <g stroke="#1f2937" stroke-width="3" fill="none">
+      <rect x="28" y="44" width="148" height="124"/>
+      <path d="M102 44 v124 M28 106 h148"/>
+    </g>
+    <rect x="18" y="168" width="168" height="10" rx="2" fill="#c08a52" stroke="#1f2937" stroke-width="3"/>
+  </g>
+
+  <!-- ══ L'ENFANT, derrière la table ═══════════════════════════════════ -->
+  <g id="avatar-fente" transform="translate(212 118) scale(0.82)">
+    <g id="avatar-temoin" stroke="#1f2937" stroke-width="3.5" stroke-linejoin="round">
+      <rect x="30" y="52" width="60" height="84" rx="14" fill="#a7b2c0"/>
+      <rect x="38" y="10" width="44" height="40" rx="12" fill="#cbd5e1"/>
+      <circle cx="51" cy="30" r="4.5" fill="#1f2937" stroke="none"/>
+      <circle cx="69" cy="30" r="4.5" fill="#1f2937" stroke="none"/>
+      <path d="M60 10 v-8" stroke-linecap="round"/>
+      <circle cx="60" cy="-4" r="5" fill="#FDB813"/>
+      <path d="M30 70 l-20 20" stroke-linecap="round" fill="none"/>
+      <path d="M90 70 l20 20" stroke-linecap="round" fill="none"/>
+    </g>
+  </g>
+
+  <!-- ══ LA TABLE ══════════════════════════════════════════════════════ -->
+  <g stroke="#1f2937" stroke-width="3" stroke-linejoin="round">
+    <rect x="34" y="294" width="14" height="46" fill="#8e5c2f"/>
+    <rect x="428" y="294" width="14" height="46" fill="#8e5c2f"/>
+    <rect x="16" y="248" width="448" height="16" rx="3" fill="#c08a52"/>
+    <rect x="24" y="264" width="432" height="32" fill="url(#bois)"/>
+  </g>
+
+  <!-- ══ LA MÉMOIRE : les feuilles volantes, posées sur la table ═══════ -->
+  <g id="memoire">
+    <g id="note-1" opacity="0" transform="rotate(-6 76 226)">
+      <rect x="48" y="206" width="56" height="42" rx="3" fill="#fbfdff" stroke="#1f2937" stroke-width="2.5"/>
+      <g stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round">
+        <path d="M56 218 h34"/><path d="M56 228 h30"/><path d="M56 238 h22"/>
+      </g>
+    </g>
+    <g id="note-2" opacity="0" transform="rotate(5 140 224)">
+      <rect x="112" y="204" width="56" height="42" rx="3" fill="#fbfdff" stroke="#1f2937" stroke-width="2.5"/>
+      <g stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round">
+        <path d="M120 216 h36"/><path d="M120 226 h28"/><path d="M120 236 h32"/>
+      </g>
+    </g>
+    <g id="note-3" opacity="0" transform="rotate(-3 204 228)">
+      <rect x="176" y="208" width="56" height="42" rx="3" fill="#fbfdff" stroke="#1f2937" stroke-width="2.5"/>
+      <g stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round">
+        <path d="M184 220 h32"/><path d="M184 230 h36"/><path d="M184 240 h20"/>
+      </g>
+    </g>
+    <g id="note-4" opacity="0" transform="rotate(8 118 196)">
+      <rect x="90" y="176" width="56" height="42" rx="3" fill="#fbfdff" stroke="#1f2937" stroke-width="2.5"/>
+      <g stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round">
+        <path d="M98 188 h34"/><path d="M98 198 h24"/><path d="M98 208 h30"/>
+      </g>
+    </g>
+    <g id="note-5" opacity="0" transform="rotate(-9 182 192)">
+      <rect x="154" y="172" width="56" height="42" rx="3" fill="#fbfdff" stroke="#1f2937" stroke-width="2.5"/>
+      <g stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round">
+        <path d="M162 184 h30"/><path d="M162 194 h34"/><path d="M162 204 h22"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- ══ LE FICHIER : le cahier relié, ouvert sur la table ═════════════ -->
+  <g id="cahier">
+    <path d="M262 250 q74 -14 148 0 l6 -58 q-80 -14 -160 0 z" fill="#2f6f8f" stroke="#1f2937" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M270 246 q68 -12 136 0 l5 -50 q-73 -12 -146 0 z" fill="#fdfbf2" stroke="#1f2937" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M338 196 v50" stroke="#c7bfa8" stroke-width="2.5"/>
+    <g font-family="ui-monospace, monospace" font-size="10.5" font-weight="700" fill="#334155">
+      <text id="ligne-1" x="280" y="212" opacity="0">Ama 14</text>
+      <text id="ligne-2" x="280" y="230" opacity="0">Kofi 11</text>
+      <text id="ligne-3" x="346" y="212" opacity="0">Yawa 16</text>
+      <text id="ligne-4" x="346" y="230" opacity="0">Essi 13</text>
+    </g>
+    <g stroke="#9fb6c4" stroke-width="1.5" opacity="0.6">
+      <path d="M278 220 h50 M278 238 h50 M344 220 h56 M344 238 h56"/>
+    </g>
+  </g>
+
+  <!-- La main qui écrit, pendant un noter() -->
+  <g id="plume" opacity="0">
+    <path d="M292 198 l22 -34 l10 6 l-22 34 z" fill="#FDB813" stroke="#1f2937" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M292 198 l6 4 l6 -3 z" fill="#1f2937"/>
+  </g>
+
+  <!-- ══ LA LAMPE ══════════════════════════════════════════════════════ -->
+  <g stroke="#1f2937" stroke-width="3" stroke-linejoin="round">
+    <path d="M424 248 h44 l-6 -16 h-32 z" fill="#8d949d"/>
+    <rect x="436" y="196" width="20" height="36" fill="#cbd5e1"/>
+    <path d="M430 196 h32 l-8 -16 h-16 z" fill="#8d949d"/>
+  </g>
+  <g id="lampe-allumee" opacity="0">
+    <circle cx="446" cy="212" r="9" fill="#ffd166"/>
+  </g>
+
+  <!-- ══ LA NUIT ═══════════════════════════════════════════════════════ -->
+  <rect id="nuit" x="0" y="0" width="480" height="360" fill="#0a1226" opacity="0"/>
+  <circle id="lueur-lampe" cx="430" cy="224" r="150" fill="url(#flamme)" opacity="0"/>
+</svg>

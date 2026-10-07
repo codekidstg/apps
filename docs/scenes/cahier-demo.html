@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le cahier — demonstration</title>
+<style>
+  :root { --fond:#0f172a; --carte:#1e293b; --bord:#334155; --texte:#e2e8f0; --doux:#94a3b8; --or:#FDB813 }
+  * { box-sizing:border-box }
+  body { margin:0; padding:20px; background:var(--fond); color:var(--texte);
+         font-family:ui-sans-serif,system-ui,sans-serif }
+  h1 { font-size:17px; margin:0 0 4px } p.sous { margin:0 0 18px; color:var(--doux); font-size:13px }
+  .plateau { display:grid; grid-template-columns:minmax(260px,1fr) minmax(300px,1.15fr); gap:16px;
+             align-items:start; max-width:900px }
+  @media (max-width:760px) { .plateau { grid-template-columns:1fr } }
+  .carte { background:var(--carte); border:1px solid var(--bord); border-radius:16px; padding:14px }
+  pre { margin:0; font-family:ui-monospace,monospace; font-size:12.5px; line-height:1.7; color:#FDB813;
+        background:#050f1a; border-radius:10px; padding:12px; overflow-x:auto }
+  pre b { display:block; border-radius:4px; margin:0 -4px; padding:0 4px }
+  pre b.actif { background:#FDB81325; outline:1px solid #FDB81360 }
+  .scene { background:#050f1a; border:1px solid var(--bord); border-radius:16px; padding:8px; overflow:hidden }
+  .barre { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap }
+  button { font:inherit; font-weight:800; font-size:13px; border:0; border-radius:12px; padding:10px 16px;
+           cursor:pointer; background:var(--or); color:#0f172a }
+  button.fant { background:#1e293b; color:var(--doux); border:1px solid var(--bord) }
+  .etat { margin-top:12px; font-family:ui-monospace,monospace; font-size:12px; color:var(--doux) }
+  .verdict { margin-top:10px; border-radius:12px; padding:10px 14px; font-weight:800; font-size:13px; display:none }
+  .note { max-width:900px; margin:20px 0 0; color:var(--doux); font-size:12.5px; line-height:1.7 }
+  #nuit, #ciel-nuit, #lueur-lampe, #lampe-allumee, #plume { transition:opacity .9s ease }
+  #memoire g { transition:opacity .5s ease, transform 1.1s cubic-bezier(.4,0,.6,1) }
+  #ligne-1, #ligne-2, #ligne-3, #ligne-4 { transition:opacity .4s ease }
+</style></head><body>
+
+<h1>Le cahier — ce qui est en memoire s'envole, ce qui est ecrit reste</h1>
+<p class="sous">Trois journees. Le soir, le programme se ferme.</p>
+
+<div class="plateau">
+  <div class="carte">
+    <pre id="code"></pre>
+    <div class="etat" id="etat">memoire : vide · cahier : vide</div>
+    <div class="verdict" id="verdict"></div>
+    <div class="barre">
+      <button onclick="jouer('sans')">Sans ecrire le soir</button>
+      <button onclick="jouer('bien')">Ecrire le soir, relire le matin</button>
+      <button class="fant" onclick="jouer('piege')">Ecrire le matin (piege du "w")</button>
+      <button class="fant" onclick="raz()">Recommencer</button>
+    </div>
+  </div>
+  <div class="scene" id="boite"><svg id="scene" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img"
+     aria-label="Une table, des feuilles volantes et un cahier relié, devant une fenêtre">
+  <defs>
+    <linearGradient id="mur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ead9bb"/><stop offset="1" stop-color="#d8bf98"/>
+    </linearGradient>
+    <linearGradient id="sol" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a6243"/><stop offset="1" stop-color="#6b4a33"/>
+    </linearGradient>
+    <linearGradient id="bois" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c08a52"/><stop offset="1" stop-color="#8e5c2f"/>
+    </linearGradient>
+    <linearGradient id="jour" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ecae6"/><stop offset="1" stop-color="#d8f0f7"/>
+    </linearGradient>
+    <radialGradient id="flamme" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffd166" stop-opacity="0.9"/>
+      <stop offset="0.55" stop-color="#ffb703" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#ffb703" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ══ LA PIÈCE ══════════════════════════════════════════════════════ -->
+  <rect x="0" y="0" width="480" height="286" fill="url(#mur)"/>
+  <path d="M0 286 h480 v74 H0 z" fill="url(#sol)" stroke="#1f2937" stroke-width="3"/>
+  <path d="M0 286 h480" stroke="#1f2937" stroke-width="3"/>
+
+  <!-- ══ LA FENÊTRE ════════════════════════════════════════════════════ -->
+  <g>
+    <rect x="28" y="44" width="148" height="124" fill="url(#jour)"/>
+    <g id="ciel-nuit" opacity="0">
+      <rect x="28" y="44" width="148" height="124" fill="#101c3a"/>
+      <circle cx="140" cy="76" r="14" fill="#ffe8a3"/>
+      <circle cx="134" cy="72" r="12" fill="#101c3a"/>
+      <g fill="#e2e8f0">
+        <circle cx="54" cy="68" r="1.6"/><circle cx="82" cy="58" r="1.3"/>
+        <circle cx="66" cy="104" r="1.5"/><circle cx="104" cy="88" r="1.2"/>
+        <circle cx="48" cy="134" r="1.4"/><circle cx="158" cy="118" r="1.5"/>
+      </g>
+    </g>
+    <g stroke="#1f2937" stroke-width="3" fill="none">
+      <rect x="28" y="44" width="148" height="124"/>
+      <path d="M102 44 v124 M28 106 h148"/>
+    </g>
+    <rect x="18" y="168" width="168" height="10" rx="2" fill="#c08a52" stroke="#1f2937" stroke-width="3"/>
+  </g>
+
+  <!-- ══ L'ENFANT, derrière la table ═══════════════════════════════════ -->
+  <g id="avatar-fente" transform="translate(212 118) scale(0.82)">
+    <g id="avatar-temoin" stroke="#1f2937" stroke-width="3.5" stroke-linejoin="round">
+      <rect x="30" y="52" width="60" height="84" rx="14" fill="#a7b2c0"/>
+      <rect x="38" y="10" width="44" height="40" rx="12" fill="#cbd5e1"/>
+      <circle cx="51" cy="30" r="4.5" fill="#1f2937" stroke="none"/>
+      <circle cx="69" cy="30" r="4.5" fill="#1f2937" stroke="none"/>
+      <path d="M60 10 v-8" stroke-linecap="round"/>
+      <circle cx="60" cy="-4" r="5" fill="#FDB813"/>
+      <path d="M30 70 l-20 20" stroke-linecap="round" fill="none"/>
+      <path d="M90 70 l20 20" stroke-linecap="round" fill="none"/>
+    </g>
+  </g>
+
+  <!-- ══ LA TABLE ══════════════════════════════════════════════════════ -->
+  <g stroke="#1f2937" stroke-width="3" stroke-linejoin="round">
+    <rect x="34" y="294" width="14" height="46" fill="#8e5c2f"/>
+    <rect x="428" y="294" width="14" height="46" fill="#8e5c2f"/>
+    <rect x="16" y="248" width="448" height="16" rx="3" fill="#c08a52"/>
+    <rect x="24" y="264" width="432" height="32" fill="url(#bois)"/>
+  </g>
+
+  <!-- ══ LA MÉMOIRE : les feuilles volantes, posées sur la table ═══════ -->
+  <g id="memoire">
+    <g id="note-1" opacity="0" transform="rotate(-6 76 226)">
+      <rect x="48" y="206" width="56" height="42" rx="3" fill="#fbfdff" stroke="#1f2937" stroke-width="2.5"/>
+      <g stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round">
+        <path d="M56 218 h34"/><path d="M56 228 h30"/><path d="M56 238 h22"/>
+      </g>
+    </g>
+    <g id="note-2" opacity="0" transform="rotate(5 140 224)">
+      <rect x="112" y="204" width="56" height="42" rx="3" fill="#fbfdff" stroke="#1f2937" stroke-width="2.5"/>
+      <g stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round">
+        <path d="M120 216 h36"/><path d="M120 226 h28"/><path d="M120 236 h32"/>
+      </g>
+    </g>
+    <g id="note-3" opacity="0" transform="rotate(-3 204 228)">
+      <rect x="176" y="208" width="56" height="42" rx="3" fill="#fbfdff" stroke="#1f2937" stroke-width="2.5"/>
+      <g stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round">
+        <path d="M184 220 h32"/><path d="M184 230 h36"/><path d="M184 240 h20"/>
+      </g>
+    </g>
+    <g id="note-4" opacity="0" transform="rotate(8 118 196)">
+      <rect x="90" y="176" width="56" height="42" rx="3" fill="#fbfdff" stroke="#1f2937" stroke-width="2.5"/>
+      <g stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round">
+        <path d="M98 188 h34"/><path d="M98 198 h24"/><path d="M98 208 h30"/>
+      </g>
+    </g>
+    <g id="note-5" opacity="0" transform="rotate(-9 182 192)">
+      <rect x="154" y="172" width="56" height="42" rx="3" fill="#fbfdff" stroke="#1f2937" stroke-width="2.5"/>
+      <g stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round">
+        <path d="M162 184 h30"/><path d="M162 194 h34"/><path d="M162 204 h22"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- ══ LE FICHIER : le cahier relié, ouvert sur la table ═════════════ -->
+  <g id="cahier">
+    <path d="M262 250 q74 -14 148 0 l6 -58 q-80 -14 -160 0 z" fill="#2f6f8f" stroke="#1f2937" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M270 246 q68 -12 136 0 l5 -50 q-73 -12 -146 0 z" fill="#fdfbf2" stroke="#1f2937" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M338 196 v50" stroke="#c7bfa8" stroke-width="2.5"/>
+    <g font-family="ui-monospace, monospace" font-size="10.5" font-weight="700" fill="#334155">
+      <text id="ligne-1" x="280" y="212" opacity="0">Ama 14</text>
+      <text id="ligne-2" x="280" y="230" opacity="0">Kofi 11</text>
+      <text id="ligne-3" x="346" y="212" opacity="0">Yawa 16</text>
+      <text id="ligne-4" x="346" y="230" opacity="0">Essi 13</text>
+    </g>
+    <g stroke="#9fb6c4" stroke-width="1.5" opacity="0.6">
+      <path d="M278 220 h50 M278 238 h50 M344 220 h56 M344 238 h56"/>
+    </g>
+  </g>
+
+  <!-- La main qui écrit, pendant un noter() -->
+  <g id="plume" opacity="0">
+    <path d="M292 198 l22 -34 l10 6 l-22 34 z" fill="#FDB813" stroke="#1f2937" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M292 198 l6 4 l6 -3 z" fill="#1f2937"/>
+  </g>
+
+  <!-- ══ LA LAMPE ══════════════════════════════════════════════════════ -->
+  <g stroke="#1f2937" stroke-width="3" stroke-linejoin="round">
+    <path d="M424 248 h44 l-6 -16 h-32 z" fill="#8d949d"/>
+    <rect x="436" y="196" width="20" height="36" fill="#cbd5e1"/>
+    <path d="M430 196 h32 l-8 -16 h-16 z" fill="#8d949d"/>
+  </g>
+  <g id="lampe-allumee" opacity="0">
+    <circle cx="446" cy="212" r="9" fill="#ffd166"/>
+  </g>
+
+  <!-- ══ LA NUIT ═══════════════════════════════════════════════════════ -->
+  <rect id="nuit" x="0" y="0" width="480" height="360" fill="#0a1226" opacity="0"/>
+  <circle id="lueur-lampe" cx="430" cy="224" r="150" fill="url(#flamme)" opacity="0"/>
+</svg>
+</div>
+</div>
+
+<p class="note"><b>Ce que le lecteur de scenes pilotera</b> d'apres le journal du programme :
+<code>#note-1..5</code> qui apparaissent puis s'envolent par la fenetre, <code>#ligne-1..4</code>
+ecrites dans le <code>#cahier</code>, la <code>#plume</code>, le <code>#ciel-nuit</code>, le voile
+<code>#nuit</code>, la <code>#lampe-allumee</code> et sa <code>#lueur-lampe</code>.
+Le robot gris est un temoin de cadrage : l'avatar de l'enfant prend sa place.</p>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const dors = (ms) => new Promise(r => setTimeout(r, ms));
+let memoire = 0, cahier = 0, stop = 0;
+
+const CODES = {
+  sans:  ['notes = []', 'ajouter(notes)', '# rien n\'est ecrit', 'fermer()'],
+  bien:  ['notes = lire_cahier()', 'ajouter(notes)', 'ecrire_cahier(notes)', 'fermer()'],
+  piege: ['notes = []', 'ecrire_cahier(notes)', 'ajouter(notes)', 'fermer()'],
+};
+let mode = 'bien';
+function ecrireCode() {
+  $("#code").innerHTML = CODES[mode].map((l, n) => '<b id="c' + n + '">' + l.replace(/</g,"&lt;") + '</b>').join("");
+}
+function ligne(n) {
+  document.querySelectorAll("pre b").forEach(b => b.classList.remove("actif"));
+  if (n != null && $("#c" + n)) $("#c" + n).classList.add("actif");
+}
+function majEtat(txt) {
+  $("#etat").textContent = txt || ("memoire : " + memoire + " note" + (memoire > 1 ? "s" : "") +
+    " · cahier : " + cahier + " ligne" + (cahier > 1 ? "s" : ""));
+}
+const noteOn = (n, v) => $("#note-" + n).setAttribute("opacity", v);
+const ligneOn = (n, v) => $("#ligne-" + n).setAttribute("opacity", v);
+
+async function poserNotes(combien) {
+  for (let k = 0; k < combien && memoire < 5; k++) {
+    memoire++; noteOn(memoire, 1); majEtat(); await dors(360);
+  }
+}
+async function ecrireCahier(n) {
+  $("#plume").setAttribute("opacity", 1);
+  for (let k = 1; k <= Math.min(n, 4); k++) { ligneOn(k, 1); await dors(260); }
+  cahier = Math.min(n, 4);
+  $("#plume").setAttribute("opacity", 0); majEtat();
+}
+async function effacerCahier() {
+  for (let k = 1; k <= 4; k++) ligneOn(k, 0);
+  cahier = 0; majEtat();
+}
+async function coucher() {
+  $("#ciel-nuit").setAttribute("opacity", 1);
+  $("#nuit").setAttribute("opacity", 0.78);
+  $("#lampe-allumee").setAttribute("opacity", 1);
+  $("#lueur-lampe").setAttribute("opacity", 1);
+  await dors(700);
+  // Ce qui est reste en memoire part par la fenetre.
+  for (let k = 1; k <= memoire; k++) {
+    const g = $("#note-" + k);
+    g.style.transform = "translate(-110px,-205px) rotate(-24deg)";
+    g.setAttribute("opacity", 0);
+  }
+  const partis = memoire; memoire = 0;
+  await dors(1100); majEtat();
+  return partis;
+}
+async function lever() {
+  for (let k = 1; k <= 5; k++) { const g = $("#note-" + k); g.style.transform = ""; noteOn(k, 0); }
+  $("#ciel-nuit").setAttribute("opacity", 0);
+  $("#nuit").setAttribute("opacity", 0);
+  $("#lampe-allumee").setAttribute("opacity", 0);
+  $("#lueur-lampe").setAttribute("opacity", 0);
+  await dors(700);
+}
+
+async function jouer(m) {
+  raz(); mode = m; ecrireCode(); await dors(200);
+  const v = $("#verdict");
+  if (m === "piege") {
+    ligne(0); await dors(400);
+    ligne(2); await poserNotes(3);
+    ligne(2); await ecrireCahier(3); await dors(500);
+    ligne(3); await coucher(); await lever();
+    // Deuxieme matin : on ecrit AVANT d'ajouter, avec une memoire vide.
+    ligne(1); await dors(400); await effacerCahier(); await dors(600);
+    v.style.display = "block"; v.style.background = "#2d0a0a"; v.style.color = "#fca5a5";
+    v.style.border = "1px solid #ef444460";
+    v.innerHTML = "Le deuxieme matin, ecrire_cahier a ete appele AVANT d'avoir quoi que ce soit en memoire.<br>" +
+      "Le cahier a ete ecrase par du vide. Les trois notes d'hier n'existent plus nulle part.";
+    return;
+  }
+  if (m === "sans") {
+    ligne(0); await dors(400);
+    ligne(1); await poserNotes(3); await dors(400);
+    ligne(3); const partis = await coucher(); await lever();
+    v.style.display = "block"; v.style.background = "#2d0a0a"; v.style.color = "#fca5a5";
+    v.style.border = "1px solid #ef444460";
+    v.innerHTML = "La nuit a emporte les " + partis + " notes par la fenetre.<br>" +
+      "Le cahier est reste vide : rien n'a ete ecrit avant la fermeture.";
+    return;
+  }
+  ligne(0); await dors(500);
+  ligne(1); await poserNotes(2); await dors(300);
+  ligne(2); await ecrireCahier(2); await dors(400);
+  ligne(3); await coucher(); await lever();
+  // Deuxieme journee : on relit, puis on ajoute.
+  ligne(0); await dors(300);
+  for (let k = 1; k <= 2; k++) { memoire++; noteOn(k, 1); await dors(300); }
+  majEtat(); ligne(1); await poserNotes(2); await dors(300);
+  ligne(2); await ecrireCahier(4); await dors(400);
+  v.style.display = "block"; v.style.background = "#052e16"; v.style.color = "#6ee7b7";
+  v.style.border = "1px solid #10b98160";
+  v.innerHTML = "Deuxieme matin : les deux notes d'hier sont revenues du cahier sur la table.<br>" +
+    "Quatre notes en tout, et elles survivront a la prochaine nuit.";
+}
+
+function raz() {
+  memoire = 0; cahier = 0;
+  for (let k = 1; k <= 5; k++) { const g = $("#note-" + k); g.style.transform = ""; noteOn(k, 0); }
+  for (let k = 1; k <= 4; k++) ligneOn(k, 0);
+  $("#ciel-nuit").setAttribute("opacity", 0); $("#nuit").setAttribute("opacity", 0);
+  $("#lampe-allumee").setAttribute("opacity", 0); $("#lueur-lampe").setAttribute("opacity", 0);
+  $("#plume").setAttribute("opacity", 0);
+  $("#verdict").style.display = "none";
+  ecrireCode(); ligne(null); majEtat();
+}
+raz();
+</script>
+</body></html>

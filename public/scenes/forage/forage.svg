@@ -1,0 +1,171 @@
+<!--
+  Scène « Le forage » — Bâtisseur, thème 3, séance 1 « La boucle qui attend ».
+
+  Dessin de contenu, pas d'applicatif : aucun script ni animation ici. Le
+  lecteur de scènes manipule les identifiants ci-dessous d'après le journal de
+  la boucle de l'enfant.
+
+  PROFONDEUR — trois plans, et c'est ce qui donne l'échelle :
+    fond   y 150-232  palmiers, mur de concession
+    milieu y 232-262  la pompe et l'enfant se tiennent là
+    devant y 262-360  le bidon, plus près, donc plus grand
+
+  CE QUE LE LECTEUR PILOTE
+  ────────────────────────
+  #eau-niveau   rect, en coordonnées LOCALES du groupe #bidon-pose :
+                intérieur de y=244 (0 L) à y=124 (40 L), soit 3 px par litre.
+                litres L  →  y = 244 - 3*litres  ·  height = 3*litres
+  #eau-surface  path : la surface. translate(0, -3*litres), et un va-et-vient
+                de 2 px pour l'ondulation.
+  #seau         group : glisse de la pompe au bidon, puis bascule
+                (rotate ~108° autour de 178,250) pour verser.
+  #filet-eau    path : le jet. opacity 0 → 1 pendant le versement.
+  #debordement  group : l'eau qui passe par-dessus bord. Caché par défaut.
+  #flaque       ellipse : la terre mouillée. opacity 0 → 0.55 au débordement.
+  #bidon-corps  path : ±1,5 px en translation quand la boucle ne finit pas.
+  #avatar-fente group : emplacement de l'avatar. Il contient un gabarit de
+                120 × 140 — exactement le viewBox de AvatarSvg — mis à
+                l'échelle et posé sur le sol du plan milieu. Le lecteur y
+                injecte <AvatarSvg size=... /> et retire le témoin gris.
+
+  Palette : contour #1f2937, épaisseur 3. Terre #a4502b, bidon #f1c21b,
+  eau #2a9fd6, accent de l'application #FDB813.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img"
+     aria-label="Un forage : une pompe, un seau, un enfant et un bidon de 40 litres">
+  <defs>
+    <linearGradient id="ciel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ecae6"/>
+      <stop offset="0.55" stop-color="#d9eff7"/>
+      <stop offset="1" stop-color="#ffeccb"/>
+    </linearGradient>
+    <linearGradient id="terre-loin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c06a3c"/><stop offset="1" stop-color="#a95a30"/>
+    </linearGradient>
+    <linearGradient id="terre-pres" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a4502b"/><stop offset="1" stop-color="#83401f"/>
+    </linearGradient>
+    <linearGradient id="jaune" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f7d14a"/><stop offset="0.5" stop-color="#eab808"/>
+      <stop offset="1" stop-color="#c79a05"/>
+    </linearGradient>
+    <linearGradient id="bleu" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#54c6ee"/><stop offset="1" stop-color="#1b7fb6"/>
+    </linearGradient>
+    <clipPath id="interieur-bidon">
+      <path d="M304 124 h92 v116 a6 6 0 0 1 -6 6 h-80 a6 6 0 0 1 -6 -6 z"/>
+    </clipPath>
+  </defs>
+
+  <!-- ══ FOND ══════════════════════════════════════════════════════════ -->
+  <rect x="0" y="0" width="480" height="240" fill="url(#ciel)"/>
+  <circle cx="412" cy="52" r="24" fill="#ffd166"/>
+  <circle cx="412" cy="52" r="34" fill="#ffd166" opacity="0.25"/>
+
+  <!-- Deux palmiers et le mur d'une concession, en silhouette claire -->
+  <g opacity="0.75">
+    <g fill="#7a9b5e" stroke="#5f7d47" stroke-width="2" stroke-linejoin="round">
+      <g transform="translate(-52 0)">
+      <path d="M78 232 q-5 -42 4 -72" fill="none" stroke="#8a6a46" stroke-width="7" stroke-linecap="round"/>
+      <path d="M82 158 q-32 -6 -44 12 q26 -4 44 2z"/>
+      <path d="M82 158 q32 -8 46 10 q-28 -4 -46 2z"/>
+      <path d="M82 158 q-16 -26 -42 -28 q22 14 42 32z"/>
+      <path d="M82 158 q18 -28 44 -28 q-24 14 -44 32z"/>
+      </g>
+      <g transform="translate(38 0)">
+      <path d="M404 232 q4 -34 -2 -58" fill="none" stroke="#8a6a46" stroke-width="6" stroke-linecap="round"/>
+      <path d="M402 174 q-26 -6 -36 10 q22 -4 36 2z"/>
+      <path d="M402 174 q26 -8 38 8 q-24 -4 -38 2z"/>
+      <path d="M402 174 q-12 -22 -34 -24 q18 12 34 28z"/>
+      </g>
+    </g>
+    <path d="M150 232 v-30 h120 v30z" fill="#d8b48a" stroke="#b8956c" stroke-width="2"/>
+    <path d="M150 206 h120" stroke="#c4a078" stroke-width="2"/>
+    <path d="M276 232 v-20 h44 v20z" fill="#cfa87c" stroke="#b8956c" stroke-width="2"/>
+  </g>
+
+  <!-- ══ LE SOL ════════════════════════════════════════════════════════ -->
+  <path d="M0 232 q120 -6 240 0 q120 6 240 0 v34 H0 z" fill="url(#terre-loin)"/>
+  <path d="M0 262 q80 -8 160 0 q80 8 160 0 q80 -8 160 0 v98 H0 z"
+        fill="url(#terre-pres)" stroke="#1f2937" stroke-width="3"/>
+  <g stroke="#6d3317" stroke-width="3" stroke-linecap="round" opacity="0.45">
+    <path d="M24 300 h30"/><path d="M104 330 h38"/><path d="M186 306 h24"/>
+    <path d="M330 342 h34"/><path d="M414 312 h30"/><path d="M58 348 h44"/>
+  </g>
+
+  <!-- ══ LA POMPE, plan milieu ═════════════════════════════════════════ -->
+  <g stroke="#1f2937" stroke-width="3" stroke-linejoin="round">
+    <path d="M38 258 h96 l-9 -20 h-78 z" fill="#c3c9d1"/>
+    <path d="M47 238 h78" stroke="#9aa3ad" stroke-width="2"/>
+    <rect x="72" y="156" width="26" height="82" fill="#949ca6"/>
+    <rect x="66" y="144" width="38" height="15" rx="4" fill="#737b85"/>
+    <path d="M98 176 h30 l12 13 h-15 l-7 -6 h-20 z" fill="#949ca6"/>
+    <path d="M66 151 l-44 -24 a7 7 0 0 1 7 -12 l46 22 z" fill="#737b85"/>
+    <circle cx="85" cy="152" r="5" fill="#dde3ea"/>
+  </g>
+
+  <!-- ══ L'ENFANT, plan milieu — gabarit 120 × 140 de AvatarSvg ════════ -->
+  <g id="avatar-fente" transform="translate(214 142) scale(0.8)">
+    <ellipse cx="60" cy="140" rx="34" ry="7" fill="#1f2937" opacity="0.22"/>
+    <g id="avatar-temoin" stroke="#1f2937" stroke-width="3.5" stroke-linejoin="round">
+      <rect x="30" y="52" width="60" height="84" rx="14" fill="#a7b2c0"/>
+      <rect x="38" y="10" width="44" height="40" rx="12" fill="#cbd5e1"/>
+      <circle cx="51" cy="30" r="4.5" fill="#1f2937" stroke="none"/>
+      <circle cx="69" cy="30" r="4.5" fill="#1f2937" stroke="none"/>
+      <path d="M60 10 v-8" stroke-linecap="round"/>
+      <circle cx="60" cy="-4" r="5" fill="#FDB813"/>
+      <path d="M30 70 l-16 24" stroke-linecap="round" fill="none"/>
+      <path d="M90 70 l16 24" stroke-linecap="round" fill="none"/>
+    </g>
+  </g>
+
+  <!-- ══ LE BIDON, premier plan ════════════════════════════════════════ -->
+  <g id="bidon-pose" transform="translate(26 36)">
+    <ellipse id="flaque" cx="350" cy="256" rx="78" ry="16" fill="#52260f" opacity="0"/>
+    <ellipse cx="350" cy="252" rx="56" ry="8" fill="#1f2937" opacity="0.28"/>
+
+    <path d="M300 118 q-26 6 -26 28 q0 22 26 26" fill="none" stroke="#1f2937" stroke-width="13" stroke-linecap="round"/>
+    <path d="M300 118 q-26 6 -26 28 q0 22 26 26" fill="none" stroke="#eab808" stroke-width="6" stroke-linecap="round"/>
+
+    <path id="bidon-corps" d="M298 118 h104 a6 6 0 0 1 6 6 v120 a8 8 0 0 1 -8 8 h-100 a8 8 0 0 1 -8 -8 v-120 a6 6 0 0 1 6 -6 z"
+          fill="url(#jaune)" stroke="#1f2937" stroke-width="3"/>
+
+    <g clip-path="url(#interieur-bidon)">
+      <rect id="eau-niveau" x="304" y="244" width="92" height="0" fill="url(#bleu)"/>
+      <path id="eau-surface" d="M304 240 q11 -7 23 0 q11 7 23 0 q11 -7 23 0 q11 7 23 0 v10 H304 z"
+            fill="#7fd3f0" opacity="0"/>
+    </g>
+
+    <g stroke="#1f2937" stroke-width="2.5" stroke-linecap="round" opacity="0.6">
+      <path d="M384 214 h16"/><path d="M384 184 h16"/><path d="M384 154 h16"/>
+    </g>
+    <path d="M376 124 h26" stroke="#FDB813" stroke-width="4.5" stroke-linecap="round"/>
+    <g font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#6b5607" text-anchor="end">
+      <text x="380" y="218">10</text><text x="380" y="188">20</text><text x="380" y="158">30</text>
+    </g>
+    <text x="372" y="128" font-family="ui-monospace, monospace" font-size="12.5" font-weight="800"
+          fill="#8a6a00" text-anchor="end">40 L</text>
+
+    <rect x="330" y="98" width="38" height="22" fill="#eab808" stroke="#1f2937" stroke-width="3"/>
+    <rect x="324" y="86" width="50" height="16" rx="5" fill="#f7d14a" stroke="#1f2937" stroke-width="3"/>
+    <path d="M313 134 v94" stroke="#fff3b0" stroke-width="6" stroke-linecap="round" opacity="0.45"/>
+
+    <g id="debordement" opacity="0">
+      <path d="M332 104 q-26 14 -30 40 q-4 30 2 58 q3 22 12 34" fill="none" stroke="#4fc0ea"
+            stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+      <path d="M366 104 q26 14 30 40 q4 30 -2 58 q-3 22 -12 34" fill="none" stroke="#4fc0ea"
+            stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+      <circle cx="316" cy="248" r="5" fill="#7fd3f0"/>
+      <circle cx="388" cy="242" r="4" fill="#7fd3f0"/>
+    </g>
+  </g>
+  <!-- ══ LE SEAU, sous le bec ══════════════════════════════════════════ -->
+  <g id="seau">
+    <ellipse cx="178" cy="252" rx="22" ry="5" fill="#1f2937" opacity="0.2"/>
+    <path d="M154 222 h48 l-6 28 h-36 z" fill="#5fb0d8" stroke="#1f2937" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M156 230 h44" stroke="#9adcf5" stroke-width="4" stroke-linecap="round"/>
+    <path d="M156 221 q22 -20 44 0" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <path id="filet-eau" d="M362 150 q8 18 14 32" fill="none" stroke="#4fc0ea"
+        stroke-width="8" stroke-linecap="round" opacity="0"/>
+</svg>

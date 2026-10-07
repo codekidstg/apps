@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le forage — demonstration</title>
+<style>
+  :root { --fond:#0f172a; --carte:#1e293b; --bord:#334155; --texte:#e2e8f0;
+          --doux:#94a3b8; --or:#FDB813; --vert:#10b981; --rouge:#ef4444; }
+  * { box-sizing:border-box }
+  body { margin:0; padding:20px; background:var(--fond); color:var(--texte);
+         font-family:ui-sans-serif,system-ui,sans-serif }
+  h1 { font-size:17px; margin:0 0 4px }
+  p.sous { margin:0 0 18px; color:var(--doux); font-size:13px }
+  .plateau { display:grid; grid-template-columns:minmax(260px,1fr) minmax(300px,1.15fr);
+             gap:16px; align-items:start; max-width:900px }
+  @media (max-width:760px) { .plateau { grid-template-columns:1fr } }
+  .carte { background:var(--carte); border:1px solid var(--bord); border-radius:16px; padding:14px }
+  pre { margin:0; font-family:ui-monospace,monospace; font-size:13px; line-height:1.75;
+        color:#FDB813; background:#050f1a; border-radius:10px; padding:12px; overflow-x:auto }
+  pre b { display:block; border-radius:4px; margin:0 -4px; padding:0 4px }
+  pre b.actif { background:#FDB81325; outline:1px solid #FDB81360 }
+  pre i { font-style:normal; color:#7fd3f0 }
+  .scene { background:#050f1a; border:1px solid var(--bord); border-radius:16px;
+           padding:8px; overflow:hidden }
+  .barre { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap }
+  button { font:inherit; font-weight:800; font-size:13px; border:0; border-radius:12px;
+           padding:10px 16px; cursor:pointer; background:var(--or); color:#0f172a }
+  button.fant { background:#1e293b; color:var(--doux); border:1px solid var(--bord) }
+  .etat { margin-top:12px; font-family:ui-monospace,monospace; font-size:12px; color:var(--doux) }
+  .verdict { margin-top:10px; border-radius:12px; padding:10px 14px; font-weight:800; font-size:13px; display:none }
+  .note { max-width:900px; margin:20px 0 0; color:var(--doux); font-size:12.5px; line-height:1.7 }
+  @keyframes tremble { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-1.5px)} 75%{transform:translateX(1.5px)} }
+  #seau { transition: transform .45s cubic-bezier(.4,0,.2,1) }
+  .tremble #bidon-corps { animation:tremble .12s infinite }
+</style></head><body>
+
+<h1>Le forage — ce que l'enfant voit quand sa boucle tourne</h1>
+<p class="sous">Le code a gauche, la scene a droite. Chaque tour de boucle verse un seau.</p>
+
+<div class="plateau">
+  <div class="carte">
+    <pre><b id="l0">litres = 0</b><b id="l1">seaux = 0</b><b id="l2">while litres &lt; 40:</b><b id="l3">    litres = litres + <i id="pas">4</i></b><b id="l4">    seaux = seaux + 1</b><b id="l5">print("Seaux :", seaux)</b></pre>
+    <div class="etat" id="etat">litres = 0 · seaux = 0 · la question n'a pas encore ete posee</div>
+    <div class="verdict" id="verdict"></div>
+    <div class="barre">
+      <button onclick="pas()">Un tour de boucle</button>
+      <button class="fant" onclick="tout()">Jusqu'au bout</button>
+      <button class="fant" onclick="sansFin()">Sans la ligne qui avance</button>
+      <button class="fant" onclick="raz()">Recommencer</button>
+      <button class="fant" onclick="seau(4)">Seau de 4 L</button>
+      <button class="fant" onclick="seau(6)">Seau de 6 L</button>
+    </div>
+  </div>
+  <div class="scene" id="boite"><svg id="scene" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img"
+     aria-label="Un forage : une pompe, un seau, un enfant et un bidon de 40 litres">
+  <defs>
+    <linearGradient id="ciel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ecae6"/>
+      <stop offset="0.55" stop-color="#d9eff7"/>
+      <stop offset="1" stop-color="#ffeccb"/>
+    </linearGradient>
+    <linearGradient id="terre-loin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c06a3c"/><stop offset="1" stop-color="#a95a30"/>
+    </linearGradient>
+    <linearGradient id="terre-pres" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a4502b"/><stop offset="1" stop-color="#83401f"/>
+    </linearGradient>
+    <linearGradient id="jaune" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f7d14a"/><stop offset="0.5" stop-color="#eab808"/>
+      <stop offset="1" stop-color="#c79a05"/>
+    </linearGradient>
+    <linearGradient id="bleu" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#54c6ee"/><stop offset="1" stop-color="#1b7fb6"/>
+    </linearGradient>
+    <clipPath id="interieur-bidon">
+      <path d="M304 124 h92 v116 a6 6 0 0 1 -6 6 h-80 a6 6 0 0 1 -6 -6 z"/>
+    </clipPath>
+  </defs>
+
+  <!-- ══ FOND ══════════════════════════════════════════════════════════ -->
+  <rect x="0" y="0" width="480" height="240" fill="url(#ciel)"/>
+  <circle cx="412" cy="52" r="24" fill="#ffd166"/>
+  <circle cx="412" cy="52" r="34" fill="#ffd166" opacity="0.25"/>
+
+  <!-- Deux palmiers et le mur d'une concession, en silhouette claire -->
+  <g opacity="0.75">
+    <g fill="#7a9b5e" stroke="#5f7d47" stroke-width="2" stroke-linejoin="round">
+      <g transform="translate(-52 0)">
+      <path d="M78 232 q-5 -42 4 -72" fill="none" stroke="#8a6a46" stroke-width="7" stroke-linecap="round"/>
+      <path d="M82 158 q-32 -6 -44 12 q26 -4 44 2z"/>
+      <path d="M82 158 q32 -8 46 10 q-28 -4 -46 2z"/>
+      <path d="M82 158 q-16 -26 -42 -28 q22 14 42 32z"/>
+      <path d="M82 158 q18 -28 44 -28 q-24 14 -44 32z"/>
+      </g>
+      <g transform="translate(38 0)">
+      <path d="M404 232 q4 -34 -2 -58" fill="none" stroke="#8a6a46" stroke-width="6" stroke-linecap="round"/>
+      <path d="M402 174 q-26 -6 -36 10 q22 -4 36 2z"/>
+      <path d="M402 174 q26 -8 38 8 q-24 -4 -38 2z"/>
+      <path d="M402 174 q-12 -22 -34 -24 q18 12 34 28z"/>
+      </g>
+    </g>
+    <path d="M150 232 v-30 h120 v30z" fill="#d8b48a" stroke="#b8956c" stroke-width="2"/>
+    <path d="M150 206 h120" stroke="#c4a078" stroke-width="2"/>
+    <path d="M276 232 v-20 h44 v20z" fill="#cfa87c" stroke="#b8956c" stroke-width="2"/>
+  </g>
+
+  <!-- ══ LE SOL ════════════════════════════════════════════════════════ -->
+  <path d="M0 232 q120 -6 240 0 q120 6 240 0 v34 H0 z" fill="url(#terre-loin)"/>
+  <path d="M0 262 q80 -8 160 0 q80 8 160 0 q80 -8 160 0 v98 H0 z"
+        fill="url(#terre-pres)" stroke="#1f2937" stroke-width="3"/>
+  <g stroke="#6d3317" stroke-width="3" stroke-linecap="round" opacity="0.45">
+    <path d="M24 300 h30"/><path d="M104 330 h38"/><path d="M186 306 h24"/>
+    <path d="M330 342 h34"/><path d="M414 312 h30"/><path d="M58 348 h44"/>
+  </g>
+
+  <!-- ══ LA POMPE, plan milieu ═════════════════════════════════════════ -->
+  <g stroke="#1f2937" stroke-width="3" stroke-linejoin="round">
+    <path d="M38 258 h96 l-9 -20 h-78 z" fill="#c3c9d1"/>
+    <path d="M47 238 h78" stroke="#9aa3ad" stroke-width="2"/>
+    <rect x="72" y="156" width="26" height="82" fill="#949ca6"/>
+    <rect x="66" y="144" width="38" height="15" rx="4" fill="#737b85"/>
+    <path d="M98 176 h30 l12 13 h-15 l-7 -6 h-20 z" fill="#949ca6"/>
+    <path d="M66 151 l-44 -24 a7 7 0 0 1 7 -12 l46 22 z" fill="#737b85"/>
+    <circle cx="85" cy="152" r="5" fill="#dde3ea"/>
+  </g>
+
+  <!-- ══ L'ENFANT, plan milieu — gabarit 120 × 140 de AvatarSvg ════════ -->
+  <g id="avatar-fente" transform="translate(214 142) scale(0.8)">
+    <ellipse cx="60" cy="140" rx="34" ry="7" fill="#1f2937" opacity="0.22"/>
+    <g id="avatar-temoin" stroke="#1f2937" stroke-width="3.5" stroke-linejoin="round">
+      <rect x="30" y="52" width="60" height="84" rx="14" fill="#a7b2c0"/>
+      <rect x="38" y="10" width="44" height="40" rx="12" fill="#cbd5e1"/>
+      <circle cx="51" cy="30" r="4.5" fill="#1f2937" stroke="none"/>
+      <circle cx="69" cy="30" r="4.5" fill="#1f2937" stroke="none"/>
+      <path d="M60 10 v-8" stroke-linecap="round"/>
+      <circle cx="60" cy="-4" r="5" fill="#FDB813"/>
+      <path d="M30 70 l-16 24" stroke-linecap="round" fill="none"/>
+      <path d="M90 70 l16 24" stroke-linecap="round" fill="none"/>
+    </g>
+  </g>
+
+  <!-- ══ LE BIDON, premier plan ════════════════════════════════════════ -->
+  <g id="bidon-pose" transform="translate(26 36)">
+    <ellipse id="flaque" cx="350" cy="256" rx="78" ry="16" fill="#52260f" opacity="0"/>
+    <ellipse cx="350" cy="252" rx="56" ry="8" fill="#1f2937" opacity="0.28"/>
+
+    <path d="M300 118 q-26 6 -26 28 q0 22 26 26" fill="none" stroke="#1f2937" stroke-width="13" stroke-linecap="round"/>
+    <path d="M300 118 q-26 6 -26 28 q0 22 26 26" fill="none" stroke="#eab808" stroke-width="6" stroke-linecap="round"/>
+
+    <path id="bidon-corps" d="M298 118 h104 a6 6 0 0 1 6 6 v120 a8 8 0 0 1 -8 8 h-100 a8 8 0 0 1 -8 -8 v-120 a6 6 0 0 1 6 -6 z"
+          fill="url(#jaune)" stroke="#1f2937" stroke-width="3"/>
+
+    <g clip-path="url(#interieur-bidon)">
+      <rect id="eau-niveau" x="304" y="244" width="92" height="0" fill="url(#bleu)"/>
+      <path id="eau-surface" d="M304 240 q11 -7 23 0 q11 7 23 0 q11 -7 23 0 q11 7 23 0 v10 H304 z"
+            fill="#7fd3f0" opacity="0"/>
+    </g>
+
+    <g stroke="#1f2937" stroke-width="2.5" stroke-linecap="round" opacity="0.6">
+      <path d="M384 214 h16"/><path d="M384 184 h16"/><path d="M384 154 h16"/>
+    </g>
+    <path d="M376 124 h26" stroke="#FDB813" stroke-width="4.5" stroke-linecap="round"/>
+    <g font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#6b5607" text-anchor="end">
+      <text x="380" y="218">10</text><text x="380" y="188">20</text><text x="380" y="158">30</text>
+    </g>
+    <text x="372" y="128" font-family="ui-monospace, monospace" font-size="12.5" font-weight="800"
+          fill="#8a6a00" text-anchor="end">40 L</text>
+
+    <rect x="330" y="98" width="38" height="22" fill="#eab808" stroke="#1f2937" stroke-width="3"/>
+    <rect x="324" y="86" width="50" height="16" rx="5" fill="#f7d14a" stroke="#1f2937" stroke-width="3"/>
+    <path d="M313 134 v94" stroke="#fff3b0" stroke-width="6" stroke-linecap="round" opacity="0.45"/>
+
+    <g id="debordement" opacity="0">
+      <path d="M332 104 q-26 14 -30 40 q-4 30 2 58 q3 22 12 34" fill="none" stroke="#4fc0ea"
+            stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+      <path d="M366 104 q26 14 30 40 q4 30 -2 58 q-3 22 -12 34" fill="none" stroke="#4fc0ea"
+            stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+      <circle cx="316" cy="248" r="5" fill="#7fd3f0"/>
+      <circle cx="388" cy="242" r="4" fill="#7fd3f0"/>
+    </g>
+  </g>
+  <!-- ══ LE SEAU, sous le bec ══════════════════════════════════════════ -->
+  <g id="seau">
+    <ellipse cx="178" cy="252" rx="22" ry="5" fill="#1f2937" opacity="0.2"/>
+    <path d="M154 222 h48 l-6 28 h-36 z" fill="#5fb0d8" stroke="#1f2937" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M156 230 h44" stroke="#9adcf5" stroke-width="4" stroke-linecap="round"/>
+    <path d="M156 221 q22 -20 44 0" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <path id="filet-eau" d="M362 150 q8 18 14 32" fill="none" stroke="#4fc0ea"
+        stroke-width="8" stroke-linecap="round" opacity="0"/>
+</svg>
+</div>
+</div>
+
+<p class="note">
+  <b>Ce que le lecteur de scenes pilotera</b> d'apres le journal de la boucle : la hauteur de
+  <code>#eau-niveau</code> et sa surface, le trajet et la bascule de <code>#seau</code>, le jet
+  <code>#filet-eau</code>, le <code>#debordement</code> et la <code>#flaque</code> de terre mouillee,
+  et le tremblement de <code>#bidon-corps</code> quand la boucle ne finit plus.
+  Le robot gris est un temoin de cadrage : l'avatar de l'enfant prend sa place.
+</p>
+
+<script>
+const CONTENANCE = 40; let SEAU = 4; const PX_PAR_LITRE = 3, FOND = 244;
+let litres = 0, seaux = 0, debordee = false, anim = null;
+const $ = (s) => document.querySelector(s);
+const eau = $("#eau-niveau"), surface = $("#eau-surface");
+
+function dessiner() {
+  const h = Math.min(litres, CONTENANCE) * PX_PAR_LITRE;
+  eau.setAttribute("y", FOND - h);
+  eau.setAttribute("height", h);
+  surface.setAttribute("transform", "translate(0," + (-h) + ")");
+  surface.setAttribute("opacity", h > 2 ? 1 : 0);
+  const trop = litres > CONTENANCE;
+  $("#debordement").setAttribute("opacity", trop ? 1 : 0);
+  $("#flaque").setAttribute("opacity", trop ? 0.55 : 0);
+  $("#etat").textContent = "litres = " + litres + " · seaux = " + seaux +
+    " · la question « litres < 40 » repond " + (litres < CONTENANCE ? "oui" : "non");
+}
+function surligner(id) {
+  document.querySelectorAll("pre b").forEach(b => b.classList.remove("actif"));
+  if (id) $("#" + id).classList.add("actif");
+}
+function verser(apres) {
+  surligner("l3");
+  $("#seau").setAttribute("transform", "translate(176 -96) rotate(104 178 250)");
+  setTimeout(() => $("#filet-eau").setAttribute("opacity", 1), 150);
+  setTimeout(() => {
+    litres += SEAU; seaux += 1; dessiner(); surligner("l4");
+    setTimeout(() => {
+      $("#filet-eau").setAttribute("opacity", 0);
+      $("#seau").setAttribute("transform", "translate(0 0) rotate(0 178 250)");
+      surligner("l2"); if (apres) apres();
+    }, 320);
+  }, 260);
+}
+function pas() {
+  if (anim) return;
+  if (litres >= CONTENANCE) return fin();
+  anim = 1; verser(() => { anim = null; if (litres >= CONTENANCE) fin(); });
+}
+function tout() {
+  if (anim) return;
+  anim = 1;
+  const suite = () => {
+    if (litres < CONTENANCE) verser(suite);
+    else { anim = null; fin(); }
+  };
+  suite();
+}
+function sansFin() {
+  raz(); $("#boite").classList.add("tremble"); surligner("l2");
+  const v = $("#verdict");
+  v.style.display = "block"; v.style.background = "#2d0a0a";
+  v.style.color = "#fca5a5"; v.style.border = "1px solid #ef444460";
+  v.textContent = "Le bidon ne se remplit pas. La question repond oui, toujours oui. ■ Arreter";
+  $("#etat").textContent = "litres = 0 · seaux = 0 · rien n'avance";
+}
+function fin() {
+  surligner("l5");
+  const v = $("#verdict"), trop = litres > CONTENANCE;
+  v.style.display = "block";
+  v.style.background = trop ? "#2d1a00" : "#052e16";
+  v.style.color = trop ? "#fcd34d" : "#6ee7b7";
+  v.style.border = "1px solid " + (trop ? "#f59e0b60" : "#10b98160");
+  v.textContent = trop
+    ? "Ca a deborde : " + litres + " litres pour un bidon de 40. Une boucle s'arrete APRES le seuil."
+    : "Bidon plein en " + seaux + " seaux — et ce nombre, tu ne l'avais pas ecrit.";
+}
+function seau(n) { SEAU = n; document.querySelector("#pas").textContent = n; raz(); }
+function raz() {
+  litres = 0; seaux = 0; anim = null;
+  $("#boite").classList.remove("tremble");
+  $("#verdict").style.display = "none";
+  $("#seau").setAttribute("transform", "translate(0 0) rotate(0 178 250)");
+  $("#filet-eau").setAttribute("opacity", 0);
+  surligner(null); dessiner();
+}
+raz();
+</script>
+</body></html>

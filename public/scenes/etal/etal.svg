@@ -1,0 +1,204 @@
+<!--
+  Scène « L'étal du marché » — Bâtisseur, thème 3.
+  Séance 2 (les chaînes), séance 3 (les erreurs), et le délestage du Jalon 2.
+
+  Dessin de contenu, pas d'applicatif : aucun script ni animation ici. Le
+  lecteur de scènes manipule les identifiants ci-dessous d'après le journal de
+  la boucle de l'enfant.
+
+  Il fait nuit tombante, et c'est volontaire : le délestage ne se voit que
+  dans le noir. Le forage se joue en plein jour — les deux décors ne doivent
+  pas se ressembler.
+
+  CE QUE LE LECTEUR PILOTE
+  ────────────────────────
+  #file          group des trois clients. Avance d'un cran : translate(+58,0)
+                 par client servi, le premier sort par la gauche.
+  #papier        group : le papier tendu. translate vers le comptoir pendant
+                 que la ligne int(papier) s'exécute.
+  #papier-texte  text : ce que le client a écrit — "2000", " 1500 ", "deux mille".
+                 C'est la seule chaîne variable de la scène.
+  #tampon-refus  group : la croix rouge posée sur le papier quand le except
+                 attrape l'erreur. Caché par défaut.
+  #tiroir        rect : le tiroir de la caisse. translate(0,+10) quand il
+                 s'ouvre, puis retour — un rebond de 150 ms.
+  #billet-1..5   rect : la pile de billets. Le lecteur en montre autant que de
+                 clients encaissés (opacity 0 → 1, du bas vers le haut).
+  #total-texte   text : le montant de la caisse. Se fige au délestage.
+  #ampoule       circle + #halo radial : la lumière. Deux clignotements
+                 (opacity 1 → 0.2 → 1 → 0) avant de lâcher.
+  #pales         group : les pales du ventilateur. Rotation continue autour de
+                 136,176 ; ralentit puis s'arrête au délestage.
+  #nuit          rect + étoiles : le voile du délestage. opacity 0 → 0.92.
+                 Les clients restants s'effacent dessous, un par un.
+  #avatar-fente  group : gabarit 120 × 140 de AvatarSvg, derrière le comptoir —
+                 l'enfant tient l'étal. Le témoin gris se remplace.
+
+  Palette : contour #1f2937, épaisseur 3. Bois #a9703f, lumière #ffd166,
+  nuit #050b18, accent de l'application #FDB813.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img"
+     aria-label="Un étal de marché le soir : un comptoir, une caisse, une ampoule et une file de clients">
+  <defs>
+    <linearGradient id="soir" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e2a55"/>
+      <stop offset="0.55" stop-color="#5b4a7a"/>
+      <stop offset="1" stop-color="#e8865a"/>
+    </linearGradient>
+    <linearGradient id="rue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a3b46"/><stop offset="1" stop-color="#2e2530"/>
+    </linearGradient>
+    <linearGradient id="bois" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c08a52"/><stop offset="1" stop-color="#8e5c2f"/>
+    </linearGradient>
+    <linearGradient id="tole" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9aa3ad"/><stop offset="1" stop-color="#6b7280"/>
+    </linearGradient>
+    <radialGradient id="lueur" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffd166" stop-opacity="0.75"/>
+      <stop offset="0.6" stop-color="#ffd166" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ffd166" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ══ FOND ══════════════════════════════════════════════════════════ -->
+  <rect x="0" y="0" width="480" height="250" fill="url(#soir)"/>
+  <circle cx="58" cy="206" r="20" fill="#ffb04a" opacity="0.9"/>
+
+  <!-- La ville au loin -->
+  <g fill="#2a2440" opacity="0.85">
+    <rect x="0" y="196" width="58" height="54"/><rect x="62" y="178" width="40" height="72"/>
+    <rect x="300" y="186" width="52" height="64"/><rect x="356" y="202" width="34" height="48"/>
+    <rect x="398" y="172" width="46" height="78"/><rect x="448" y="192" width="32" height="58"/>
+  </g>
+  <g fill="#ffd166" opacity="0.55">
+    <rect x="70" y="188" width="7" height="9"/><rect x="84" y="204" width="7" height="9"/>
+    <rect x="408" y="184" width="7" height="9"/><rect x="424" y="206" width="7" height="9"/>
+    <rect x="310" y="198" width="7" height="9"/>
+  </g>
+
+  <!-- ══ LA RUE ════════════════════════════════════════════════════════ -->
+  <path d="M0 250 q120 -5 240 0 q120 5 240 0 v110 H0 z" fill="url(#rue)" stroke="#1f2937" stroke-width="3"/>
+
+  <!-- ══ L'ABRI : deux poteaux et une tôle ═════════════════════════════ -->
+  <g stroke="#1f2937" stroke-width="3" stroke-linejoin="round">
+    <rect x="130" y="112" width="12" height="192" fill="#8e5c2f"/>
+    <rect x="384" y="100" width="12" height="192" fill="#8e5c2f"/>
+    <path d="M112 126 L404 94 L412 112 L120 144 Z" fill="url(#tole)"/>
+  </g>
+  <g stroke="#59616b" stroke-width="2" opacity="0.8">
+    <path d="M150 136 L146 120"/><path d="M196 131 L192 115"/><path d="M242 126 L238 110"/>
+    <path d="M288 121 L284 105"/><path d="M334 116 L330 100"/><path d="M380 111 L376 95"/>
+  </g>
+
+  <!-- ══ LE VENTILATEUR, accroché au poteau de gauche ══════════════════ -->
+  <g stroke="#1f2937" stroke-width="2.5" stroke-linejoin="round">
+    <rect x="136" y="188" width="8" height="16" fill="#6b7280"/>
+    <circle cx="140" cy="176" r="19" fill="#3f4650" opacity="0.9"/>
+    <g id="pales" fill="#aeb6c0">
+      <path d="M140 176 q-4 -16 4 -18 q6 6 2 18z"/>
+      <path d="M140 176 q16 -4 18 4 q-6 6 -18 2z"/>
+      <path d="M140 176 q4 16 -4 18 q-6 -6 -2 -18z"/>
+      <path d="M140 176 q-16 4 -18 -4 q6 -6 18 -2z"/>
+    </g>
+    <circle cx="140" cy="176" r="4" fill="#cbd5e1"/>
+  </g>
+
+  <!-- ══ L'AMPOULE ═════════════════════════════════════════════════════ -->
+  <circle id="halo" cx="252" cy="178" r="138" fill="url(#lueur)"/>
+  <path d="M206 134 v20" stroke="#1f2937" stroke-width="2.5"/>
+  <g id="ampoule">
+    <circle cx="206" cy="166" r="12" fill="#ffe08a" stroke="#1f2937" stroke-width="2.5"/>
+    <rect x="200" y="150" width="12" height="7" rx="2" fill="#9aa3ad" stroke="#1f2937" stroke-width="2"/>
+    <path d="M201 166 q5 -7 10 0" fill="none" stroke="#c9972a" stroke-width="2"/>
+  </g>
+
+  <!-- ══ L'ENFANT, derrière le comptoir — gabarit 120 × 140 ════════════ -->
+  <g id="avatar-fente" transform="translate(236 148) scale(0.85)">
+    <g id="avatar-temoin" stroke="#1f2937" stroke-width="3.5" stroke-linejoin="round">
+      <rect x="30" y="52" width="60" height="84" rx="14" fill="#a7b2c0"/>
+      <rect x="38" y="10" width="44" height="40" rx="12" fill="#cbd5e1"/>
+      <circle cx="51" cy="30" r="4.5" fill="#1f2937" stroke="none"/>
+      <circle cx="69" cy="30" r="4.5" fill="#1f2937" stroke="none"/>
+      <path d="M60 10 v-8" stroke-linecap="round"/>
+      <circle cx="60" cy="-4" r="5" fill="#FDB813"/>
+      <path d="M30 70 l-18 22" stroke-linecap="round" fill="none"/>
+      <path d="M90 70 l18 22" stroke-linecap="round" fill="none"/>
+    </g>
+  </g>
+
+  <!-- ══ LE COMPTOIR ═══════════════════════════════════════════════════ -->
+  <g stroke="#1f2937" stroke-width="3" stroke-linejoin="round">
+    <!-- ce qui est posé dessus, dessiné avant le plateau de devant -->
+    <g>
+      <rect x="146" y="226" width="64" height="30" rx="4" fill="#8e5c2f"/>
+      <rect id="tiroir" x="150" y="240" width="56" height="14" rx="3" fill="#a9703f"/>
+      <circle cx="178" cy="247" r="2.5" fill="#1f2937" stroke="none"/>
+      <g stroke-width="2">
+        <rect id="billet-5" x="226" y="214" width="56" height="8" rx="2" fill="#86c06c" opacity="0"/>
+        <rect id="billet-4" x="223" y="222" width="56" height="8" rx="2" fill="#9ccf82" opacity="0"/>
+        <rect id="billet-3" x="226" y="230" width="56" height="8" rx="2" fill="#86c06c" opacity="0"/>
+        <rect id="billet-2" x="223" y="238" width="56" height="8" rx="2" fill="#9ccf82" opacity="0"/>
+        <rect id="billet-1" x="226" y="246" width="56" height="8" rx="2" fill="#86c06c" opacity="0"/>
+      </g>
+      <rect x="300" y="214" width="84" height="42" rx="5" fill="#13202e"/>
+      <text x="342" y="230" font-family="ui-monospace, monospace" font-size="10" font-weight="700"
+            fill="#64748b" text-anchor="middle" stroke="none">CAISSE</text>
+      <text id="total-texte" x="342" y="248" font-family="ui-monospace, monospace" font-size="15"
+            font-weight="800" fill="#FDB813" text-anchor="middle" stroke="none">0 F</text>
+    </g>
+    <rect x="124" y="254" width="278" height="14" rx="3" fill="#c08a52"/>
+    <rect x="132" y="268" width="262" height="46" fill="url(#bois)"/>
+    <path d="M140 276 h246 M140 290 h246 M140 304 h246" stroke="#7a4e26" stroke-width="2"/>
+  </g>
+
+  <!-- ══ LE PAPIER DU CLIENT ═══════════════════════════════════════════ -->
+  <g id="papier" transform="translate(0 0)">
+    <g transform="rotate(-7 198 288)">
+      <rect x="166" y="268" width="64" height="40" rx="3" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5"/>
+      <text id="papier-texte" x="198" y="294" font-family="ui-monospace, monospace" font-size="15"
+            font-weight="800" fill="#1f2937" text-anchor="middle">2000</text>
+    </g>
+    <g id="tampon-refus" opacity="0">
+      <circle cx="198" cy="288" r="22" fill="none" stroke="#ef4444" stroke-width="4"/>
+      <path d="M186 276 l24 24 M210 276 l-24 24" stroke="#ef4444" stroke-width="4" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- ══ LA FILE, devant le comptoir ═══════════════════════════════════ -->
+  <g id="file">
+    <g id="client-3" transform="translate(-116 0)">
+      <ellipse cx="150" cy="340" rx="20" ry="5" fill="#000" opacity="0.3"/>
+      <g stroke="#1f2937" stroke-width="3" stroke-linejoin="round">
+        <rect x="134" y="286" width="32" height="50" rx="11" fill="#9b5de5"/>
+        <circle cx="150" cy="274" r="14" fill="#6b4226"/>
+      </g>
+    </g>
+    <g id="client-2" transform="translate(-58 0)">
+      <ellipse cx="150" cy="340" rx="20" ry="5" fill="#000" opacity="0.3"/>
+      <g stroke="#1f2937" stroke-width="3" stroke-linejoin="round">
+        <rect x="134" y="286" width="32" height="50" rx="11" fill="#2a9d8f"/>
+        <circle cx="150" cy="274" r="14" fill="#50341f"/>
+      </g>
+    </g>
+    <g id="client-1">
+      <ellipse cx="150" cy="340" rx="20" ry="5" fill="#000" opacity="0.3"/>
+      <g stroke="#1f2937" stroke-width="3" stroke-linejoin="round">
+        <rect x="134" y="286" width="32" height="50" rx="11" fill="#e76f51"/>
+        <circle cx="150" cy="274" r="14" fill="#5c3a1e"/>
+        <path d="M166 300 l20 -10" stroke-linecap="round" fill="none"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- ══ LE DÉLESTAGE ══════════════════════════════════════════════════ -->
+  <g id="nuit" opacity="0">
+    <rect x="0" y="0" width="480" height="360" fill="#050b18" opacity="0.92"/>
+    <g fill="#e2e8f0">
+      <circle cx="92" cy="54" r="1.8"/><circle cx="168" cy="36" r="1.4"/>
+      <circle cx="246" cy="62" r="2"/><circle cx="330" cy="40" r="1.5"/>
+      <circle cx="412" cy="70" r="1.7"/><circle cx="54" cy="96" r="1.3"/>
+      <circle cx="368" cy="104" r="1.4"/>
+    </g>
+  </g>
+</svg>
