@@ -54,8 +54,11 @@ const BLOCS = [
       language: "python",
       required: true,
       instructions:
-        "Chaque coup de pompe donne 8 litres, et ce programme s'arrete a 16.\n" +
-        "La bassine en veut 40 : change la question de la boucle, puis lance.",
+        "<p>Ta mère t'envoie au forage. La bassine de la maison fait <strong>40 litres</strong>, et elle est vide.</p>" +
+        "<p>Quelqu'un a commencé le programme avant toi — mais il s'arrête à <strong>16 litres</strong>. La bassine est loin d'être pleine.</p>" +
+        "<p>🎯 <strong>Ta mission</strong> — fais-le remplir toute la bassine.<br>" +
+        "🧰 <strong>Tu as</strong> — un programme qui marche déjà, et <strong>un seul nombre à changer</strong>.<br>" +
+        "✅ <strong>C'est réussi quand</strong> — l'eau arrive au trait des 40 litres.</p>",
       starter_code:
         "litres = 0\n\n" +
         "while litres < 16:\n" +
@@ -97,6 +100,36 @@ const BLOCS = [
       "    litres = litres [___] tirer()",
     blanks: ["0", "while", "+"],
   }),
+
+  // ── La pompe capricieuse : éditeur vide, c'est à lui d'écrire ──────────
+  // Le nombre de tours est tiré au sort, donc ni l'enfant ni personne ne peut
+  // l'écrire d'avance. C'est la seule façon de PROUVER qu'un `for` ne suffit
+  // pas — et la consigne l'invite à essayer, pour qu'il le voie.
+  {
+    type: "code_challenge",
+    content: {
+      language: "python",
+      required: true,
+      instructions:
+        "<p>Ce matin, la pompe est capricieuse : un coup donne 4 litres, le suivant en donne 12. <strong>Tu ne peux pas savoir combien de seaux il te faudra</strong> — personne ne peut.</p>" +
+        "<p>🎯 <strong>Ta mission</strong> — remplir les 40 litres de la bassine, et annoncer combien de seaux il a fallu.<br>" +
+        "🧰 <strong>Tu as</strong> — <code>tirer()</code>, qui donne le contenu d'un seau en litres. Et un éditeur vide : tout le programme est à toi.<br>" +
+        "✅ <strong>C'est réussi quand</strong> — la bassine est pleine, et que ta dernière ligne annonce le nombre de seaux.</p>" +
+        "<p>⚠️ Un <code>for i in range(...)</code> ne peut pas gagner ici. Essaie, pour voir ce qui se passe.</p>",
+      scene: { decor: "forage", reglages: { contenance: 40, prise_min: 4, prise_max: 12 }, plafond: 200 },
+      starter_code:
+        "# La bassine fait 40 litres. tirer() te donne un seau.\n" +
+        "# A toi d'ecrire le programme.\n",
+      hidden_tests:
+        "seaux = [e for e in _journal if e[\"quoi\"] == \"verser\"]\n" +
+        "total = sum(e[\"litres\"] for e in seaux)\n" +
+        'assert "while" in code, "Tu ne sais pas combien de seaux il faudra : seul un while peut decider tout seul quand s arreter."\n' +
+        'assert total >= 40, "La bassine veut 40 litres, et ton programme s arrete a " + str(total) + "."\n' +
+        'lignes = [l for l in output.split("\\n") if l.strip()]\n' +
+        'assert lignes, "Ton programme n affiche rien. Dis au moins combien de seaux il a fallu."\n' +
+        'assert str(len(seaux)) in lignes[-1], "Il a fallu " + str(len(seaux)) + " seaux : ta derniere ligne doit l annoncer."',
+    },
+  },
 
   // ── 4. Vérification du mécanisme ────────────────────────────────────────
   {
@@ -162,6 +195,36 @@ const BLOCS = [
     ],
   }),
 
+  // ── Ne pas déborder : la question peut parler de ce qui VA arriver ─────
+  // `break` n'est pas enseigné, et c'est tant mieux : la seule issue est une
+  // condition qui regarde le tour suivant. Un `while litres < 40` déborde à
+  // 48, et le décor le montre — l'eau par terre et la terre qui fonce.
+  {
+    type: "code_challenge",
+    content: {
+      language: "python",
+      required: true,
+      instructions:
+        "<p>Tu as vu ce qui s'est passé : la bassine a un peu débordé. Normal — une boucle s'arrête <em>après</em> avoir dépassé, pas pile dessus.</p>" +
+        "<p>Aujourd'hui le seau est grand : <strong>12 litres à chaque coup</strong>. La bassine n'en contient que 40, et l'eau qui déborde est perdue.</p>" +
+        "<p>🎯 <strong>Ta mission</strong> — mettre le plus d'eau possible dans la bassine, <strong>sans jamais la faire déborder</strong>.<br>" +
+        "🧰 <strong>Tu as</strong> — <code>tirer()</code>, qui donne toujours 12 litres aujourd'hui.<br>" +
+        "✅ <strong>C'est réussi quand</strong> — il n'y a pas une goutte par terre, et qu'on ne pouvait pas en mettre un de plus.</p>" +
+        "<p>💡 Ta question ne doit plus parler de ce que la bassine contient, mais de ce qu'elle contiendrait <em>après</em> le prochain seau.</p>",
+      scene: { decor: "forage", reglages: { contenance: 40, prise_min: 12, prise_max: 12 }, plafond: 200 },
+      starter_code:
+        "litres = 0\n\n" +
+        "# Chaque seau fait 12 litres, la bassine en contient 40.\n" +
+        "# Remplis au maximum, sans une goutte par terre.\n",
+      hidden_tests:
+        "seaux = [e for e in _journal if e[\"quoi\"] == \"verser\"]\n" +
+        "total = sum(e[\"litres\"] for e in seaux)\n" +
+        'assert "while" in code, "Il faut une boucle while : tu ne sais pas d avance combien de seaux tiennent dans la bassine."\n' +
+        'assert total <= 40, "Ca a deborde : " + str(total) + " litres verses dans une bassine de 40. Ta question doit regarder le seau SUIVANT."\n' +
+        'assert total >= 36, "Tu t es arrete trop tot : avec des seaux de 12 litres, on peut monter jusqu a 36 sans deborder. Toi, tu es a " + str(total) + "."',
+    },
+  },
+
   // ── 9. La deuxième forme : attendre quelqu'un ───────────────────────────
   texte(
     "<h3>La boucle qui attend quelqu'un</h3>" +
@@ -182,9 +245,10 @@ const BLOCS = [
       language: "python",
       required: true,
       instructions:
-        "Ouvre la boutique. Pour chaque client, demande son nom et dis-lui bonjour.\n" +
-        "Quand on tape fin, la boutique ferme : annonce combien de clients sont passes.\n" +
-        "Attention : « fin » n'est pas un client. On ne lui dit pas bonjour.",
+        "<p>Tu tiens la boutique du quartier. Les clients arrivent les uns après les autres, et tu ne sais pas combien viendront aujourd'hui.</p>" +
+        "<p>🎯 <strong>Ta mission</strong> — saluer chaque client par son nom, jusqu'à ce qu'on tape <code>fin</code>. À la fermeture, annoncer combien sont passés.<br>" +
+        "🧰 <strong>Tu as</strong> — <code>input()</code> pour demander, et le premier client est déjà écrit.<br>" +
+        "✅ <strong>C'est réussi quand</strong> — chaque client a son bonjour, <strong>« fin » n'en reçoit pas</strong>, et le compte s'affiche à la fin.</p>",
       starter_code:
         "clients = 0\n" +
         'reponse = input("Nom du client (ou fin) : ")\n\n' +
@@ -246,9 +310,11 @@ const BLOCS = [
       language: "python",
       required: true,
       instructions:
-        "Le carnet de la journee. A chaque vente, tape le montant en francs ; tape fin pour fermer.\n" +
-        "A la fermeture, affiche le nombre de ventes et le total de la journee.\n" +
-        "Attention : « fin » n'est pas un nombre. Compare d'abord, convertis ensuite.",
+        "<p>C'est le soir. Avant de fermer, tu reprends le carnet de la journée : chaque vente, l'une après l'autre.</p>" +
+        "<p>🎯 <strong>Ta mission</strong> — saisir les montants jusqu'à <code>fin</code>, puis annoncer le nombre de ventes et le total de la journée.<br>" +
+        "🧰 <strong>Tu as</strong> — <code>int()</code> pour transformer un texte en nombre, et trois valeurs qui partent de zéro.<br>" +
+        "✅ <strong>C'est réussi quand</strong> — les deux chiffres s'affichent, et que le programme ne plante pas sur le mot <code>fin</code>.</p>" +
+        "<p>⚠️ « fin » n'est pas un nombre : compare d'abord, convertis ensuite.</p>",
       starter_code:
         "total = 0\n" +
         "ventes = 0\n" +
@@ -308,7 +374,51 @@ const SOLUTIONS = {
         "litres = 0\n\nfor i in range(5):\n    litres = litres + tirer()\n    print(\"Dans la bassine :\", litres, \"litres\")\n" },
     ],
   },
+  // Le banc rejoue un tirage FIXE : hors du navigateur, le hasard rendrait les
+  // verdicts incomparables d'une exécution à l'autre.
+  4: {
+    prelude:
+      "_journal = []\n" +
+      "_suite = [7, 11, 5, 9, 12, 4]\n" +
+      "def tirer():\n" +
+      "    prise = _suite[len(_journal) % len(_suite)]\n" +
+      '    _journal.append({"quoi": "verser", "litres": prise})\n' +
+      "    return prise\n",
+    cas: [
+      { nom: "juste", attendu: "ok", code:
+        "litres = 0\nseaux = 0\nwhile litres < 40:\n    litres = litres + tirer()\n    seaux = seaux + 1\n" +
+        '    print("Dans la bassine :", litres, "litres")\nprint("Seaux :", seaux)\n' },
+      // Le for ne peut pas gagner : il faut écrire un nombre de tours, et aucun
+      // nombre n'est le bon quand la pompe décide.
+      { nom: "un for de trois tours", attendu: "test raté", code:
+        "litres = 0\nfor i in range(3):\n    litres = litres + tirer()\n" +
+        '    print("Dans la bassine :", litres, "litres")\nprint("Seaux :", 3)\n' },
+      { nom: "oublie d annoncer les seaux", attendu: "test raté", code:
+        "litres = 0\nwhile litres < 40:\n    litres = litres + tirer()\n" +
+        '    print("Niveau :", litres)\n' },
+    ],
+  },
   9: {
+    prelude:
+      "_journal = []\n" +
+      "def tirer():\n" +
+      '    _journal.append({"quoi": "verser", "litres": 12})\n' +
+      "    return 12\n",
+    cas: [
+      { nom: "juste", attendu: "ok", code:
+        "litres = 0\nwhile litres + 12 <= 40:\n    litres = litres + tirer()\n" +
+        '    print("Dans la bassine :", litres, "litres")\n' },
+      // La question regarde le présent au lieu du tour suivant : 48 litres dans
+      // une bassine de 40, et le décor montre l'eau par terre.
+      { nom: "regarde le present et deborde", attendu: "test raté", code:
+        "litres = 0\nwhile litres < 40:\n    litres = litres + tirer()\n" +
+        '    print("Dans la bassine :", litres, "litres")\n' },
+      { nom: "s arrete trop tot", attendu: "test raté", code:
+        "litres = 0\nwhile litres < 24:\n    litres = litres + tirer()\n" +
+        '    print("Dans la bassine :", litres, "litres")\n' },
+    ],
+  },
+  11: {
     reponses: ["Ama", "Kofi", "fin"],
     cas: [
       { nom: "juste", attendu: "ok", code:
@@ -351,7 +461,7 @@ const SOLUTIONS = {
         'print("Clients :", 2)\n' },
     ],
   },
-  12: {
+  14: {
     reponses: ["1500", "800", "2300", "fin"],
     cas: [
       { nom: "juste", attendu: "ok", code:
