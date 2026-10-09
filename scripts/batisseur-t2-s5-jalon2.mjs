@@ -25,6 +25,11 @@ const LECON = "🏆 Jalon 2 — Carnet de notes qui sauvegarde";
 
 // ── Garde-fous ───────────────────────────────────────────────────────────
 const HIER = ["Ama 14", "Kofi 11", "Yawa 16"];
+// Ce que l'enfant TAPE, et ce qui doit finir dans le cahier. Les deux
+// diffèrent : un humain tape avec des espaces et des majuscules, et la séance 2
+// a appris à nettoyer ça. Sans cette différence, le jalon ne prouverait rien
+// de la deuxième semaine du thème.
+const TAPE = ["  Essi 13  ", "Kodjo 15  "];
 const AUJOURDHUI = ["Essi 13", "Kodjo 15"];
 const TOTAL = HIER.length + AUJOURDHUI.length;
 if (TOTAL !== 5) throw new Error(`${TOTAL} notes attendues au total`);
@@ -32,11 +37,15 @@ const CONTENU_HIER = HIER.join("\n") + "\n";
 
 const texte = (html) => ({ type: "text", content: { html } });
 const jeu = (content) => ({ type: "game", content });
-const cahier = () => ({ decor: "cahier", reglages: {}, plafond: 200 });
+// `cahier_depart` : ce que le prélude pose dans le fichier avant le code de
+// l'enfant. La première étape du jalon commence par « relis le cahier » — il
+// faut donc qu'il y ait quelque chose à relire, à tous les coups.
+const cahier = (depart) => ({ decor: "cahier", reglages: depart ? { cahier_depart: depart } : {}, plafond: 200 });
 
 const CRITERES = [
   "il relit le cahier au démarrage, et affiche ce qu'il contient",
   "il accepte des notes tant qu'on ne tape pas « fin »",
+  "il range les notes propres, même quand on les tape de travers",
   "il sauve tout avant de se terminer",
   "il ne plante pas le tout premier jour, quand le cahier n'existe pas encore",
   "on le ferme, on le rouvre, et rien n'a été perdu",
@@ -71,7 +80,7 @@ const BLOCS = [
         "<p>🎯 <strong>Ta mission</strong> — relire le cahier au démarrage et afficher chaque note, une par ligne.<br>" +
         "🧰 <strong>Tu as</strong> — tout ce que tu sais depuis la semaine dernière. Rien de neuf.<br>" +
         `✅ <strong>C'est réussi quand</strong> — les ${HIER.length} notes d'hier s'affichent.</p>`,
-      scene: cahier(),
+      scene: cahier(HIER),
       starter_code: "# Relis le cahier et affiche ce qu'il contient.\n",
       hidden_tests:
         'assert ".split(" in code, "read() rend un seul texte : il faut le redecouper en lignes."\n' +
@@ -88,8 +97,8 @@ const BLOCS = [
       required: true,
       instructions:
         "<p><strong>Deuxième étape.</strong> On oublie le cahier une minute : on s'occupe de la saisie.</p>" +
-        "<p>🎯 <strong>Ta mission</strong> — demander des notes l'une après l'autre, jusqu'à ce qu'on tape <code>fin</code>, puis annoncer combien on en a reçues.<br>" +
-        "🧰 <strong>Tu as</strong> — la boucle qui attend, et une liste pour ranger.<br>" +
+        "<p>🎯 <strong>Ta mission</strong> — demander des notes l'une après l'autre jusqu'à <code>fin</code>, les ranger <strong>propres</strong>, puis annoncer combien on en a reçues.<br>" +
+        "🧰 <strong>Tu as</strong> — la boucle qui attend, une liste pour ranger, et les outils de nettoyage de la semaine dernière.<br>" +
         `✅ <strong>C'est réussi quand</strong> — « fin » n'est pas compté comme une note, et que le compte est juste.</p>`,
       starter_code:
         "notes = []\n\n" +
@@ -98,7 +107,7 @@ const BLOCS = [
         "import re\n" +
         'assert "while" in code, "Tu ne sais pas combien de notes on te donnera : c est une boucle while."\n' +
         'assert code.count("input(") >= 2, "La question doit etre posee avant la boucle et a chaque tour."\n' +
-        'assert "fin" not in output.lower().split("notes")[-1], "fin n est pas une note : elle ne doit pas etre rangee."\n' +
+        'assert ".strip(" in code, "On tape vite, avec des espaces autour. Range les notes propres."\n' +
         'nombres = re.findall(r"\\d+", output)\n' +
         `assert "${AUJOURDHUI.length}" in nombres, "Deux notes ont ete donnees avant fin."`,
     },
@@ -167,13 +176,13 @@ const BLOCS = [
         "<p>🎯 <strong>Ta mission</strong> — écrire le carnet de notes complet :</p>" +
         "<ol>" +
         "<li>au démarrage, relire le cahier et dire combien de notes il contenait ;</li>" +
-        "<li>demander des notes jusqu'à <code>fin</code> ;</li>" +
+        "<li>demander des notes jusqu'à <code>fin</code>, et les ranger propres — on tape vite, avec des espaces et des majuscules ;</li>" +
         "<li>tout sauver, et annoncer le nouveau total.</li>" +
         "</ol>" +
         "<p>🧰 <strong>Tu as</strong> — les cinq semaines du thème. Aucun outil nouveau.<br>" +
         `✅ <strong>C'est réussi quand</strong> — le cahier contient les ${HIER.length} notes d'hier <strong>et</strong> les nouvelles, et que le programme ne plante pas si le cahier n'existe pas.</p>` +
         "<p>⚠️ Relis <strong>avant</strong> d'ouvrir en <code>\"w\"</code>. C'est le piège, et c'est le seul.</p>",
-      scene: cahier(),
+      scene: cahier(HIER),
       starter_code:
         "# 1. Relire le cahier (il peut ne pas exister).\n" +
         "# 2. Demander des notes jusqu'a fin.\n" +
@@ -184,8 +193,10 @@ const BLOCS = [
         'assert "try" in code and "except" in code, "Le premier jour, le cahier n existe pas : il faut un filet."\n' +
         'assert ".split(" in code, "Relire rend un seul texte : il faut le redecouper."\n' +
         'assert ".close(" in code, "Un cahier qu on ne ferme pas ne garde rien."\n' +
+        'assert ".strip(" in code, "Les notes arrivent avec des espaces autour : range-les propres."\n' +
         'garde = _vrai_open("carnet.txt").read()\n' +
         'lignes = [l for l in garde.split("\\n") if l.strip()]\n' +
+        'assert "  Essi" not in garde, "La note est rangee avec ses espaces autour : nettoie-la avant de la garder."\n' +
         'for n in ["Ama", "Kofi", "Yawa"]:\n' +
         '    assert n in garde, "Tu as perdu " + n + " : relis le cahier AVANT de l ouvrir en w."\n' +
         'for n in ["Essi", "Kodjo"]:\n' +
@@ -275,17 +286,17 @@ const SOLUTIONS = {
   ] },
   3: {
     prelude: PRELUDE(false),
-    reponses: [...AUJOURDHUI, "fin"],
+    reponses: [...TAPE, "fin"],
     cas: [
       { nom: "juste", attendu: "ok", code:
         "notes = []\n" +
         'reponse = input("Note (ou fin) : ")\n' +
-        'while reponse != "fin":\n    notes.append(reponse)\n    reponse = input("Note (ou fin) : ")\n' +
+        'while reponse != "fin":\n    notes.append(reponse.strip())\n    reponse = input("Note (ou fin) : ")\n' +
         'print("Notes recues :", len(notes))\n' },
       { nom: "compte fin comme une note", attendu: "test raté", code:
         "notes = []\n" +
         'reponse = ""\n' +
-        'while reponse != "fin":\n    reponse = input("Note (ou fin) : ")\n    notes.append(reponse)\n' +
+        'while reponse != "fin":\n    reponse = input("Note (ou fin) : ")\n    notes.append(reponse.strip())\n' +
         'print("Notes recues :", len(notes))\n' },
     ],
   },
@@ -299,12 +310,12 @@ const SOLUTIONS = {
   ] },
   7: {
     prelude: PRELUDE(true),
-    reponses: [...AUJOURDHUI, "fin"],
+    reponses: [...TAPE, "fin"],
     cas: [
       { nom: "juste", attendu: "ok", code:
         LIRE('print("Hier :", len(notes), "notes")\n' +
           'reponse = input("Note (ou fin) : ")\n' +
-          'while reponse != "fin":\n    notes.append(reponse)\n    reponse = input("Note (ou fin) : ")\n' +
+          'while reponse != "fin":\n    notes.append(reponse.strip())\n    reponse = input("Note (ou fin) : ")\n' +
           'f = open("carnet.txt", "w")\nfor n in notes:\n    f.write(n + "\\n")\nf.close()\n' +
           'print("Total :", len(notes))\n') },
       // Le piège du jalon, en vrai : il ouvre en "w" avant d'avoir relu, et
@@ -312,14 +323,14 @@ const SOLUTIONS = {
       { nom: "ouvre en w avant de relire", attendu: "test raté", code:
         'f = open("carnet.txt", "w")\nnotes = []\n' +
         'reponse = input("Note (ou fin) : ")\n' +
-        'while reponse != "fin":\n    notes.append(reponse)\n    reponse = input("Note (ou fin) : ")\n' +
+        'while reponse != "fin":\n    notes.append(reponse.strip())\n    reponse = input("Note (ou fin) : ")\n' +
         'for n in notes:\n    f.write(n + "\\n")\nf.close()\n' +
         'print("Total :", len(notes))\n' },
       { nom: "oublie le filet du premier jour", attendu: "test raté", code:
         'f = open("carnet.txt", "r")\ncontenu = f.read()\nf.close()\n' +
         'notes = []\nfor l in contenu.split("\\n"):\n    if l != "":\n        notes.append(l)\n' +
         'reponse = input("Note (ou fin) : ")\n' +
-        'while reponse != "fin":\n    notes.append(reponse)\n    reponse = input("Note (ou fin) : ")\n' +
+        'while reponse != "fin":\n    notes.append(reponse.strip())\n    reponse = input("Note (ou fin) : ")\n' +
         'f = open("carnet.txt", "w")\nfor n in notes:\n    f.write(n + "\\n")\nf.close()\n' +
         'print("Total :", len(notes))\n' },
     ],

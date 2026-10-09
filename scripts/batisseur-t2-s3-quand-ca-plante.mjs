@@ -72,7 +72,7 @@ const BLOCS = [
       instructions:
         "<p>Le filet est déjà posé dans ton programme — <code>try</code> en haut, <code>except</code> en bas. Mais <strong>les deux lignes qui peuvent casser sont restées dehors</strong>, et la boutique s'éteint quand même.</p>" +
         "<p>🎯 <strong>Ta mission</strong> — mettre à l'abri les deux lignes dangereuses, pour que toute la file passe.<br>" +
-        "🧰 <strong>Tu as</strong> — le filet déjà écrit. Il n'y a rien à taper : il faut <strong>décaler deux lignes vers la droite</strong>, pour qu'elles entrent dans le <code>try</code>.<br>" +
+        "🧰 <strong>Tu as</strong> — le filet déjà écrit. Aucune ligne nouvelle à inventer : il faut <strong>décaler deux lignes vers la droite</strong>, de quatre espaces, pour qu'elles entrent dans le <code>try</code>.<br>" +
         "✅ <strong>C'est réussi quand</strong> — la lumière reste allumée, trois clients sont encaissés et le quatrième est refusé poliment.</p>",
       scene: etal(FILE_1),
       starter_code:

@@ -124,6 +124,23 @@ def ajouter(texte):
 def fermer():
     """La nuit tombe : ce qui n'est pas dans le cahier s'envole."""
     _evt({"quoi": "fermer"})
+
+# L'état de départ du cahier, posé AVANT le code de l'enfant.
+#
+# Sans ça, un exercice qui commence par « le cahier contient les notes d'hier »
+# ne tenait que si l'enfant venait d'en écrire un dans la même page : un
+# rechargement, ou les blocs faits dans le désordre, et il tombait sur une
+# erreur rouge pour une notion pas encore enseignée. Chaque exercice part
+# maintenant du même état, toujours.
+import os as _os
+if _os.path.exists("carnet.txt"):
+    _os.remove("carnet.txt")
+_depart = ${py((reglages.cahier_depart as string[]) ?? null)}
+if _depart:
+    _f0 = _vrai_open("carnet.txt", "w")
+    for _l in _depart:
+        _f0.write(_l + "\\n")
+    _f0.close()
 `);
 }
 

@@ -39,7 +39,10 @@ const CONTENU = NOTES.join("\n");
 
 const texte = (html) => ({ type: "text", content: { html } });
 const jeu = (content) => ({ type: "game", content });
-const cahier = () => ({ decor: "cahier", reglages: {}, plafond: 200 });
+// `cahier_depart` est ce que le prélude pose dans le fichier AVANT le code de
+// l'enfant. Sans lui, « le cahier contient les notes d'hier » ne tenait que si
+// l'enfant venait d'écrire un cahier dans la même page.
+const cahier = (depart) => ({ decor: "cahier", reglages: depart ? { cahier_depart: depart } : {}, plafond: 200 });
 
 const BLOCS = [
   // ── 0. L'accroche : tout a disparu ─────────────────────────────────────
@@ -80,11 +83,16 @@ const BLOCS = [
     "<pre><code># ÉCRIRE\n" +
     'f = open("carnet.txt", "w")   ← w comme « write » : on va écrire\n' +
     'f.write("Ama 14")\n' +
-    "f.close()                     ← sans ça, rien n'est posé sur le papier</code></pre>" +
+    "f.close()                     ← tant qu'il est ouvert, rien n'est sûr d'être posé</code></pre>" +
     "<pre><code># RELIRE\n" +
     'f = open("carnet.txt", "r")   ← r comme « read » : on va lire\n' +
     "contenu = f.read()\n" +
     "f.close()</code></pre>" +
+    "<h3>Un signe nouveau : <code>\\n</code></h3>" +
+    "<p>Dans un cahier, les notes sont sur des lignes différentes. Pour dire à Python « va à la ligne », on écrit deux caractères collés : <code>\\n</code>.</p>" +
+    "<pre><code>f.write(\"Ama 14\")        → tout se colle à la suite\n" +
+    "f.write(\"Ama 14\\n\")      → et on passe à la ligne</code></pre>" +
+    "<p>Ça ressemble à deux signes, mais pour Python c'en est <strong>un seul</strong> : celui qui fait le retour à la ligne. Oublie-le, et tes trois notes se retrouvent écrites bout à bout sur une seule ligne.</p>" +
     "<p>Et la grande nouvelle : <strong>ce que tu écris reste là après la fin du programme.</strong> Relance-le demain, le cahier t'attend avec ce que tu y as mis.</p>"
   ),
 
@@ -111,9 +119,9 @@ const BLOCS = [
         { question: "Où vit ce qu'on range dans une variable ?",
           choices: ["Dans un fichier, pour toujours", "Le temps du programme, et pas plus", "Dans la mémoire de l'ordinateur, même éteint"], answer: 1,
           explanation: "C'est pour ça qu'on écrit dans un fichier : une variable s'évapore quand le programme se termine." },
-        { question: "Tu écris dans un cahier mais tu oublies f.close(). Que contient le fichier ?",
+        { question: "Tu écris dans un cahier mais tu oublies f.close(). Que contient le fichier, dans ton éditeur ?",
           choices: ["Rien du tout", "La note", "Un morceau de la note"], answer: 0,
-          explanation: "Vérifié : sans close(), le fichier reste vide. Tant qu'il est ouvert, rien n'est posé sur le papier." },
+          explanation: "Tant qu'un cahier reste ouvert, ce qu'on y écrit attend quelque part — et dans ton éditeur, il n'arrive jamais sur le papier. On ferme, toujours." },
         { question: 'À quoi sert le "r" dans open("carnet.txt", "r") ?',
           choices: ["À dire qu'on veut lire", "À dire qu'on veut écrire", "À ranger le fichier"], answer: 0,
           explanation: "r comme read, lire. w comme write, écrire. Deux lettres, deux intentions très différentes." },
@@ -216,7 +224,7 @@ const BLOCS = [
         "🧰 <strong>Tu as</strong> — la recette de lecture, <code>.split(\"\\n\")</code> pour redécouper, et la boucle <code>for</code>.<br>" +
         `✅ <strong>C'est réussi quand</strong> — les ${NOTES.length} notes s'affichent et que le compte est annoncé.</p>` +
         "<p>⚠️ Ouvre en <code>\"r\"</code>. En <code>\"w\"</code>, tu effacerais ce que tu viens chercher.</p>",
-      scene: cahier(),
+      scene: cahier(NOTES),
       starter_code:
         "# Le cahier contient deja les notes d'hier.\n" +
         "# Relis-le, decoupe-le en lignes, affiche-les, et compte.\n",
@@ -277,7 +285,7 @@ const BLOCS = [
         "🧰 <strong>Tu as</strong> — les deux recettes, <code>.split(\"\\n\")</code>, <code>.append()</code> et le filet <code>FileNotFoundError</code>.<br>" +
         "✅ <strong>C'est réussi quand</strong> — le cahier contient les notes d'hier <strong>et</strong> celle d'aujourd'hui, sans rien avoir perdu.</p>" +
         "<p>⚠️ Relis d'abord. Si tu ouvres en <code>\"w\"</code> avant d'avoir lu, tu effaces hier.</p>",
-      scene: cahier(),
+      scene: cahier(NOTES),
       starter_code:
         "# 1. Relis le cahier (il peut ne pas exister le premier jour).\n" +
         "# 2. Ajoute la note du jour : Essi 13\n" +

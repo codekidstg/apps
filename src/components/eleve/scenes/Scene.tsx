@@ -124,7 +124,9 @@ function appliquer(svg: SVGElement, decor: Decor, journal: Evt[], jusqua: number
   }
 
   // cahier — l'enfant écrit de vrais fichiers, le prélude enveloppe `open`
-  let surTable = 0, lignes: string[] = [], nuit = false;
+  // Le cahier ne part pas toujours vide : certains exercices commencent avec
+  // les notes d'hier, posées par le prélude.
+  let surTable = 0, lignes: string[] = [...((reglages.cahier_depart as string[]) ?? [])], nuit = false;
   for (const e of vus) {
     if (e.quoi === "ajouter") surTable++;
     if (e.quoi === "effacer") lignes = [];                       // open(..., "w") vide le cahier
