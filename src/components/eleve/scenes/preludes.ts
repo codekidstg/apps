@@ -135,7 +135,7 @@ def fermer():
 import os as _os
 if _os.path.exists("carnet.txt"):
     _os.remove("carnet.txt")
-_depart = ${py((reglages.cahier_depart as string[]) ?? null)}
+_depart = ${JSON.stringify((reglages.cahier_depart as string[]) ?? [])}
 if _depart:
     _f0 = _vrai_open("carnet.txt", "w")
     for _l in _depart:

@@ -7,9 +7,9 @@ import { preludeDe, COLLECTE, type SceneConfig } from "@/components/eleve/scenes
 const PythonRunner = dynamic(() => import("@/components/editor/PythonRunner"), { ssr: false });
 const Scene = dynamic(() => import("@/components/eleve/scenes/Scene"), { ssr: false });
 
-const sc: SceneConfig = { decor: "cahier", reglages: { cahier_depart: ["Ama 14", "Kofi 11", "Yawa 16"] }, plafond: 200 };
-const SUJET = `<p>Page fraîche, aucun autre bloc n'a tourné. Le cahier doit pourtant contenir les notes d'hier.</p>
-<p>🎯 <strong>Ta mission</strong> — relire le cahier, afficher chaque note, puis annoncer combien il y en a.</p>`;
+const sc: SceneConfig = { decor: "cahier", reglages: {}, plafond: 200 };
+const SUJET = `<p>L'exercice exact sur lequel ça bloquait : séance 4, premier défi, cahier vide au départ.</p>
+<p>🎯 <strong>Ta mission</strong> — ajouter <code>f.close()</code> pour que la note arrive vraiment dans le cahier.</p>`;
 
 export default function Verif() {
   return (
@@ -18,8 +18,8 @@ export default function Verif() {
         <div style={{ color: "#94a3b8", fontSize: 14, lineHeight: 1.7, marginBottom: 16 }}
              dangerouslySetInnerHTML={{ __html: SUJET }} />
         <PythonRunner
-          starterCode={"# Relis le cahier, decoupe-le, affiche, et compte.\n"}
-          hiddenTests={'assert ".split(" in code, "Il faut redecouper le texte en lignes."\nfor n in ["Ama", "Kofi", "Yawa"]:\n    assert n in output, "Il manque " + n + "."\nassert "3" in output, "Il y a 3 notes."'}
+          starterCode={'f = open("carnet.txt", "w")\nf.write("Ama 14")\nprint("Ecrit !")\n'}
+          hiddenTests={'assert ".close(" in code, "Il faut fermer le cahier."\ngarde = _vrai_open("carnet.txt").read()\nassert garde == "Ama 14", "Le cahier devrait contenir Ama 14. Il contient : " + repr(garde)'}
           language="python"
           prelude={preludeDe(sc)}
           collect={COLLECTE[sc.decor]}
