@@ -123,26 +123,31 @@ function appliquer(svg: SVGElement, decor: Decor, journal: Evt[], jusqua: number
     return courant ? 700 : 0;
   }
 
-  // cahier
-  const notes: string[] = [];
-  let cahier: string[] = [], nuit = false;
+  // cahier — l'enfant écrit de vrais fichiers, le prélude enveloppe `open`
+  let surTable = 0, lignes: string[] = [], nuit = false;
   for (const e of vus) {
-    if (e.quoi === "ajouter") notes.push(String(e.texte));
-    if (e.quoi === "noter") cahier = (e.lignes as string[]) ?? [];
-    if (e.quoi === "relire") notes.push(...((e.lignes as string[]) ?? []));
-    if (e.quoi === "fermer") { notes.length = 0; nuit = true; }
+    if (e.quoi === "ajouter") surTable++;
+    if (e.quoi === "effacer") lignes = [];                       // open(..., "w") vide le cahier
+    if (e.quoi === "noter") lignes.push(String(e.texte));
+    if (e.quoi === "relire") surTable += String(e.texte ?? "").split("\n").filter((x) => x.trim()).length;
+    if (e.quoi === "fermer") { surTable = 0; nuit = true; }
   }
   for (let i = 1; i <= 5; i++) {
     const g = $(`note-${i}`);
     if (!g) continue;
-    g.setAttribute("opacity", i <= notes.length ? "1" : "0");
-    g.style.transform = nuit && i > notes.length ? "translate(-110px,-205px) rotate(-24deg)" : "";
+    g.setAttribute("opacity", i <= surTable ? "1" : "0");
+    g.style.transform = nuit && i > surTable ? "translate(-110px,-205px) rotate(-24deg)" : "";
   }
-  for (let i = 1; i <= 4; i++) pose(`ligne-${i}`, "opacity", i <= cahier.length ? 1 : 0);
+  for (let i = 1; i <= 4; i++) {
+    const t = $(`ligne-${i}`);
+    if (!t) continue;
+    t.setAttribute("opacity", i <= lignes.length ? "1" : "0");
+    if (i <= lignes.length) t.textContent = lignes[i - 1].replace(/\n/g, " ").trim().slice(0, 14);
+  }
   for (const id of ["ciel-nuit", "lampe-allumee", "lueur-lampe"]) pose(id, "opacity", nuit ? 1 : 0);
   pose("nuit", "opacity", nuit ? 0.78 : 0);
   pose("plume", "opacity", courant?.quoi === "noter" ? 1 : 0);
-  return courant ? 700 : 0;
+  return courant ? 650 : 0;
 }
 
 export default function Scene({ scene, recolte, enMarche, plante = false, stdout }: Props) {

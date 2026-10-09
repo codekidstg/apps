@@ -82,27 +82,44 @@ def refuser(papier):
 `);
   }
 
+  // ── Le cahier ─────────────────────────────────────────────────────────
+  // L'enfant écrit de VRAIS fichiers : open, write, close, read. Vérifié dans
+  // le navigateur — ils marchent, ils survivent d'une exécution à l'autre, et
+  // sans close() le fichier reste vide.
+  //
+  // Le prélude n'invente donc aucune commande : il enveloppe `open` pour que
+  // la scène sache ce qui se passe. Le `class` ci-dessous ne sort jamais du
+  // prélude : l'enfant ne le voit pas, et il n'est pas dans sa liste de mots.
   return (
     COMPTEUR(plafond, "Qu'est-ce qui devrait changer, dans ta boucle ?") +
     `
-_cahier = []
+_vrai_open = open
+notes = []
 
-def ajouter(notes, texte):
-    """Pose une note sur la table — en memoire."""
+class _Cahier:
+    def __init__(self, f):
+        self._f = f
+    def write(self, texte):
+        _evt({"quoi": "noter", "texte": str(texte)})
+        return self._f.write(texte)
+    def read(self):
+        contenu = self._f.read()
+        _evt({"quoi": "relire", "texte": contenu})
+        return contenu
+    def close(self):
+        return self._f.close()
+
+def open(nom, mode="r"):
+    """Le vrai open de Python. La scene regarde par-dessus l'epaule."""
+    if "w" in mode:
+        _evt({"quoi": "effacer"})
+    return _Cahier(_vrai_open(nom, mode))
+
+def ajouter(texte):
+    """Pose une note sur la table — en memoire, donc fragile."""
     notes.append(texte)
     _evt({"quoi": "ajouter", "texte": str(texte)})
     return notes
-
-def ecrire_cahier(notes):
-    """Recopie la memoire dans le cahier. Ce qui etait ecrit avant est perdu."""
-    global _cahier
-    _cahier = list(notes)
-    _evt({"quoi": "noter", "lignes": list(_cahier)})
-
-def lire_cahier():
-    """Rend ce que le cahier a garde."""
-    _evt({"quoi": "relire", "lignes": list(_cahier)})
-    return list(_cahier)
 
 def fermer():
     """La nuit tombe : ce qui n'est pas dans le cahier s'envole."""
@@ -114,5 +131,5 @@ def fermer():
 export const COLLECTE: Record<Decor, string[]> = {
   forage: ["_journal", "poids", "minutes"],
   etal: ["_journal"],
-  cahier: ["_journal", "_cahier"],
+  cahier: ["_journal", "notes"],
 };
