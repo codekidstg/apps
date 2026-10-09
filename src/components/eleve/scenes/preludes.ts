@@ -93,7 +93,8 @@ def refuser(papier):
   return (
     COMPTEUR(plafond, "Qu'est-ce qui devrait changer, dans ta boucle ?") +
     `
-_vrai_open = open
+import builtins as _b
+_vrai_open = _b.open   # le VRAI open, pas le wrapper de l'execution precedente
 notes = []
 
 class _Cahier:

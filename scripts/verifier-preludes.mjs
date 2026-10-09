@@ -52,6 +52,13 @@ for (const l of lecons) {
     // juste après, parce qu'une amorce doit toujours pouvoir tourner telle
     // quelle — c'est ce que l'enfant voit en arrivant.
     cas.push({ code: "", tests: "", reponses: [], prelude: preludeDe(c.scene) });
+    // Le worker garde ses globales et REJOUE le prélude à chaque exécution,
+    // et à chaque saisie. Un prélude qui enveloppe une fonction de Python doit
+    // donc survivre à son propre rejeu — sinon il finit par s'appeler
+    // lui-même. C'est arrivé, et une seule exécution ne le voyait pas.
+    etiquettes.push(`${ou} [prélude rejoué]`);
+    cas.push({ code: preludeDe(c.scene) + "\n_t = open('_essai.txt', 'w')\n_t.write('x')\n_t.close()\n",
+               tests: "", reponses: [], prelude: preludeDe(c.scene) });
     // Une amorce a le droit de planter — c'est même parfois toute la leçon,
     // comme la boutique qui s'éteint avant qu'on ait posé le filet. Mais alors
     // la consigne doit le DIRE : un enfant ne doit jamais rencontrer un écran
