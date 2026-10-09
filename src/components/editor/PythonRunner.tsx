@@ -29,7 +29,15 @@ type Props = {
    * téléphone ou d'ordinateur ; les erreurs et les questions restent en clair,
    * en dessous, là où elles se lisent.
    */
-  rendreSortie?: (stdout: string, enMarche: boolean, recolte: Record<string, unknown> | null) => React.ReactNode;
+  rendreSortie?: (stdout: string, enMarche: boolean, recolte: Record<string, unknown> | null, plante: boolean) => React.ReactNode;
+  /**
+   * Garder l'affichage quand le programme plante.
+   *
+   * Par défaut on l'efface : l'atelier montre un écran de téléphone, et un
+   * écran figé à côté d'une erreur rouge n'aide personne. Mais une scène, si :
+   * la boutique qui s'éteint au milieu de la file EST le sujet de la leçon.
+   */
+  garderSortieSiPlante?: boolean;
   /**
    * Code exécuté avant celui de l'enfant. C'est lui qui définit les commandes
    * d'une scène — `tirer()`, `encaisser()` — et le journal qu'elles remplissent.
@@ -96,6 +104,7 @@ export default function PythonRunner({
   libre = false,
   theme,
   rendreSortie,
+  garderSortieSiPlante = false,
   prelude,
   collect,
   onSortie,
@@ -191,6 +200,10 @@ export default function PythonRunner({
         setStatus("success");
         if (ok) onSuccess?.();
       } else {
+        // Le programme a plante, mais il a vecu avant : son journal raconte ce
+        // qui s'est passe jusqu'a l'erreur. C'est tout ce qu'une scene a besoin
+        // de savoir pour montrer la boutique s'eteindre au milieu de la file.
+        setRecolte((e.data.collected as Record<string, unknown>) ?? null);
         setErrMsg(e.data.error as string);
         setStatus("error");
       }
@@ -319,7 +332,7 @@ export default function PythonRunner({
       </div>
 
       {/* L'écran de l'atelier : il ne montre que ce que le programme affiche. */}
-      {rendreSortie && !errMsg && rendreSortie(stdout, isLoading, recolte)}
+      {rendreSortie && (!errMsg || garderSortieSiPlante) && rendreSortie(stdout, isLoading, recolte, !!errMsg)}
 
       {/* Console output */}
       {((stdout && !rendreSortie) || errMsg || hintMsg) && (

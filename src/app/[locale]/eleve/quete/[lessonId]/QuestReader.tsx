@@ -503,9 +503,10 @@ export default function QuestReader({ lessonId, title, blocks, alreadyCompleted,
                         onSuccess={() => markCodeDone(block.id)}
                         prelude={sc ? preludeDe(sc) : undefined}
                         collect={sc ? COLLECTE[sc.decor] : undefined}
+                        garderSortieSiPlante={!!sc}
                         rendreSortie={sc
-                          ? (out, enMarche, recolte) => (
-                              <Scene scene={sc} recolte={recolte} enMarche={enMarche} stdout={out} />)
+                          ? (out, enMarche, recolte, plante) => (
+                              <Scene scene={sc} recolte={recolte} enMarche={enMarche} plante={plante} stdout={out} />)
                           : undefined}
                       />
                     );

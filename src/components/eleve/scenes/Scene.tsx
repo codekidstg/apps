@@ -31,6 +31,8 @@ type Props = {
   /** Ce que le prélude a rapporté. `null` tant que rien n'a tourné. */
   recolte: Record<string, unknown> | null;
   enMarche: boolean;
+  /** Le programme s'est arrêté sur une erreur. À l'étal, le courant saute. */
+  plante?: boolean;
   /** La sortie texte, affichée sous la scène : les print() comptent encore. */
   stdout?: string;
 };
@@ -53,7 +55,7 @@ const nb = (v: unknown, defaut = 0) => (typeof v === "number" ? v : defaut);
  * `jusqua = -1` remet tout à neuf. Rend la durée à attendre avant le suivant.
  */
 function appliquer(svg: SVGElement, decor: Decor, journal: Evt[], jusqua: number,
-                   reglages: Record<string, unknown>): number {
+                   reglages: Record<string, unknown>, plante = false): number {
   const $ = (id: string) => svg.querySelector<SVGElement>(`#${id}`);
   const pose = (id: string, attr: string, v: string | number) => $(id)?.setAttribute(attr, String(v));
   const vus = journal.slice(0, jusqua + 1);
@@ -96,6 +98,28 @@ function appliquer(svg: SVGElement, decor: Decor, journal: Evt[], jusqua: number
     pose("papier", "transform", courant ? "translate(96 -34) scale(.9)" : "translate(0 0)");
     pose("tampon-refus", "opacity", courant?.quoi === "refuser" ? 1 : 0);
     pose("tiroir", "transform", courant?.quoi === "encaisser" ? "translate(0 10)" : "translate(0 0)");
+    // Le délestage : il n'arrive qu'au tout dernier événement, parce que le
+    // programme s'est arrêté là. L'ampoule, le ventilateur et les clients
+    // restants partent ensemble.
+    const fini = jusqua >= journal.length - 1;
+    const noir = plante && fini;
+    // Le papier qui a tué la boutique n'a jamais produit d'événement : le
+    // programme est mort avant de l'encaisser. On le retrouve par sa place
+    // dans la file, et on le laisse en l'air, figé, sous les yeux de l'enfant.
+    if (noir) {
+      const liste = (reglages.papiers as string[]) ?? [];
+      const coupable = liste[passes];
+      if (coupable !== undefined && papier) {
+        papier.textContent = `"${coupable}"`;
+        pose("papier", "opacity", 1);
+        pose("papier", "transform", "translate(96 -34) scale(.9)");
+        pose("tampon-refus", "opacity", 0);
+      }
+    }
+    pose("nuit", "opacity", noir ? 0.92 : 0);
+    pose("ampoule", "opacity", noir ? 0 : 1);
+    pose("halo", "opacity", noir ? 0 : 1);
+    svg.querySelector("#pales")?.setAttribute("style", noir ? "animation-duration:6s" : "");
     return courant ? 700 : 0;
   }
 
@@ -121,7 +145,7 @@ function appliquer(svg: SVGElement, decor: Decor, journal: Evt[], jusqua: number
   return courant ? 700 : 0;
 }
 
-export default function Scene({ scene, recolte, enMarche, stdout }: Props) {
+export default function Scene({ scene, recolte, enMarche, plante = false, stdout }: Props) {
   const boite = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGElement | null>(null);
   const joue = useRef(-1);
@@ -156,12 +180,12 @@ export default function Scene({ scene, recolte, enMarche, stdout }: Props) {
     if (!svg) return;
     const suite = (i: number) => {
       if (i >= journal.length) return;
-      const attente = appliquer(svg, scene.decor, journal, i, reglages);
+      const attente = appliquer(svg, scene.decor, journal, i, reglages, plante);
       joue.current = i;
       minuteur.current = setTimeout(() => suite(i + 1), attente);
     };
     suite(depuis);
-  }, [journal, scene.decor, reglages]);
+  }, [journal, scene.decor, reglages, plante]);
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -171,17 +195,17 @@ export default function Scene({ scene, recolte, enMarche, stdout }: Props) {
     // Rien n'a encore tourné, ou le programme repart : on remet à neuf.
     if (journal.length === 0 || journal.length <= joue.current) {
       joue.current = -1;
-      appliquer(svg, scene.decor, journal, -1, reglages);
+      appliquer(svg, scene.decor, journal, -1, reglages, plante);
       if (journal.length === 0) return;
     }
     const sobre = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (sobre) {
-      appliquer(svg, scene.decor, journal, journal.length - 1, reglages);
+      appliquer(svg, scene.decor, journal, journal.length - 1, reglages, plante);
       joue.current = journal.length - 1;
       return;
     }
     derouler(joue.current + 1);
-  }, [journal, pret, scene.decor, reglages, derouler]);
+  }, [journal, pret, scene.decor, reglages, plante, derouler]);
 
   return (
     <div className="space-y-2">
