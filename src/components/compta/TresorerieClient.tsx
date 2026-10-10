@@ -22,8 +22,8 @@ function fmtDate(iso: string) {
 // Lecture seule, sauf pour l'admin qui peut la supprimer. C'est un paiement
 // réel : la suppression change les totaux et ne se rattrape pas, d'où la
 // confirmation en deux temps plutôt que la croix immédiate des lignes saisies.
-function AutoLine({ id, name, label, date, amount, sign, kind, isAdmin, onDeleted }: {
-  id: string; name: string; label: string; date: string; amount: number;
+function AutoLine({ id, name, label, date, seanceDu, amount, sign, kind, isAdmin, onDeleted }: {
+  id: string; name: string; label: string; date: string; seanceDu?: string; amount: number;
   sign: "+" | "−"; kind: "mentor" | "parent"; isAdmin?: boolean; onDeleted: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -46,7 +46,14 @@ function AutoLine({ id, name, label, date, amount, sign, kind, isAdmin, onDelete
         <div className="text-xs text-gray-400 font-semibold shrink-0 w-24 tabular-nums">{fmtDate(date)}</div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-gray-800 truncate">{name}</div>
-          <div className="text-[11px] text-gray-400 truncate">{label}</div>
+          {/* La date de gauche est celle du règlement. Sans rappeler la séance
+              réglée, « payé le 5 octobre » ne dit pas à quoi ça correspond. */}
+          <div className="text-[11px] text-gray-400 truncate">
+            {label}
+            {seanceDu && seanceDu.slice(0, 10) !== date.slice(0, 10) && (
+              <span className="text-gray-300"> · séance du {fmtDate(seanceDu)}</span>
+            )}
+          </div>
         </div>
         <span className={`font-black text-sm shrink-0 tabular-nums ${color}`}>
           {sign}{fmt(amount)}
@@ -246,7 +253,7 @@ const PRESETS = [
 function SectionCard({ title, total, autoLines, autoKind, manualLines, type, sign, isAdmin }: {
   title: string;
   total: number;
-  autoLines: { id: string; name: string; label: string; date: string; amount_fcfa: number }[];
+  autoLines: { id: string; name: string; label: string; date: string; seanceDu?: string; amount_fcfa: number }[];
   /** Table d'origine des lignes auto — dit laquelle supprimer. */
   autoKind: "mentor" | "parent";
   manualLines: ManualLine[];
@@ -284,6 +291,7 @@ function SectionCard({ title, total, autoLines, autoKind, manualLines, type, sig
               name={l.name}
               label={l.label}
               date={l.date}
+              seanceDu={l.seanceDu}
               amount={l.amount_fcfa}
               sign={sign}
               kind={autoKind}
